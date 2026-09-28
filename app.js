@@ -1,6 +1,7 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V6.0
+   EHSEBLI / HONDA FINANCIAL MANAGER V6.1
    Super Admin + Search + Individual Permissions + Live Sync
+   + Bug Fix: New users now properly saved to Firestore
    ========================================================= */
 
 /* =========================================================
@@ -252,13 +253,14 @@ function applyRoleUI() {
 }
 
 /* =========================================================
-   USER ROLE LOAD
+   USER ROLE LOAD (v6.1 - Fixed: No query for new users)
    ========================================================= */
 async function loadUserRole(uid) {
   try {
     const userEmail = (currentUser.email || '').toLowerCase().trim();
     isSuperAdmin = isSuperAdminEmail(userEmail);
 
+    // 👑 Super Admin handling
     if (isSuperAdmin) {
       userRole = 'admin';
       currentUserPermissionsOverride = null;
@@ -272,34 +274,32 @@ async function loadUserRole(uid) {
       return;
     }
 
+    // 📄 Read existing user doc (own doc only — allowed by rules)
     const doc = await db.collection('users').doc(uid).get();
 
     if (doc.exists && doc.data().role && ROLES_META[doc.data().role]) {
+      // ✅ موجود بالفعل
       userRole = doc.data().role;
       currentUserPermissionsOverride = doc.data().permissionsOverride || null;
-      
+
+      // 🛡️ حماية إضافية: بس Super Admin يقدر يبقى admin
       if (userRole === 'admin' && !isSuperAdmin) {
-        const allUsers = await db.collection('users').get();
-        const otherAdmins = allUsers.docs.filter(d => d.id !== uid && d.data().role === 'admin');
-        if (otherAdmins.length > 0) {
-          userRole = 'free';
-          currentUserPermissionsOverride = null;
-        }
+        userRole = 'free';
       }
-      
+
+      // تحديث آخر تسجيل دخول بدون تغيير دور
       await db.collection('users').doc(uid).set({
         email: currentUser.email,
         displayName: currentUser.displayName || '',
         lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
     } else {
-      const allUsers = await db.collection('users').limit(2).get();
-      const otherUsers = allUsers.docs.filter(d => d.id !== uid);
-      userRole = otherUsers.length === 0 ? 'admin' : 'free';
+      // 🆕 مستخدم جديد → افتراضي "مجاني" (بدون query على كل المستخدمين)
+      userRole = 'free';
       currentUserPermissionsOverride = null;
 
       await db.collection('users').doc(uid).set({
-        role: userRole,
+        role: 'free',
         email: currentUser.email,
         displayName: currentUser.displayName || '',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -399,7 +399,7 @@ async function renderUsersList() {
     users.sort((a, b) => a.priority - b.priority);
 
     if (searchCount) {
-      searchCount.textContent = q ? `${users.length} نتيجة` : '';
+      searchCount.textContent = q ? `${users.length} نتيجة` : `${users.length} مستخدم`;
     }
 
     if (!users.length) {
@@ -1749,7 +1749,7 @@ function downloadBackup() {
   if (!hasFeature('backup')) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '6.0',
+    version: '6.1',
     createdAt: new Date().toISOString(),
     userEmail: currentUser.email,
     userRole: userRole,
