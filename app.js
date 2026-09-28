@@ -1,6 +1,6 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V5.0
-   Super Admin + Flexible Roles + Maximum Data Security
+   EHSEBLI / HONDA FINANCIAL MANAGER V6.0
+   Super Admin + Search + Individual Permissions + Live Sync
    ========================================================= */
 
 /* =========================================================
@@ -54,6 +54,10 @@ let syncPending = false;
 let authResolved = false;
 
 let adminActiveTab = 'users';
+let usersSearchQuery = '';
+let editingUserPermissions = null;
+let currentUserPermissionsOverride = null;
+let userDocUnsubscribe = null;
 
 /* =========================================================
    ROLES META
@@ -105,7 +109,6 @@ function escapeHTML(value) {
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
-/* 🛡️ تنظيف النصوص من أي رموز خطرة */
 function sanitizeString(str, maxLength = 500) {
   return String(str || '').replace(/[\u0000-\u001F\u007F]/g, '').slice(0, maxLength).trim();
 }
@@ -118,7 +121,6 @@ function isSuperAdminEmail(email) {
   return SUPER_ADMIN_EMAILS.map(e => e.toLowerCase().trim()).includes(String(email || '').toLowerCase().trim());
 }
 
-/* 🛡️ تحقق من صحة بيانات العملية */
 function validateTransaction(t) {
   if (!t || typeof t !== 'object') return false;
   if (!t.id || typeof t.id !== 'string') return false;
@@ -129,7 +131,6 @@ function validateTransaction(t) {
   return true;
 }
 
-/* 🛡️ تطبيع العملية قبل الحفظ */
 function normalizeTransaction(t) {
   return {
     id: String(t.id).slice(0, 100),
@@ -151,16 +152,30 @@ function normalizeTransaction(t) {
    ========================================================= */
 function hasFeature(feature) {
   if (isSuperAdmin || userRole === 'admin') return true;
+  
+  if (currentUserPermissionsOverride && 
+      typeof currentUserPermissionsOverride[feature] === 'boolean') {
+    return currentUserPermissionsOverride[feature];
+  }
+  
   const perms = rolePermissions[userRole];
   if (!perms) return false;
   return perms[feature] === true;
 }
+
 function getMaxTransactions() {
   if (isSuperAdmin || userRole === 'admin') return -1;
+  
+  if (currentUserPermissionsOverride && 
+      typeof currentUserPermissionsOverride.maxTransactions === 'number') {
+    return currentUserPermissionsOverride.maxTransactions;
+  }
+  
   const perms = rolePermissions[userRole];
   if (!perms) return -1;
   return Number(perms.maxTransactions ?? -1);
 }
+
 function canAddMoreTransactions() {
   const max = getMaxTransactions();
   if (max === -1) return true;
@@ -246,6 +261,7 @@ async function loadUserRole(uid) {
 
     if (isSuperAdmin) {
       userRole = 'admin';
+      currentUserPermissionsOverride = null;
       await db.collection('users').doc(uid).set({
         role: 'admin',
         email: currentUser.email,
@@ -260,16 +276,17 @@ async function loadUserRole(uid) {
 
     if (doc.exists && doc.data().role && ROLES_META[doc.data().role]) {
       userRole = doc.data().role;
-      // حماية إضافية: لو حد حاول يخلي نفسه admin ومش super
+      currentUserPermissionsOverride = doc.data().permissionsOverride || null;
+      
       if (userRole === 'admin' && !isSuperAdmin) {
-        // نتحقق: هل هو أول مستخدم؟
         const allUsers = await db.collection('users').get();
         const otherAdmins = allUsers.docs.filter(d => d.id !== uid && d.data().role === 'admin');
         if (otherAdmins.length > 0) {
-          // فيه admin تاني، يعني ده كان لازم يكون super
           userRole = 'free';
+          currentUserPermissionsOverride = null;
         }
       }
+      
       await db.collection('users').doc(uid).set({
         email: currentUser.email,
         displayName: currentUser.displayName || '',
@@ -279,6 +296,7 @@ async function loadUserRole(uid) {
       const allUsers = await db.collection('users').limit(2).get();
       const otherUsers = allUsers.docs.filter(d => d.id !== uid);
       userRole = otherUsers.length === 0 ? 'admin' : 'free';
+      currentUserPermissionsOverride = null;
 
       await db.collection('users').doc(uid).set({
         role: userRole,
@@ -297,6 +315,7 @@ async function loadUserRole(uid) {
     } else {
       userRole = 'free';
     }
+    currentUserPermissionsOverride = null;
   }
 }
 
@@ -334,8 +353,14 @@ function closeAdminPanel() {
   modal.classList.remove('flex');
 }
 
+function filterUsersList() {
+  usersSearchQuery = (document.getElementById('usersSearchInput').value || '').trim().toLowerCase();
+  renderUsersList();
+}
+
 async function renderUsersList() {
   const container = document.getElementById('usersList');
+  const searchCount = document.getElementById('usersSearchCount');
   container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> جاري التحميل...</div>';
 
   try {
@@ -344,32 +369,54 @@ async function renderUsersList() {
 
     if (snap.empty) {
       container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400">لا يوجد مستخدمين</div>';
+      if (searchCount) searchCount.textContent = '';
       return;
     }
 
-    const users = [];
+    let users = [];
     snap.forEach(doc => {
       const data = doc.data();
       const emailLower = (data.email || '').toLowerCase().trim();
+      const nameLower = (data.displayName || '').toLowerCase().trim();
       const isSuper = isSuperAdminEmail(emailLower);
       const isMe = doc.id === currentUser.uid;
       const roleKey = data.role || 'free';
+      const hasOverride = data.permissionsOverride && Object.keys(data.permissionsOverride).length > 0;
 
       let priority = 3;
       if (isSuper) priority = 0;
       else if (roleKey === 'admin') priority = 1;
       else if (isMe) priority = 2;
 
-      users.push({ doc, data, isSuper, isMe, roleKey, priority, emailLower });
+      users.push({ doc, data, isSuper, isMe, roleKey, priority, emailLower, nameLower, hasOverride });
     });
+
+    const q = usersSearchQuery;
+    if (q) {
+      users = users.filter(u => u.emailLower.includes(q) || u.nameLower.includes(q));
+    }
 
     users.sort((a, b) => a.priority - b.priority);
 
-    users.forEach(({ doc, data, isSuper, isMe, roleKey }) => {
+    if (searchCount) {
+      searchCount.textContent = q ? `${users.length} نتيجة` : '';
+    }
+
+    if (!users.length) {
+      container.innerHTML = `
+        <div class="text-center py-8 text-xs text-slate-400">
+          <i class="fa-solid fa-magnifying-glass text-3xl mb-3 opacity-30"></i>
+          <p class="font-bold">لا توجد نتائج مطابقة</p>
+        </div>
+      `;
+      return;
+    }
+
+    users.forEach(({ doc, data, isSuper, isMe, roleKey, hasOverride }) => {
       const meta = ROLES_META[roleKey] || ROLES_META.free;
 
       const card = document.createElement('div');
-      card.className = 'p-3 rounded-xl border flex items-center justify-between gap-3 ' + (
+      card.className = 'p-3 rounded-xl border flex items-center justify-between gap-2 ' + (
         isSuper
           ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/40'
           : 'border-slate-200 dark:border-dark-750 bg-slate-50/50 dark:bg-dark-850/50'
@@ -393,16 +440,24 @@ async function renderUsersList() {
             ${isSuper ? '<i class="fa-solid fa-crown text-amber-500"></i>' : `<i class="fa-solid ${meta.icon}"></i>`}
             <span class="truncate">${escapeHTML(data.displayName || 'بدون اسم')}</span>
             ${isSuper ? '<span class="text-[9px] text-amber-500 font-black px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">👑 SUPER</span>' : ''}
+            ${hasOverride ? '<span class="text-[9px] text-cyan-500 font-black px-1.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/30">🎛️ خاص</span>' : ''}
             ${isMe ? '<span class="text-[9px] text-orange-500 font-black">(أنت)</span>' : ''}
           </div>
           <div class="text-[10px] text-slate-400 truncate mt-0.5">${escapeHTML(data.email || '')}</div>
           <div class="text-[9px] text-slate-500 mt-0.5">${lastLoginStr}</div>
         </div>
-        <select onchange="changeUserRole('${doc.id}', this.value)"
-                ${disabled ? 'disabled' : ''}
-                class="text-[10px] font-black rounded-lg px-2 py-1.5 border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}">
-          ${optionsHtml}
-        </select>
+        <div class="flex items-center gap-1 shrink-0">
+          <select onchange="changeUserRole('${doc.id}', this.value)"
+                  ${disabled ? 'disabled' : ''}
+                  class="text-[10px] font-black rounded-lg px-2 py-1.5 border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}">
+            ${optionsHtml}
+          </select>
+          <button onclick="openUserPermissionsModal('${doc.id}')"
+                  title="صلاحيات مخصصة"
+                  class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition flex items-center justify-center">
+            <i class="fa-solid fa-sliders text-xs"></i>
+          </button>
+        </div>
       `;
       container.appendChild(card);
     });
@@ -427,13 +482,8 @@ async function changeUserRole(uid, newRole) {
     const targetData = targetDoc.data() || {};
     const targetEmail = (targetData.email || '').toLowerCase().trim();
 
-    if (isSuperAdminEmail(targetEmail) && newRole !== 'admin') {
-      showToast('لا يمكن تعديل صلاحيات Super Admin 🛡️', 'error');
-      renderUsersList();
-      return;
-    }
     if (isSuperAdminEmail(targetEmail)) {
-      showToast('دور Super Admin ثابت 🛡️', 'info');
+      showToast('لا يمكن تعديل صلاحيات Super Admin 🛡️', 'error');
       renderUsersList();
       return;
     }
@@ -451,6 +501,185 @@ async function changeUserRole(uid, newRole) {
   }
 }
 
+/* =========================================================
+   USER PERMISSIONS OVERRIDE MODAL
+   ========================================================= */
+async function openUserPermissionsModal(uid) {
+  if (userRole !== 'admin') { showToast('غير مصرح', 'error'); return; }
+  
+  try {
+    const doc = await db.collection('users').doc(uid).get();
+    if (!doc.exists) { showToast('المستخدم غير موجود', 'error'); return; }
+    
+    const data = doc.data();
+    const isSuper = isSuperAdminEmail(data.email);
+    
+    if (isSuper) {
+      showToast('لا يمكن تعديل صلاحيات Super Admin 🛡️', 'error');
+      return;
+    }
+    
+    editingUserPermissions = { uid, data };
+    
+    document.getElementById('userPermTitle').textContent = `صلاحيات: ${data.displayName || 'بدون اسم'}`;
+    document.getElementById('userPermEmail').textContent = data.email || '';
+    
+    const roleSelect = document.getElementById('userPermRole');
+    const currentRole = data.role || 'free';
+    Array.from(roleSelect.options).forEach(opt => {
+      opt.selected = opt.value === currentRole;
+    });
+    
+    renderUserPermOverrides(data.permissionsOverride || {});
+    
+    const modal = document.getElementById('userPermissionsModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  } catch (error) {
+    console.error(error);
+    showToast('فشل تحميل بيانات المستخدم', 'error');
+  }
+}
+
+function renderUserPermOverrides(override) {
+  const container = document.getElementById('userPermOverrides');
+  container.innerHTML = '';
+  
+  FEATURE_LIST.forEach(feature => {
+    const val = override[feature.key];
+    let state = 'inherit';
+    if (val === true) state = 'allow';
+    else if (val === false) state = 'deny';
+    
+    const row = document.createElement('div');
+    row.className = 'perm-row';
+    row.innerHTML = `
+      <div class="perm-row-label">
+        <i class="fa-solid ${feature.icon}"></i>
+        <span>${feature.label}</span>
+      </div>
+      <select class="perm-override-select" data-feature-override="${feature.key}">
+        <option value="inherit" ${state === 'inherit' ? 'selected' : ''}>🔵 حسب الدور</option>
+        <option value="allow" ${state === 'allow' ? 'selected' : ''}>🟢 مفعّل دايماً</option>
+        <option value="deny" ${state === 'deny' ? 'selected' : ''}>🔴 معطّل دايماً</option>
+      </select>
+    `;
+    container.appendChild(row);
+  });
+  
+  const maxVal = override.maxTransactions;
+  const maxDisplay = typeof maxVal === 'number' ? maxVal : '';
+  
+  const maxRow = document.createElement('div');
+  maxRow.className = 'perm-row';
+  maxRow.innerHTML = `
+    <div class="perm-row-label">
+      <i class="fa-solid fa-list-ol"></i>
+      <span>حد العمليات</span>
+    </div>
+    <input type="number" min="-1" step="1" 
+           class="perm-max-input" 
+           id="userPermMaxTx"
+           value="${maxDisplay}"
+           placeholder="حسب الدور">
+  `;
+  container.appendChild(maxRow);
+}
+
+function resetUserPermissionsOverride() {
+  if (!editingUserPermissions) return;
+  renderUserPermOverrides({});
+  const currentRole = editingUserPermissions.data.role || 'free';
+  const roleSelect = document.getElementById('userPermRole');
+  Array.from(roleSelect.options).forEach(opt => {
+    opt.selected = opt.value === currentRole;
+  });
+  showToast('تم إعادة تعيين الصلاحيات — اضغط حفظ للتأكيد', 'info');
+}
+
+function closeUserPermissionsModal() {
+  const modal = document.getElementById('userPermissionsModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+  editingUserPermissions = null;
+}
+
+async function saveUserPermissionsOverride() {
+  if (!editingUserPermissions) return;
+  if (userRole !== 'admin') { showToast('غير مصرح', 'error'); return; }
+  
+  const uid = editingUserPermissions.uid;
+  const newRole = document.getElementById('userPermRole').value;
+  
+  if (!ROLES_META[newRole]) {
+    showToast('دور غير صحيح', 'error');
+    return;
+  }
+  
+  const override = {};
+  
+  FEATURE_LIST.forEach(feature => {
+    const el = document.querySelector(`[data-feature-override="${feature.key}"]`);
+    if (!el) return;
+    const val = el.value;
+    if (val === 'allow') override[feature.key] = true;
+    else if (val === 'deny') override[feature.key] = false;
+  });
+  
+  const maxEl = document.getElementById('userPermMaxTx');
+  if (maxEl && maxEl.value.trim() !== '') {
+    const n = parseInt(maxEl.value, 10);
+    if (isFinite(n)) override.maxTransactions = Math.max(-1, Math.min(1000000, n));
+  }
+  
+  const hasOverride = Object.keys(override).length > 0;
+  
+  try {
+    await db.collection('users').doc(uid).update({
+      role: newRole,
+      permissionsOverride: hasOverride ? override : null,
+      permissionsUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      permissionsUpdatedBy: currentUser.uid
+    });
+    
+    showToast('تم حفظ الصلاحيات بنجاح ✓', 'success');
+    closeUserPermissionsModal();
+    renderUsersList();
+  } catch (error) {
+    console.error(error);
+    showToast('فشل حفظ الصلاحيات', 'error');
+  }
+}
+
+/* =========================================================
+   LIVE PERMISSIONS SYNC
+   ========================================================= */
+function subscribeToUserDoc(uid) {
+  if (userDocUnsubscribe) {
+    try { userDocUnsubscribe(); } catch(e) {}
+    userDocUnsubscribe = null;
+  }
+  
+  userDocUnsubscribe = db.collection('users').doc(uid).onSnapshot(doc => {
+    if (!doc.exists) return;
+    const data = doc.data();
+    
+    if (!isSuperAdmin && data.role && ROLES_META[data.role]) {
+      userRole = data.role;
+    }
+    
+    currentUserPermissionsOverride = data.permissionsOverride || null;
+    
+    applyRoleUI();
+    refreshAll();
+  }, err => {
+    console.warn('User doc snapshot error:', err);
+  });
+}
+
+/* =========================================================
+   ROLE PERMISSIONS EDITOR
+   ========================================================= */
 function renderPermissionsEditor() {
   const container = document.getElementById('permsList');
   container.innerHTML = '';
@@ -532,9 +761,9 @@ function togglePerm(btn) {
 async function saveRolePermissions() {
   if (userRole !== 'admin') { showToast('غير مصرح', 'error'); return; }
 
-  document.querySelectorAll('.perm-max-input').forEach(input => {
+  document.querySelectorAll('.perm-max-input[data-role]').forEach(input => {
     const roleKey = input.dataset.role;
-    if (roleKey === 'admin') return;
+    if (!roleKey || roleKey === 'admin') return;
     const raw = input.value.trim();
     const val = raw === '' ? -1 : Math.max(-1, Math.min(1000000, parseInt(raw, 10) || -1));
     if (!rolePermissions[roleKey]) rolePermissions[roleKey] = { ...DEFAULT_PERMISSIONS[roleKey] };
@@ -686,6 +915,8 @@ auth.onAuthStateChanged(async user => {
     refreshAll();
     switchTab('transactions');
 
+    subscribeToUserDoc(user.uid);
+
     loadCloudData(user.uid).finally(() => {
       if (getPin()) showPinLock();
       else hidePinLock();
@@ -694,7 +925,14 @@ auth.onAuthStateChanged(async user => {
     currentUser = null;
     userRole = 'free';
     isSuperAdmin = false;
+    currentUserPermissionsOverride = null;
     rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+    
+    if (userDocUnsubscribe) {
+      try { userDocUnsubscribe(); } catch(e) {}
+      userDocUnsubscribe = null;
+    }
+    
     hidePinLock();
     showLoginWall();
     footerSync.innerHTML = `<i class="fa-solid fa-database text-amber-500"></i> سجّل الدخول للمزامنة`;
@@ -1287,7 +1525,6 @@ function handleFormSubmit(event) {
   const reference = sanitizeString(document.getElementById('formReference').value, 50);
   const notes = sanitizeString(document.getElementById('formNotes').value, 200);
 
-  /* ✅ التحقق قبل الإضافة */
   if (!amount || amount <= 0 || amount > 1e9) { 
     showToast('يرجى إدخال مبلغ صحيح (أكبر من 0)', 'error'); 
     return; 
@@ -1301,7 +1538,6 @@ function handleFormSubmit(event) {
     return; 
   }
 
-  /* 🛡️ فحص الحد الأقصى — قبل الإضافة */
   if (!wasEditing && !canAddMoreTransactions()) {
     showToast(`وصلت للحد الأقصى (${getMaxTransactions()} عملية)`, 'error');
     return;
@@ -1513,7 +1749,7 @@ function downloadBackup() {
   if (!hasFeature('backup')) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '5.0',
+    version: '6.0',
     createdAt: new Date().toISOString(),
     userEmail: currentUser.email,
     userRole: userRole,
@@ -1552,7 +1788,6 @@ function restoreBackup(event) {
       let restored = Array.isArray(backup) ? backup : backup.transactions;
       if (!Array.isArray(restored)) throw new Error('Invalid backup');
 
-      // 🛡️ تصفية وفحص كل عملية
       restored = restored.filter(validateTransaction);
       if (!restored.length) throw new Error('No valid transactions');
 
@@ -1851,6 +2086,7 @@ document.addEventListener('keydown', event => {
     closeModal(); closeConfirm(); closeBackupModal();
     closeBudgetModal(); closePinModal(); closeMenus();
     closeAdminPanel();
+    closeUserPermissionsModal();
   }
 });
 

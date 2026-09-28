@@ -1,5 +1,5 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V5
+   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V6
    ========================================================= */
 
 * { box-sizing: border-box; }
@@ -350,6 +350,33 @@ body.not-authed #appFooter { display: none !important; }
   color: white;
 }
 .perm-max-input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, .12);
+}
+
+/* =========================================================
+   PERMISSION OVERRIDE SELECT (3-state)
+   ========================================================= */
+.perm-override-select {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  outline: none;
+  transition: .2s;
+  min-width: 130px;
+  text-align: center;
+}
+.dark .perm-override-select {
+  background: #1e222d;
+  border-color: #262b38;
+  color: white;
+}
+.perm-override-select:focus {
   border-color: #f97316;
   box-shadow: 0 0 0 3px rgba(249, 115, 22, .12);
 }
