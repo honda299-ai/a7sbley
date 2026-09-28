@@ -1,5 +1,5 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V7
+   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V8
    ========================================================= */
 
 * { box-sizing: border-box; }
@@ -376,4 +376,54 @@ body.not-authed #appFooter { display: none !important; }
 .perm-override-select:focus {
   border-color: #f97316;
   box-shadow: 0 0 0 3px rgba(249, 115, 22, .12);
+}
+
+/* =========================================================
+   LOGIN WALL TABS & PANELS
+   ========================================================= */
+.login-method-tab {
+  padding: 10px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #cbd5e1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: .2s;
+}
+.login-method-tab i { font-size: 14px; }
+.login-method-tab:hover { background: rgba(255,255,255,.05); color: white; }
+.login-method-tab.active {
+  background: linear-gradient(135deg, #ea580c, #f97316);
+  color: white;
+  box-shadow: 0 5px 15px rgba(249, 115, 22, .3);
+}
+
+.login-panel { animation: modalIn .2s ease; }
+
+.email-mode-tab {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #cbd5e1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: .2s;
+}
+.email-mode-tab:hover { color: white; }
+.email-mode-tab.active {
+  background: rgba(249, 115, 22, .15);
+  color: #f97316;
+}
+
+/* reCAPTCHA badge tweaks */
+.grecaptcha-badge {
+  visibility: hidden;
 }

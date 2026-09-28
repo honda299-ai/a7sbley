@@ -1,5 +1,6 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V7.0
+   EHSEBLI / HONDA FINANCIAL MANAGER V8.0
+   Google + Email/Password + Phone (OTP) Auth
    Super Admin + Search + Individual Permissions + Live Sync
    + Remove PIN + Forgot PIN Recovery
    ========================================================= */
@@ -59,7 +60,12 @@ let usersSearchQuery = '';
 let editingUserPermissions = null;
 let currentUserPermissionsOverride = null;
 let userDocUnsubscribe = null;
-let pendingPinRemoval = false;
+
+/* ---------- Auth State ---------- */
+let currentLoginMethod = 'google';
+let emailMode = 'signin';
+let confirmationResult = null;
+let recaptchaVerifier = null;
 
 /* =========================================================
    ROLES META
@@ -263,11 +269,12 @@ function updatePinUI() {
 }
 
 /* =========================================================
-   USER ROLE LOAD
+   USER ROLE LOAD (Supports Google, Email, Phone users)
    ========================================================= */
 async function loadUserRole(uid) {
   try {
     const userEmail = (currentUser.email || '').toLowerCase().trim();
+    const userPhone = currentUser.phoneNumber || '';
     isSuperAdmin = isSuperAdminEmail(userEmail);
 
     if (isSuperAdmin) {
@@ -278,6 +285,7 @@ async function loadUserRole(uid) {
         email: currentUser.email,
         displayName: currentUser.displayName || '',
         isSuperAdmin: true,
+        loginMethod: getLoginMethod(),
         lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
       return;
@@ -294,8 +302,10 @@ async function loadUserRole(uid) {
       }
 
       await db.collection('users').doc(uid).set({
-        email: currentUser.email,
-        displayName: currentUser.displayName || '',
+        email: currentUser.email || null,
+        phoneNumber: userPhone || null,
+        displayName: currentUser.displayName || doc.data().displayName || '',
+        loginMethod: getLoginMethod(),
         lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
     } else {
@@ -304,8 +314,10 @@ async function loadUserRole(uid) {
 
       await db.collection('users').doc(uid).set({
         role: 'free',
-        email: currentUser.email,
+        email: currentUser.email || null,
+        phoneNumber: userPhone || null,
         displayName: currentUser.displayName || '',
+        loginMethod: getLoginMethod(),
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
@@ -321,6 +333,16 @@ async function loadUserRole(uid) {
     }
     currentUserPermissionsOverride = null;
   }
+}
+
+function getLoginMethod() {
+  const user = auth.currentUser;
+  if (!user) return 'unknown';
+  const providers = (user.providerData || []).map(p => p.providerId);
+  if (providers.includes('google.com')) return 'google';
+  if (providers.includes('password')) return 'email';
+  if (providers.includes('phone')) return 'phone';
+  return 'unknown';
 }
 
 /* =========================================================
@@ -382,6 +404,7 @@ async function renderUsersList() {
       const data = doc.data();
       const emailLower = (data.email || '').toLowerCase().trim();
       const nameLower = (data.displayName || '').toLowerCase().trim();
+      const phoneLower = (data.phoneNumber || '').toLowerCase().trim();
       const isSuper = isSuperAdminEmail(emailLower);
       const isMe = doc.id === currentUser.uid;
       const roleKey = data.role || 'free';
@@ -392,12 +415,16 @@ async function renderUsersList() {
       else if (roleKey === 'admin') priority = 1;
       else if (isMe) priority = 2;
 
-      users.push({ doc, data, isSuper, isMe, roleKey, priority, emailLower, nameLower, hasOverride });
+      users.push({ doc, data, isSuper, isMe, roleKey, priority, emailLower, nameLower, phoneLower, hasOverride });
     });
 
     const q = usersSearchQuery;
     if (q) {
-      users = users.filter(u => u.emailLower.includes(q) || u.nameLower.includes(q));
+      users = users.filter(u => 
+        u.emailLower.includes(q) || 
+        u.nameLower.includes(q) ||
+        u.phoneLower.includes(q)
+      );
     }
 
     users.sort((a, b) => a.priority - b.priority);
@@ -438,16 +465,27 @@ async function renderUsersList() {
 
       const disabled = isMe || isSuper;
 
+      // Login method badge
+      const method = data.loginMethod || 'unknown';
+      let methodBadge = '';
+      if (method === 'google') methodBadge = '<span class="text-[8px] text-red-500 font-black px-1.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/30">G</span>';
+      else if (method === 'email') methodBadge = '<span class="text-[8px] text-blue-500 font-black px-1.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30">@</span>';
+      else if (method === 'phone') methodBadge = '<span class="text-[8px] text-emerald-500 font-black px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">📱</span>';
+
+      // Identifier (email or phone)
+      const identifier = data.email ? escapeHTML(data.email) : (data.phoneNumber ? '📱 ' + escapeHTML(data.phoneNumber) : 'بدون معرّف');
+
       card.innerHTML = `
         <div class="min-w-0 flex-1">
           <div class="text-xs font-black truncate flex items-center gap-1.5 flex-wrap">
             ${isSuper ? '<i class="fa-solid fa-crown text-amber-500"></i>' : `<i class="fa-solid ${meta.icon}"></i>`}
             <span class="truncate">${escapeHTML(data.displayName || 'بدون اسم')}</span>
+            ${methodBadge}
             ${isSuper ? '<span class="text-[9px] text-amber-500 font-black px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">👑 SUPER</span>' : ''}
             ${hasOverride ? '<span class="text-[9px] text-cyan-500 font-black px-1.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/30">🎛️ خاص</span>' : ''}
             ${isMe ? '<span class="text-[9px] text-orange-500 font-black">(أنت)</span>' : ''}
           </div>
-          <div class="text-[10px] text-slate-400 truncate mt-0.5">${escapeHTML(data.email || '')}</div>
+          <div class="text-[10px] text-slate-400 truncate mt-0.5">${identifier}</div>
           <div class="text-[9px] text-slate-500 mt-0.5">${lastLoginStr}</div>
         </div>
         <div class="flex items-center gap-1 shrink-0">
@@ -526,7 +564,7 @@ async function openUserPermissionsModal(uid) {
     editingUserPermissions = { uid, data };
     
     document.getElementById('userPermTitle').textContent = `صلاحيات: ${data.displayName || 'بدون اسم'}`;
-    document.getElementById('userPermEmail').textContent = data.email || '';
+    document.getElementById('userPermEmail').textContent = data.email || data.phoneNumber || '';
     
     const roleSelect = document.getElementById('userPermRole');
     const currentRole = data.role || 'free';
@@ -785,6 +823,386 @@ async function saveRolePermissions() {
 }
 
 /* =========================================================
+   LOGIN METHOD SWITCHING
+   ========================================================= */
+function switchLoginMethod(method) {
+  currentLoginMethod = method;
+  ['google', 'email', 'phone'].forEach(m => {
+    const tab = document.getElementById('loginTab' + m.charAt(0).toUpperCase() + m.slice(1));
+    const panel = document.getElementById('loginPanel' + m.charAt(0).toUpperCase() + m.slice(1));
+    if (tab) tab.classList.toggle('active', m === method);
+    if (panel) {
+      panel.classList.toggle('hidden', m !== method);
+      if (m === method) {
+        panel.classList.remove('hidden');
+      }
+    }
+  });
+
+  // Clear errors when switching
+  hideEmailError();
+  hidePhoneError();
+}
+
+function setEmailMode(mode) {
+  emailMode = mode;
+  document.getElementById('emailModeSignin').classList.toggle('active', mode === 'signin');
+  document.getElementById('emailModeSignup').classList.toggle('active', mode === 'signup');
+  
+  const signupFields = document.getElementById('signupOnlyFields');
+  const confirmPwd = document.getElementById('confirmPasswordWrapper');
+  const forgotBtn = document.getElementById('forgotPasswordBtn');
+  const submitText = document.getElementById('emailSubmitText');
+  const submitIcon = document.getElementById('emailSubmitIcon');
+  
+  if (mode === 'signup') {
+    signupFields.classList.remove('hidden');
+    confirmPwd.classList.remove('hidden');
+    forgotBtn.classList.add('hidden');
+    submitText.textContent = 'إنشاء الحساب';
+    submitIcon.className = 'fa-solid fa-user-plus';
+  } else {
+    signupFields.classList.add('hidden');
+    confirmPwd.classList.add('hidden');
+    forgotBtn.classList.remove('hidden');
+    submitText.textContent = 'تسجيل الدخول';
+    submitIcon.className = 'fa-solid fa-right-to-bracket';
+  }
+  
+  hideEmailError();
+}
+
+function togglePasswordVisibility(inputId) {
+  const input = document.getElementById(inputId);
+  const eye = document.getElementById(inputId + 'Eye');
+  if (!input || !eye) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    eye.className = 'fa-solid fa-eye-slash';
+  } else {
+    input.type = 'password';
+    eye.className = 'fa-solid fa-eye';
+  }
+}
+
+function showEmailError(msg) {
+  const el = document.getElementById('emailError');
+  if (el) {
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+}
+function hideEmailError() {
+  const el = document.getElementById('emailError');
+  if (el) el.classList.add('hidden');
+}
+function showPhoneError(msg) {
+  const el = document.getElementById('phoneError');
+  if (el) {
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+}
+function hidePhoneError() {
+  const el = document.getElementById('phoneError');
+  if (el) el.classList.add('hidden');
+}
+
+/* =========================================================
+   EMAIL AUTH
+   ========================================================= */
+async function submitEmailAuth() {
+  hideEmailError();
+  
+  const email = (document.getElementById('emailInput').value || '').trim().toLowerCase();
+  const password = document.getElementById('passwordInput').value || '';
+  const displayName = (document.getElementById('emailDisplayNameInput').value || '').trim();
+  const confirmPassword = document.getElementById('confirmPasswordInput').value || '';
+
+  // Validation
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showEmailError('❌ يرجى إدخال إيميل صحيح');
+    return;
+  }
+  if (!password || password.length < 6) {
+    showEmailError('❌ كلمة السر لازم تكون 6 أحرف على الأقل');
+    return;
+  }
+  
+  if (emailMode === 'signup') {
+    if (!displayName || displayName.length < 2) {
+      showEmailError('❌ يرجى إدخال اسمك الكامل');
+      return;
+    }
+    if (password !== confirmPassword) {
+      showEmailError('❌ كلمتي السر مش متطابقتين');
+      return;
+    }
+  }
+
+  const btn = document.getElementById('emailSubmitBtn');
+  const submitText = document.getElementById('emailSubmitText');
+  const submitIcon = document.getElementById('emailSubmitIcon');
+  
+  const originalText = submitText.textContent;
+  const originalIcon = submitIcon.className;
+  
+  btn.disabled = true;
+  submitIcon.className = 'fa-solid fa-spinner fa-spin';
+  submitText.textContent = emailMode === 'signup' ? 'جاري إنشاء الحساب...' : 'جاري الدخول...';
+
+  try {
+    if (emailMode === 'signup') {
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      if (cred.user && displayName) {
+        try {
+          await cred.user.updateProfile({ displayName });
+        } catch(e) { console.warn('updateProfile failed', e); }
+      }
+      showToast(`أهلاً بك يا ${displayName || 'صديقنا'} 🎉`, 'success');
+    } else {
+      const cred = await auth.signInWithEmailAndPassword(email, password);
+      showToast(`أهلاً بعودتك يا ${cred.user.displayName || 'صديقنا'} 👋`, 'success');
+    }
+    // auth.onAuthStateChanged handles the rest
+  } catch (error) {
+    console.error('Email auth error:', error);
+    let msg = '❌ تعذر إتمام العملية';
+    if (error.code === 'auth/email-already-in-use') msg = '❌ الإيميل مسجّل بالفعل — جرّب تسجيل الدخول';
+    else if (error.code === 'auth/invalid-email') msg = '❌ صيغة الإيميل غير صحيحة';
+    else if (error.code === 'auth/weak-password') msg = '❌ كلمة السر ضعيفة (6 أحرف على الأقل)';
+    else if (error.code === 'auth/user-not-found') msg = '❌ الإيميل غير مسجل — جرّب إنشاء حساب جديد';
+    else if (error.code === 'auth/wrong-password') msg = '❌ كلمة السر غير صحيحة';
+    else if (error.code === 'auth/invalid-credential') msg = '❌ الإيميل أو كلمة السر غير صحيحة';
+    else if (error.code === 'auth/too-many-requests') msg = '❌ تم تجاوز عدد المحاولات — حاول بعد قليل';
+    else if (error.code === 'auth/network-request-failed') msg = '❌ مشكلة في الاتصال بالإنترنت';
+    else if (error.code === 'auth/operation-not-allowed') msg = '❌ تسجيل الإيميل غير مفعل في Firebase';
+    else msg = '❌ ' + (error.message || error.code);
+    showEmailError(msg);
+  } finally {
+    btn.disabled = false;
+    submitText.textContent = originalText;
+    submitIcon.className = originalIcon;
+    setEmailMode(emailMode); // refresh button label
+  }
+}
+
+async function sendPasswordReset() {
+  hideEmailError();
+  const email = (document.getElementById('emailInput').value || '').trim().toLowerCase();
+  
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showEmailError('❌ اكتب الإيميل الأول في الخانة فوق');
+    return;
+  }
+  
+  try {
+    await auth.sendPasswordResetEmail(email);
+    showEmailError('✅ تم إرسال رابط إعادة التعيين لـ ' + email + ' — افتح الإيميل واتبع التعليمات');
+    const el = document.getElementById('emailError');
+    if (el) {
+      el.className = 'mt-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[10px] text-emerald-400 font-bold leading-relaxed';
+    }
+  } catch (error) {
+    console.error(error);
+    const el = document.getElementById('emailError');
+    if (el) el.className = 'mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-[10px] text-rose-400 font-bold leading-relaxed';
+    if (error.code === 'auth/user-not-found') showEmailError('❌ الإيميل غير مسجل');
+    else if (error.code === 'auth/invalid-email') showEmailError('❌ صيغة الإيميل غير صحيحة');
+    else showEmailError('❌ ' + (error.message || error.code));
+  }
+}
+
+/* =========================================================
+   PHONE AUTH
+   ========================================================= */
+function initRecaptcha() {
+  if (recaptchaVerifier) return recaptchaVerifier;
+  try {
+    recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptchaContainer', {
+      size: 'invisible',
+      callback: () => {},
+      'expired-callback': () => {
+        try { recaptchaVerifier.clear(); } catch(e) {}
+        recaptchaVerifier = null;
+      }
+    });
+    return recaptchaVerifier;
+  } catch (error) {
+    console.error('reCAPTCHA init error:', error);
+    return null;
+  }
+}
+
+async function sendPhoneOTP() {
+  hidePhoneError();
+  
+  const code = document.getElementById('phoneCountryCode').value || '+20';
+  let number = (document.getElementById('phoneNumberInput').value || '').replace(/[^\d]/g, '');
+  
+  if (!number || number.length < 7) {
+    showPhoneError('❌ يرجى إدخال رقم موبايل صحيح');
+    return;
+  }
+  
+  // Remove leading 0 for Egypt
+  if (code === '+20' && number.startsWith('0')) {
+    number = number.slice(1);
+  }
+  
+  const fullNumber = code + number;
+
+  const btn = document.getElementById('sendOtpBtn');
+  const text = document.getElementById('sendOtpText');
+  const icon = document.getElementById('sendOtpIcon');
+  const origText = text.textContent;
+  const origIcon = icon.className;
+
+  btn.disabled = true;
+  icon.className = 'fa-solid fa-spinner fa-spin';
+  text.textContent = 'جاري الإرسال...';
+
+  try {
+    const appVerifier = initRecaptcha();
+    if (!appVerifier) throw new Error('recaptcha-init-failed');
+
+    confirmationResult = await auth.signInWithPhoneNumber(fullNumber, appVerifier);
+    
+    // Move to step 2
+    document.getElementById('phoneStep1').classList.add('hidden');
+    document.getElementById('phoneStep2').classList.remove('hidden');
+    document.getElementById('otpInput').value = '';
+    setTimeout(() => document.getElementById('otpInput').focus(), 100);
+    showToast('تم إرسال الكود ✓', 'success');
+  } catch (error) {
+    console.error('Phone OTP error:', error);
+    let msg = '❌ تعذر إرسال الكود';
+    if (error.code === 'auth/invalid-phone-number') msg = '❌ رقم الهاتف غير صحيح';
+    else if (error.code === 'auth/too-many-requests') msg = '❌ تجاوزت الحد — حاول بعد قليل';
+    else if (error.code === 'auth/quota-exceeded') msg = '❌ تم استهلاك حد الرسائل اليومي';
+    else if (error.code === 'auth/captcha-check-failed') msg = '❌ فشل التحقق — أعد المحاولة';
+    else if (error.code === 'auth/operation-not-allowed') msg = '❌ تسجيل الموبايل غير مفعل في Firebase';
+    else if (error.message === 'recaptcha-init-failed') msg = '❌ فشل تهيئة reCAPTCHA — أعد تحميل الصفحة';
+    else msg = '❌ ' + (error.message || error.code);
+    showPhoneError(msg);
+    
+    // Reset recaptcha on error
+    try {
+      if (recaptchaVerifier) recaptchaVerifier.clear();
+    } catch(e) {}
+    recaptchaVerifier = null;
+  } finally {
+    btn.disabled = false;
+    text.textContent = origText;
+    icon.className = origIcon;
+  }
+}
+
+async function verifyPhoneOTP() {
+  hidePhoneError();
+  const code = (document.getElementById('otpInput').value || '').trim();
+  
+  if (!code || !/^\d{4,6}$/.test(code)) {
+    showPhoneError('❌ يرجى إدخال كود صحيح من 6 أرقام');
+    return;
+  }
+  
+  if (!confirmationResult) {
+    showPhoneError('❌ انتهت صلاحية الجلسة — أعد إرسال الكود');
+    changePhoneNumber();
+    return;
+  }
+
+  const btn = document.getElementById('verifyOtpBtn');
+  const text = document.getElementById('verifyOtpText');
+  const icon = document.getElementById('verifyOtpIcon');
+  const origText = text.textContent;
+  const origIcon = icon.className;
+
+  btn.disabled = true;
+  icon.className = 'fa-solid fa-spinner fa-spin';
+  text.textContent = 'جاري التحقق...';
+
+  try {
+    const result = await confirmationResult.confirm(code);
+    showToast(`أهلاً بك يا ${result.user.phoneNumber || 'صديقنا'} 👋`, 'success');
+    // auth.onAuthStateChanged handles the rest
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    let msg = '❌ الكود غير صحيح';
+    if (error.code === 'auth/invalid-verification-code') msg = '❌ الكود غير صحيح — تأكد منه';
+    else if (error.code === 'auth/code-expired') msg = '❌ الكود انتهت صلاحيته — أرسل كود جديد';
+    else if (error.code === 'auth/too-many-requests') msg = '❌ تجاوزت الحد — حاول بعد قليل';
+    else msg = '❌ ' + (error.message || error.code);
+    showPhoneError(msg);
+  } finally {
+    btn.disabled = false;
+    text.textContent = origText;
+    icon.className = origIcon;
+  }
+}
+
+function changePhoneNumber() {
+  document.getElementById('phoneStep1').classList.remove('hidden');
+  document.getElementById('phoneStep2').classList.add('hidden');
+  document.getElementById('otpInput').value = '';
+  hidePhoneError();
+}
+
+/* =========================================================
+   GOOGLE AUTH
+   ========================================================= */
+async function loginWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+
+  try {
+    const result = await auth.signInWithPopup(provider);
+    showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success');
+  } catch (error) {
+    console.error('Popup error:', error.code, error.message);
+
+    const fallbackCodes = [
+      'auth/popup-blocked',
+      'auth/popup-closed-by-user',
+      'auth/cancelled-popup-request',
+      'auth/operation-not-supported-in-this-environment',
+      'auth/web-storage-unsupported'
+    ];
+
+    if (fallbackCodes.includes(error.code) || /popup/i.test(error.message || '')) {
+      showToast('جاري تحويلك لتسجيل الدخول...', 'info');
+      try {
+        await auth.signInWithRedirect(provider);
+      } catch (redirectErr) {
+        console.error('Redirect error:', redirectErr);
+        showToast('تعذر تسجيل الدخول: ' + redirectErr.message, 'error');
+      }
+      return;
+    }
+
+    if (error.code === 'auth/unauthorized-domain') {
+      showToast('النطاق الحالي غير مصرح به', 'error');
+    } else if (error.code === 'auth/network-request-failed') {
+      showToast('مشكلة في الاتصال بالإنترنت', 'error');
+    } else {
+      showToast('تعذر تسجيل الدخول: ' + (error.message || error.code), 'error');
+    }
+  }
+}
+
+async function handleRedirectResult() {
+  try {
+    const result = await auth.getRedirectResult();
+    if (result && result.user) {
+      showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success');
+    }
+  } catch (error) {
+    console.error('Redirect result error:', error);
+  }
+}
+
+/* =========================================================
    CATEGORIES & DEMO
    ========================================================= */
 const CATEGORIES = {
@@ -810,7 +1228,7 @@ const DEMO_ITEMS = [
    ========================================================= */
 function requireAuth() {
   if (!currentUser) {
-    showToast('يجب تسجيل الدخول بحساب Google أولاً', 'error');
+    showToast('يجب تسجيل الدخول أولاً', 'error');
     return false;
   }
   return true;
@@ -850,6 +1268,7 @@ function showLoginWall() {
   document.getElementById('loginWall').classList.add('flex');
   document.getElementById('userProfile').classList.add('hidden');
   document.getElementById('userProfile').classList.remove('flex');
+  switchLoginMethod('google');
 }
 function hideLoginWall() {
   document.body.classList.remove('not-authed');
@@ -903,14 +1322,24 @@ auth.onAuthStateChanged(async user => {
     userProfile.classList.remove('hidden');
     userProfile.classList.add('flex');
 
-    avatar.src = user.photoURL || 'https://via.placeholder.com/40';
-    avatar.title = user.displayName || user.email;
+    // Avatar handling for different auth methods
+    if (user.photoURL) {
+      avatar.src = user.photoURL;
+      avatar.style.display = '';
+    } else {
+      // Generate a fallback avatar from initials
+      const initial = (user.displayName || user.email || user.phoneNumber || 'U').charAt(0).toUpperCase();
+      avatar.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%23f97316'/><text x='50%' y='55%' text-anchor='middle' dominant-baseline='middle' font-size='20' font-family='Cairo' fill='white' font-weight='bold'>${escapeHTML(initial)}</text></svg>`;
+      avatar.style.display = '';
+    }
+    avatar.title = user.displayName || user.email || user.phoneNumber || '';
 
     cloudStatus.classList.remove('hidden');
     cloudStatus.classList.add('flex');
-    syncEmail.textContent = user.email;
+    const userIdentifier = user.email || user.phoneNumber || 'مستخدم';
+    syncEmail.textContent = userIdentifier;
 
-    footerSync.innerHTML = `<i class="fa-solid fa-cloud-check text-emerald-500"></i> متصل بالسحاب (${escapeHTML(user.email)})`;
+    footerSync.innerHTML = `<i class="fa-solid fa-cloud-check text-emerald-500"></i> متصل بالسحاب (${escapeHTML(userIdentifier)})`;
 
     await loadUserRole(user.uid);
     await loadRolePermissions();
@@ -938,6 +1367,11 @@ auth.onAuthStateChanged(async user => {
       userDocUnsubscribe = null;
     }
     
+    // Reset recaptcha
+    try { if (recaptchaVerifier) recaptchaVerifier.clear(); } catch(e) {}
+    recaptchaVerifier = null;
+    confirmationResult = null;
+    
     hidePinLock();
     showLoginWall();
     footerSync.innerHTML = `<i class="fa-solid fa-database text-amber-500"></i> سجّل الدخول للمزامنة`;
@@ -947,58 +1381,8 @@ auth.onAuthStateChanged(async user => {
 });
 
 /* =========================================================
-   LOGIN / LOGOUT
+   LOGOUT
    ========================================================= */
-async function loginWithGoogle() {
-  const provider = new firebase.auth.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-
-  try {
-    const result = await auth.signInWithPopup(provider);
-    showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success');
-  } catch (error) {
-    console.error('Popup error:', error.code, error.message);
-
-    const fallbackCodes = [
-      'auth/popup-blocked',
-      'auth/popup-closed-by-user',
-      'auth/cancelled-popup-request',
-      'auth/operation-not-supported-in-this-environment',
-      'auth/web-storage-unsupported'
-    ];
-
-    if (fallbackCodes.includes(error.code) || /popup/i.test(error.message || '')) {
-      showToast('جاري تحويلك لتسجيل الدخول...', 'info');
-      try {
-        await auth.signInWithRedirect(provider);
-      } catch (redirectErr) {
-        console.error('Redirect error:', redirectErr);
-        showToast('تعذر تسجيل الدخول: ' + redirectErr.message, 'error');
-      }
-      return;
-    }
-
-    if (error.code === 'auth/unauthorized-domain') {
-      showToast('النطاق الحالي غير مصرح به', 'error');
-    } else if (error.code === 'auth/network-request-failed') {
-      showToast('مشكلة في الاتصال بالإنترنت', 'error');
-    } else {
-      showToast('تعذر تسجيل الدخول: ' + (error.message || error.code), 'error');
-    }
-  }
-}
-
-async function handleRedirectResult() {
-  try {
-    const result = await auth.getRedirectResult();
-    if (result && result.user) {
-      showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success');
-    }
-  } catch (error) {
-    console.error('Redirect result error:', error);
-  }
-}
-
 function logout() {
   if (!currentUser) return;
   openConfirm(
@@ -1754,9 +2138,10 @@ function downloadBackup() {
   if (!hasFeature('backup')) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '7.0',
+    version: '8.0',
     createdAt: new Date().toISOString(),
-    userEmail: currentUser.email,
+    userEmail: currentUser.email || null,
+    userPhone: currentUser.phoneNumber || null,
     userRole: userRole,
     transactions,
     budget: getBudget(),
@@ -1910,7 +2295,7 @@ function printReport() {
           <div>تقرير مالي</div>
           <div>${escapeHTML(periodName)}</div>
           <div>${todayString()}</div>
-          <div>${escapeHTML(currentUser?.email || '')}</div>
+          <div>${escapeHTML(currentUser?.email || currentUser?.phoneNumber || '')}</div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:25px;">
@@ -2044,27 +2429,53 @@ async function forgotPinUnlock() {
   }
   
   try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({ 
-      prompt: 'select_account',
-      login_hint: currentUser.email || ''
-    });
+    const user = currentUser;
+    const providers = (user.providerData || []).map(p => p.providerId);
+    let provider;
     
-    const result = await currentUser.reauthenticateWithPopup(provider);
+    // Use the same auth method as sign-in
+    if (providers.includes('google.com')) {
+      provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account', login_hint: user.email || '' });
+    } else if (providers.includes('password')) {
+      provider = new firebase.auth.EmailAuthProvider();
+      provider = firebase.auth.EmailAuthProvider.credentialProvider ? null : null;
+    } else if (providers.includes('phone')) {
+      showToast('مستخدمي الموبايل: قم بتسجيل الخروج والدخول من جديد لمسح PIN', 'info');
+      return;
+    }
     
-    if (result.user && result.user.uid === currentUser.uid) {
+    if (providers.includes('google.com')) {
+      const result = await user.reauthenticateWithPopup(provider);
+      if (result.user && result.user.uid === user.uid) {
+        localStorage.removeItem(PIN_KEY);
+        updatePinUI();
+        hidePinLock();
+        showToast('تم التحقق بنجاح — تم إلغاء القفل', 'success');
+      } else {
+        showToast('الحساب مختلف — تم رفض الطلب', 'error');
+      }
+    } else if (providers.includes('password')) {
+      // Ask for password
+      const pwd = prompt('أدخل كلمة السر الحالية لتأكيد هويتك:');
+      if (!pwd) {
+        showToast('تم إلغاء العملية', 'info');
+        return;
+      }
+      const cred = firebase.auth.EmailAuthProvider.credential(user.email, pwd);
+      await user.reauthenticateWithCredential(cred);
       localStorage.removeItem(PIN_KEY);
       updatePinUI();
       hidePinLock();
       showToast('تم التحقق بنجاح — تم إلغاء القفل', 'success');
-    } else {
-      showToast('الحساب مختلف — تم رفض الطلب', 'error');
     }
   } catch (error) {
     console.error('Reauth error:', error);
     
     if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
       showToast('تم إلغاء التحقق', 'info');
+    } else if (error.code === 'auth/wrong-password') {
+      showToast('كلمة السر غير صحيحة', 'error');
     } else if (error.code === 'auth/popup-blocked') {
       showToast('المتصفح منع النافذة — حاول تاني', 'error');
     } else if (error.code === 'auth/network-request-failed') {
