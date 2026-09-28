@@ -1,7 +1,14 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V2.2
-   Mandatory Google Auth + Cloud Sync + Hashed PIN + Soft Delete
+   EHSEBLI / HONDA FINANCIAL MANAGER V5.0
+   Super Admin + Flexible Roles + Maximum Data Security
    ========================================================= */
+
+/* =========================================================
+   👑 SUPER ADMIN EMAILS
+   ========================================================= */
+const SUPER_ADMIN_EMAILS = [
+  'hondastore299@gmail.com'
+];
 
 /* ---------- Firebase Config ---------- */
 const firebaseConfig = {
@@ -25,6 +32,7 @@ const THEME_KEY = 'ehsebli_theme_v2';
 const BUDGET_KEY = 'ehsebli_budget_v2';
 const PIN_KEY = 'ehsebli_pin_v2';
 const LAST_UID_KEY = 'ehsebli_last_uid';
+const PERMS_CACHE_KEY = 'ehsebli_perms_cache';
 
 /* ---------- State ---------- */
 let currentUser = null;
@@ -33,6 +41,8 @@ let activeFilter = 'all';
 let currentPeriod = 'all';
 let currentTab = 'transactions';
 let editingId = null;
+let userRole = 'free';
+let isSuperAdmin = false;
 
 let categoryChartInstance = null;
 let balanceChartInstance = null;
@@ -43,25 +53,37 @@ let syncInProgress = false;
 let syncPending = false;
 let authResolved = false;
 
-/* ---------- Categories ---------- */
-const CATEGORIES = {
-  expense: ['شغل وأدوات صيانة','تفعيل وسيرفرات وكريدت','أكل ومشروبات','مواصلات وبنزين','فواتير والتزامات','شخصي وعائلة','مشتريات','أخرى'],
-  income: ['خدمات سوفت وير وصيانة','شحن رصيد وتفعيل أدوات','شغل ريموت أونلاين','مبيعات إكسسوار وأجهزة','عمولة / وسيط','أرباح أخرى'],
-  charity: ['صدقة جارية لوجه الله','مساعدة محتاج وتفريج كربة','إطعام طعام','بر والدين وأهل','زكاة مال','أخرى'],
-  debt_receivable: ['حساب محل صيانة','سلف شخصي لصديق','باقي خدمة لعميل','مبيعات آجلة','أخرى'],
-  debt_payable: ['دين لمورد / موزّع سيرفر','سلف مستحق للغير','فاتورة مؤجلة','شراء آجل','أخرى']
+let adminActiveTab = 'users';
+
+/* =========================================================
+   ROLES META
+   ========================================================= */
+const ROLES_META = {
+  free:     { name: 'مجاني',  icon: 'fa-user',           badgeClasses: 'bg-slate-500/10 border-slate-500/30 text-slate-400' },
+  personal: { name: 'شخصي',   icon: 'fa-user-circle',    badgeClasses: 'bg-purple-500/10 border-purple-500/30 text-purple-400' },
+  work:     { name: 'شغل',    icon: 'fa-briefcase',      badgeClasses: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' },
+  pro:      { name: 'برو',    icon: 'fa-crown',          badgeClasses: 'bg-orange-500/10 border-orange-500/30 text-orange-400' },
+  admin:    { name: 'مدير',   icon: 'fa-shield-halved',  badgeClasses: 'bg-rose-500/10 border-rose-500/30 text-rose-400' }
 };
 
-/* ---------- Demo Data ---------- */
-const DEMO_ITEMS = [
-  { id:'demo-1', type:'income', amount:1200, category:'خدمات سوفت وير وصيانة', paymentMethod:'كاش نقدي', notes:'إصلاح بوت لودر وفلاش 3 أجهزة', reference:'INV-1001', date:offsetDate(-1) },
-  { id:'demo-2', type:'charity', amount:150, category:'مساعدة محتاج وتفريج كربة', paymentMethod:'كاش نقدي', notes:'صدقة شكر بنية الرزق والبركة', reference:'', date:offsetDate(-1) },
-  { id:'demo-3', type:'expense', amount:380, category:'تفعيل وسيرفرات وكريدت', paymentMethod:'إنستاباي (InstaPay)', notes:'تفعيل باقة دونجل وسيرفر شاومي', reference:'EXP-3001', date:offsetDate(-2) },
-  { id:'demo-4', type:'income', amount:950, category:'شغل ريموت أونلاين', paymentMethod:'إنستاباي (InstaPay)', notes:'خدمة ريموت لمحل المنصورة', reference:'INV-1002', date:offsetDate(-2) },
-  { id:'demo-5', type:'expense', amount:90, category:'أكل ومشروبات', paymentMethod:'فودافون كاش / محفظة', notes:'غداء ومشروبات الشغل', reference:'', date:offsetDate(-3) },
-  { id:'demo-6', type:'debt_receivable', amount:650, category:'حساب محل صيانة', paymentMethod:'آجل / معلق', notes:'محل البرنس - باقي حساب فلاش 4 أجهزة', reference:'', status:'pending', date:offsetDate(-4) },
-  { id:'demo-7', type:'debt_payable', amount:400, category:'دين لمورد / موزّع سيرفر', paymentMethod:'آجل / معلق', notes:'كريدت سيرفر من الموزع محمد', reference:'', status:'pending', date:offsetDate(-5) }
+const FEATURE_LIST = [
+  { key: 'charity', label: 'باب الخير',      icon: 'fa-hand-holding-heart', type: 'bool' },
+  { key: 'debts',   label: 'دفتر الديون',    icon: 'fa-handshake',           type: 'bool' },
+  { key: 'budget',  label: 'الميزانية',      icon: 'fa-wallet',              type: 'bool' },
+  { key: 'export',  label: 'تصدير CSV',      icon: 'fa-file-excel',          type: 'bool' },
+  { key: 'backup',  label: 'نسخ احتياطي',    icon: 'fa-database',            type: 'bool' },
+  { key: 'reports', label: 'تقارير PDF',     icon: 'fa-file-pdf',            type: 'bool' }
 ];
+
+const DEFAULT_PERMISSIONS = {
+  free:     { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true },
+  personal: { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true },
+  work:     { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true },
+  pro:      { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true },
+  admin:    { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true }
+};
+
+let rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
 
 /* =========================================================
    HELPERS
@@ -75,20 +97,483 @@ function offsetDate(days) {
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-function money(value) { return Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+function money(value) { 
+  return Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }); 
+}
 function escapeHTML(value) {
   return String(value ?? '')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+/* 🛡️ تنظيف النصوص من أي رموز خطرة */
+function sanitizeString(str, maxLength = 500) {
+  return String(str || '').replace(/[\u0000-\u001F\u007F]/g, '').slice(0, maxLength).trim();
 }
 function isDebt(type) { return String(type || '').startsWith('debt_'); }
 function typeName(type) {
   return ({ income:'دخل', expense:'مصروف', charity:'باب الخير', debt_receivable:'دين ليا', debt_payable:'دين عليا' })[type] || type;
 }
 function getActiveTransactions() { return transactions.filter(t => !t._deleted); }
+function isSuperAdminEmail(email) {
+  return SUPER_ADMIN_EMAILS.map(e => e.toLowerCase().trim()).includes(String(email || '').toLowerCase().trim());
+}
+
+/* 🛡️ تحقق من صحة بيانات العملية */
+function validateTransaction(t) {
+  if (!t || typeof t !== 'object') return false;
+  if (!t.id || typeof t.id !== 'string') return false;
+  if (!['income','expense','charity','debt_receivable','debt_payable'].includes(t.type)) return false;
+  const amt = Number(t.amount);
+  if (!isFinite(amt) || amt <= 0 || amt > 1e9) return false;
+  if (!t.date || !/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return false;
+  return true;
+}
+
+/* 🛡️ تطبيع العملية قبل الحفظ */
+function normalizeTransaction(t) {
+  return {
+    id: String(t.id).slice(0, 100),
+    type: t.type,
+    amount: Math.min(Math.max(Number(t.amount) || 0, 0), 1e9),
+    date: t.date,
+    category: sanitizeString(t.category, 100),
+    paymentMethod: sanitizeString(t.paymentMethod, 50),
+    reference: sanitizeString(t.reference, 50),
+    notes: sanitizeString(t.notes, 200),
+    status: t.status === 'paid' || t.status === 'pending' ? t.status : undefined,
+    _deleted: t._deleted === true ? true : undefined,
+    _updatedAt: Number(t._updatedAt) || Date.now()
+  };
+}
 
 /* =========================================================
-   AUTH GUARD
+   PERMISSION HELPERS
+   ========================================================= */
+function hasFeature(feature) {
+  if (isSuperAdmin || userRole === 'admin') return true;
+  const perms = rolePermissions[userRole];
+  if (!perms) return false;
+  return perms[feature] === true;
+}
+function getMaxTransactions() {
+  if (isSuperAdmin || userRole === 'admin') return -1;
+  const perms = rolePermissions[userRole];
+  if (!perms) return -1;
+  return Number(perms.maxTransactions ?? -1);
+}
+function canAddMoreTransactions() {
+  const max = getMaxTransactions();
+  if (max === -1) return true;
+  return getActiveTransactions().length < max;
+}
+
+async function loadRolePermissions() {
+  try {
+    const doc = await db.collection('config').doc('roles').get();
+    if (doc.exists && doc.data().permissions) {
+      const cloud = doc.data().permissions;
+      const merged = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+      Object.keys(merged).forEach(r => {
+        if (cloud[r]) merged[r] = { ...merged[r], ...cloud[r] };
+      });
+      rolePermissions = merged;
+    }
+    localStorage.setItem(PERMS_CACHE_KEY, JSON.stringify(rolePermissions));
+  } catch (error) {
+    console.warn('Could not load role permissions:', error);
+    try {
+      const cached = localStorage.getItem(PERMS_CACHE_KEY);
+      if (cached) rolePermissions = JSON.parse(cached);
+    } catch(e) {}
+  }
+  applyRoleUI();
+}
+
+async function saveRolePermissionsToCloud() {
+  if (!currentUser || userRole !== 'admin') {
+    showToast('غير مصرح', 'error');
+    return false;
+  }
+  try {
+    await db.collection('config').doc('roles').set({
+      permissions: rolePermissions,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: currentUser.uid
+    }, { merge: true });
+    localStorage.setItem(PERMS_CACHE_KEY, JSON.stringify(rolePermissions));
+    return true;
+  } catch (error) {
+    console.error('Save perms error:', error);
+    showToast('فشل الحفظ في السحابة', 'error');
+    return false;
+  }
+}
+
+/* =========================================================
+   APPLY ROLE UI
+   ========================================================= */
+function applyRoleUI() {
+  document.querySelectorAll('[data-feature]').forEach(el => {
+    el.style.display = hasFeature(el.dataset.feature) ? '' : 'none';
+  });
+
+  const adminBtn = document.getElementById('adminPanelBtn');
+  const adminDivider = document.getElementById('adminDivider');
+  const showAdmin = (userRole === 'admin');
+  if (adminBtn) adminBtn.style.display = showAdmin ? '' : 'none';
+  if (adminDivider) adminDivider.style.display = showAdmin ? '' : 'none';
+
+  const badge = document.getElementById('roleBadge');
+  if (badge) {
+    if (isSuperAdmin) {
+      badge.className = 'hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-500/40 text-amber-500';
+      badge.innerHTML = '<i class="fa-solid fa-crown"></i> Super Admin';
+    } else {
+      const meta = ROLES_META[userRole] || ROLES_META.free;
+      badge.className = `hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border ${meta.badgeClasses}`;
+      badge.innerHTML = `<i class="fa-solid ${meta.icon}"></i> ${meta.name}`;
+    }
+  }
+}
+
+/* =========================================================
+   USER ROLE LOAD
+   ========================================================= */
+async function loadUserRole(uid) {
+  try {
+    const userEmail = (currentUser.email || '').toLowerCase().trim();
+    isSuperAdmin = isSuperAdminEmail(userEmail);
+
+    if (isSuperAdmin) {
+      userRole = 'admin';
+      await db.collection('users').doc(uid).set({
+        role: 'admin',
+        email: currentUser.email,
+        displayName: currentUser.displayName || '',
+        isSuperAdmin: true,
+        lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      return;
+    }
+
+    const doc = await db.collection('users').doc(uid).get();
+
+    if (doc.exists && doc.data().role && ROLES_META[doc.data().role]) {
+      userRole = doc.data().role;
+      // حماية إضافية: لو حد حاول يخلي نفسه admin ومش super
+      if (userRole === 'admin' && !isSuperAdmin) {
+        // نتحقق: هل هو أول مستخدم؟
+        const allUsers = await db.collection('users').get();
+        const otherAdmins = allUsers.docs.filter(d => d.id !== uid && d.data().role === 'admin');
+        if (otherAdmins.length > 0) {
+          // فيه admin تاني، يعني ده كان لازم يكون super
+          userRole = 'free';
+        }
+      }
+      await db.collection('users').doc(uid).set({
+        email: currentUser.email,
+        displayName: currentUser.displayName || '',
+        lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    } else {
+      const allUsers = await db.collection('users').limit(2).get();
+      const otherUsers = allUsers.docs.filter(d => d.id !== uid);
+      userRole = otherUsers.length === 0 ? 'admin' : 'free';
+
+      await db.collection('users').doc(uid).set({
+        role: userRole,
+        email: currentUser.email,
+        displayName: currentUser.displayName || '',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+  } catch (error) {
+    console.error('Role load error:', error);
+    const userEmail = (currentUser?.email || '').toLowerCase().trim();
+    if (isSuperAdminEmail(userEmail)) {
+      userRole = 'admin';
+      isSuperAdmin = true;
+    } else {
+      userRole = 'free';
+    }
+  }
+}
+
+/* =========================================================
+   ADMIN PANEL
+   ========================================================= */
+function switchAdminTab(tab) {
+  adminActiveTab = tab;
+  const isUsers = tab === 'users';
+  document.getElementById('adminTabUsers').classList.toggle('active', isUsers);
+  document.getElementById('adminTabPerms').classList.toggle('active', !isUsers);
+  document.getElementById('adminPanelUsers').classList.toggle('hidden', !isUsers);
+  document.getElementById('adminPanelPerms').classList.toggle('hidden', isUsers);
+
+  if (isUsers) renderUsersList();
+  else renderPermissionsEditor();
+}
+
+async function openAdminPanel() {
+  if (userRole !== 'admin') {
+    showToast('هذه الصفحة للمدير فقط', 'error');
+    return;
+  }
+  closeMenus();
+  const modal = document.getElementById('adminModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  await loadRolePermissions();
+  switchAdminTab('users');
+}
+
+function closeAdminPanel() {
+  const modal = document.getElementById('adminModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+async function renderUsersList() {
+  const container = document.getElementById('usersList');
+  container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> جاري التحميل...</div>';
+
+  try {
+    const snap = await db.collection('users').get();
+    container.innerHTML = '';
+
+    if (snap.empty) {
+      container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400">لا يوجد مستخدمين</div>';
+      return;
+    }
+
+    const users = [];
+    snap.forEach(doc => {
+      const data = doc.data();
+      const emailLower = (data.email || '').toLowerCase().trim();
+      const isSuper = isSuperAdminEmail(emailLower);
+      const isMe = doc.id === currentUser.uid;
+      const roleKey = data.role || 'free';
+
+      let priority = 3;
+      if (isSuper) priority = 0;
+      else if (roleKey === 'admin') priority = 1;
+      else if (isMe) priority = 2;
+
+      users.push({ doc, data, isSuper, isMe, roleKey, priority, emailLower });
+    });
+
+    users.sort((a, b) => a.priority - b.priority);
+
+    users.forEach(({ doc, data, isSuper, isMe, roleKey }) => {
+      const meta = ROLES_META[roleKey] || ROLES_META.free;
+
+      const card = document.createElement('div');
+      card.className = 'p-3 rounded-xl border flex items-center justify-between gap-3 ' + (
+        isSuper
+          ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/40'
+          : 'border-slate-200 dark:border-dark-750 bg-slate-50/50 dark:bg-dark-850/50'
+      );
+
+      let lastLoginStr = 'لم يسجل بعد';
+      try {
+        const lastLogin = data.lastLoginAt && data.lastLoginAt.toDate ? data.lastLoginAt.toDate() : null;
+        if (lastLogin) lastLoginStr = `آخر دخول: ${lastLogin.toLocaleDateString('ar-EG')}`;
+      } catch(e) {}
+
+      const optionsHtml = Object.keys(ROLES_META).map(r =>
+        `<option value="${r}" ${roleKey === r ? 'selected' : ''}>${ROLES_META[r].name}</option>`
+      ).join('');
+
+      const disabled = isMe || isSuper;
+
+      card.innerHTML = `
+        <div class="min-w-0 flex-1">
+          <div class="text-xs font-black truncate flex items-center gap-1.5 flex-wrap">
+            ${isSuper ? '<i class="fa-solid fa-crown text-amber-500"></i>' : `<i class="fa-solid ${meta.icon}"></i>`}
+            <span class="truncate">${escapeHTML(data.displayName || 'بدون اسم')}</span>
+            ${isSuper ? '<span class="text-[9px] text-amber-500 font-black px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">👑 SUPER</span>' : ''}
+            ${isMe ? '<span class="text-[9px] text-orange-500 font-black">(أنت)</span>' : ''}
+          </div>
+          <div class="text-[10px] text-slate-400 truncate mt-0.5">${escapeHTML(data.email || '')}</div>
+          <div class="text-[9px] text-slate-500 mt-0.5">${lastLoginStr}</div>
+        </div>
+        <select onchange="changeUserRole('${doc.id}', this.value)"
+                ${disabled ? 'disabled' : ''}
+                class="text-[10px] font-black rounded-lg px-2 py-1.5 border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}">
+          ${optionsHtml}
+        </select>
+      `;
+      container.appendChild(card);
+    });
+  } catch (error) {
+    console.error('Users list error:', error);
+    container.innerHTML = '<div class="text-center py-4 text-xs text-rose-500"><i class="fa-solid fa-triangle-exclamation"></i> خطأ في تحميل المستخدمين</div>';
+  }
+}
+
+async function changeUserRole(uid, newRole) {
+  if (userRole !== 'admin') { showToast('غير مصرح لك', 'error'); return; }
+  if (!ROLES_META[newRole]) return;
+
+  if (uid === currentUser.uid) {
+    showToast('لا يمكنك تغيير دورك الخاص', 'error');
+    renderUsersList();
+    return;
+  }
+
+  try {
+    const targetDoc = await db.collection('users').doc(uid).get();
+    const targetData = targetDoc.data() || {};
+    const targetEmail = (targetData.email || '').toLowerCase().trim();
+
+    if (isSuperAdminEmail(targetEmail) && newRole !== 'admin') {
+      showToast('لا يمكن تعديل صلاحيات Super Admin 🛡️', 'error');
+      renderUsersList();
+      return;
+    }
+    if (isSuperAdminEmail(targetEmail)) {
+      showToast('دور Super Admin ثابت 🛡️', 'info');
+      renderUsersList();
+      return;
+    }
+
+    await db.collection('users').doc(uid).update({
+      role: newRole,
+      roleUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      roleUpdatedBy: currentUser.uid
+    });
+    showToast(`تم تحديث الصلاحية إلى: ${ROLES_META[newRole].name}`, 'success');
+  } catch (error) {
+    console.error(error);
+    showToast('فشل تحديث الصلاحية', 'error');
+    renderUsersList();
+  }
+}
+
+function renderPermissionsEditor() {
+  const container = document.getElementById('permsList');
+  container.innerHTML = '';
+
+  Object.keys(ROLES_META).forEach(roleKey => {
+    const meta = ROLES_META[roleKey];
+    const isAdminRole = roleKey === 'admin';
+    const perms = rolePermissions[roleKey] || {};
+
+    const card = document.createElement('div');
+    card.className = 'role-card';
+
+    const maxVal = Number(perms.maxTransactions ?? -1);
+    const maxDisplay = maxVal === -1 ? '' : maxVal;
+
+    let rowsHtml = '';
+
+    rowsHtml += `
+      <div class="perm-row">
+        <div class="perm-row-label">
+          <i class="fa-solid fa-list-ol"></i>
+          <span>حد العمليات (فاضي = بلا حد)</span>
+        </div>
+        <input type="number" min="-1" step="1"
+               class="perm-max-input"
+               value="${maxDisplay}"
+               placeholder="∞"
+               data-role="${roleKey}"
+               data-key="maxTransactions"
+               ${isAdminRole ? 'disabled' : ''}>
+      </div>
+    `;
+
+    FEATURE_LIST.forEach(feature => {
+      const isOn = perms[feature.key] === true;
+      rowsHtml += `
+        <div class="perm-row">
+          <div class="perm-row-label">
+            <i class="fa-solid ${feature.icon}"></i>
+            <span>${feature.label}</span>
+          </div>
+          <button type="button"
+                  class="perm-toggle ${isOn ? 'on' : ''}"
+                  data-role="${roleKey}"
+                  data-key="${feature.key}"
+                  onclick="togglePerm(this)"
+                  ${isAdminRole ? 'disabled style="opacity:.5; cursor:not-allowed;"' : ''}>
+          </button>
+        </div>
+      `;
+    });
+
+    card.innerHTML = `
+      <div class="role-card-header">
+        <div class="role-card-title">
+          <i class="fa-solid ${meta.icon}" style="color: #f97316;"></i>
+          <span>${meta.name}</span>
+        </div>
+        ${isAdminRole ? '<span class="role-card-locked"><i class="fa-solid fa-lock"></i> مقفول</span>' : ''}
+      </div>
+      <div class="perm-grid">${rowsHtml}</div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function togglePerm(btn) {
+  if (btn.disabled) return;
+  const roleKey = btn.dataset.role;
+  const key = btn.dataset.key;
+  if (roleKey === 'admin') return;
+
+  if (!rolePermissions[roleKey]) rolePermissions[roleKey] = { ...DEFAULT_PERMISSIONS[roleKey] };
+  const current = rolePermissions[roleKey][key] === true;
+  rolePermissions[roleKey][key] = !current;
+  btn.classList.toggle('on', !current);
+}
+
+async function saveRolePermissions() {
+  if (userRole !== 'admin') { showToast('غير مصرح', 'error'); return; }
+
+  document.querySelectorAll('.perm-max-input').forEach(input => {
+    const roleKey = input.dataset.role;
+    if (roleKey === 'admin') return;
+    const raw = input.value.trim();
+    const val = raw === '' ? -1 : Math.max(-1, Math.min(1000000, parseInt(raw, 10) || -1));
+    if (!rolePermissions[roleKey]) rolePermissions[roleKey] = { ...DEFAULT_PERMISSIONS[roleKey] };
+    rolePermissions[roleKey].maxTransactions = val;
+  });
+
+  rolePermissions.admin = { ...DEFAULT_PERMISSIONS.admin };
+
+  const ok = await saveRolePermissionsToCloud();
+  if (ok) {
+    showToast('تم حفظ الصلاحيات بنجاح ✓', 'success');
+    applyRoleUI();
+    refreshAll();
+  }
+}
+
+/* =========================================================
+   CATEGORIES & DEMO
+   ========================================================= */
+const CATEGORIES = {
+  expense: ['شغل وأدوات صيانة','تفعيل وسيرفرات وكريدت','أكل ومشروبات','مواصلات وبنزين','فواتير والتزامات','شخصي وعائلة','مشتريات','أخرى'],
+  income: ['خدمات سوفت وير وصيانة','شحن رصيد وتفعيل أدوات','شغل ريموت أونلاين','مبيعات إكسسوار وأجهزة','عمولة / وسيط','أرباح أخرى'],
+  charity: ['صدقة جارية لوجه الله','مساعدة محتاج وتفريج كربة','إطعام طعام','بر والدين وأهل','زكاة مال','أخرى'],
+  debt_receivable: ['حساب محل صيانة','سلف شخصي لصديق','باقي خدمة لعميل','مبيعات آجلة','أخرى'],
+  debt_payable: ['دين لمورد / موزّع سيرفر','سلف مستحق للغير','فاتورة مؤجلة','شراء آجل','أخرى']
+};
+
+const DEMO_ITEMS = [
+  { id:'demo-1', type:'income', amount:1200, category:'خدمات سوفت وير وصيانة', paymentMethod:'كاش نقدي', notes:'إصلاح بوت لودر وفلاش 3 أجهزة', reference:'INV-1001', date:offsetDate(-1) },
+  { id:'demo-2', type:'charity', amount:150, category:'مساعدة محتاج وتفريج كربة', paymentMethod:'كاش نقدي', notes:'صدقة شكر بنية الرزق والبركة', reference:'', date:offsetDate(-1) },
+  { id:'demo-3', type:'expense', amount:380, category:'تفعيل وسيرفرات وكريدت', paymentMethod:'إنستاباي (InstaPay)', notes:'تفعيل باقة دونجل وسيرفر شاومي', reference:'EXP-3001', date:offsetDate(-2) },
+  { id:'demo-4', type:'income', amount:950, category:'شغل ريموت أونلاين', paymentMethod:'إنستاباي (InstaPay)', notes:'خدمة ريموت لمحل المنصورة', reference:'INV-1002', date:offsetDate(-2) },
+  { id:'demo-5', type:'expense', amount:90, category:'أكل ومشروبات', paymentMethod:'فودافون كاش / محفظة', notes:'غداء ومشروبات الشغل', reference:'', date:offsetDate(-3) },
+  { id:'demo-6', type:'debt_receivable', amount:650, category:'حساب محل صيانة', paymentMethod:'آجل / معلق', notes:'محل البرنس - باقي حساب فلاش 4 أجهزة', reference:'', status:'pending', date:offsetDate(-4) },
+  { id:'demo-7', type:'debt_payable', amount:400, category:'دين لمورد / موزّع سيرفر', paymentMethod:'آجل / معلق', notes:'كريدت سيرفر من الموزع محمد', reference:'', status:'pending', date:offsetDate(-5) }
+];
+
+/* =========================================================
+   AUTH GUARD + PIN
    ========================================================= */
 function requireAuth() {
   if (!currentUser) {
@@ -98,11 +583,8 @@ function requireAuth() {
   return true;
 }
 
-/* =========================================================
-   PIN HASHING
-   ========================================================= */
 async function hashPin(pin) {
-  const salted = 'ehsebli_v2_' + pin;
+  const salted = 'ehsebli_v3_' + pin;
   if (window.crypto && crypto.subtle) {
     try {
       const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salted));
@@ -116,7 +598,7 @@ async function hashPin(pin) {
 function getPin() { return localStorage.getItem(PIN_KEY); }
 
 /* =========================================================
-   UI SHOW / HIDE HELPERS
+   UI SHOW / HIDE
    ========================================================= */
 function showAuthLoading() {
   document.body.classList.add('auth-pending');
@@ -154,7 +636,7 @@ function hidePinLock() {
 }
 
 /* =========================================================
-   USER SWITCH HANDLING
+   USER SWITCH
    ========================================================= */
 function handleUserSwitch(uid) {
   const lastUid = localStorage.getItem(LAST_UID_KEY);
@@ -170,7 +652,7 @@ function handleUserSwitch(uid) {
 /* =========================================================
    AUTH STATE
    ========================================================= */
-auth.onAuthStateChanged(user => {
+auth.onAuthStateChanged(async user => {
   hideAuthLoading();
   authResolved = true;
 
@@ -197,6 +679,9 @@ auth.onAuthStateChanged(user => {
 
     footerSync.innerHTML = `<i class="fa-solid fa-cloud-check text-emerald-500"></i> متصل بالسحاب (${escapeHTML(user.email)})`;
 
+    await loadUserRole(user.uid);
+    await loadRolePermissions();
+
     loadLocalData();
     refreshAll();
     switchTab('transactions');
@@ -207,34 +692,68 @@ auth.onAuthStateChanged(user => {
     });
   } else {
     currentUser = null;
+    userRole = 'free';
+    isSuperAdmin = false;
+    rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
     hidePinLock();
     showLoginWall();
     footerSync.innerHTML = `<i class="fa-solid fa-database text-amber-500"></i> سجّل الدخول للمزامنة`;
     loadLocalData();
+    applyRoleUI();
   }
 });
 
 /* =========================================================
    LOGIN / LOGOUT
    ========================================================= */
-function loginWithGoogle() {
+async function loginWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
 
-  auth.signInWithPopup(provider)
-    .then(result => {
-      showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success');
-    })
-    .catch(error => {
-      console.error(error);
-      if (error.code === 'auth/popup-closed-by-user') {
-        showToast('تم إلغاء تسجيل الدخول', 'info');
-      } else if (error.code === 'auth/popup-blocked') {
-        showToast('المتصفح منع النافذة المنبثقة — اسمح بها وأعد المحاولة', 'error');
-      } else {
-        showToast('تعذر تسجيل الدخول: ' + (error.message || ''), 'error');
+  try {
+    const result = await auth.signInWithPopup(provider);
+    showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success');
+  } catch (error) {
+    console.error('Popup error:', error.code, error.message);
+
+    const fallbackCodes = [
+      'auth/popup-blocked',
+      'auth/popup-closed-by-user',
+      'auth/cancelled-popup-request',
+      'auth/operation-not-supported-in-this-environment',
+      'auth/web-storage-unsupported'
+    ];
+
+    if (fallbackCodes.includes(error.code) || /popup/i.test(error.message || '')) {
+      showToast('جاري تحويلك لتسجيل الدخول...', 'info');
+      try {
+        await auth.signInWithRedirect(provider);
+      } catch (redirectErr) {
+        console.error('Redirect error:', redirectErr);
+        showToast('تعذر تسجيل الدخول: ' + redirectErr.message, 'error');
       }
-    });
+      return;
+    }
+
+    if (error.code === 'auth/unauthorized-domain') {
+      showToast('النطاق الحالي غير مصرح به', 'error');
+    } else if (error.code === 'auth/network-request-failed') {
+      showToast('مشكلة في الاتصال بالإنترنت', 'error');
+    } else {
+      showToast('تعذر تسجيل الدخول: ' + (error.message || error.code), 'error');
+    }
+  }
+}
+
+async function handleRedirectResult() {
+  try {
+    const result = await auth.getRedirectResult();
+    if (result && result.user) {
+      showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success');
+    }
+  } catch (error) {
+    console.error('Redirect result error:', error);
+  }
 }
 
 function logout() {
@@ -261,9 +780,11 @@ function logoutFromLock() {
    ========================================================= */
 function mergeTransactions(local, cloud) {
   const map = new Map();
-  cloud.forEach(t => { if (t && t.id) map.set(t.id, t); });
+  cloud.forEach(t => { 
+    if (t && t.id && validateTransaction(t)) map.set(t.id, t); 
+  });
   local.forEach(t => {
-    if (!t || !t.id) return;
+    if (!t || !t.id || !validateTransaction(t)) return;
     const existing = map.get(t.id);
     if (!existing) { map.set(t.id, t); return; }
     const a = Number(existing._updatedAt) || 0;
@@ -286,7 +807,7 @@ async function syncToCloud() {
       transactions: merged,
       budget: getBudget(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    }, { merge: true });
   } catch (error) {
     console.error("Cloud sync error: ", error);
   } finally {
@@ -302,7 +823,7 @@ async function forceSyncToCloud() {
       transactions: transactions,
       budget: getBudget(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    }, { merge: true });
   } catch (error) {
     console.error("Force sync error: ", error);
   }
@@ -363,10 +884,14 @@ function toggleTheme() {
 function loadLocalData() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    transactions = saved ? (Array.isArray(JSON.parse(saved)) ? JSON.parse(saved) : []) : [];
+    const arr = saved ? JSON.parse(saved) : [];
+    transactions = Array.isArray(arr) ? arr.filter(validateTransaction) : [];
   } catch (error) { console.error(error); transactions = []; }
 }
-function saveLocalData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions)); }
+function saveLocalData() { 
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions)); 
+}
+
 function saveData(options = {}) {
   if (!requireAuth()) return;
   saveLocalData();
@@ -449,9 +974,6 @@ function updateMetrics() {
   document.getElementById('badgeDebtCount').textContent = debts.length;
 }
 
-/* =========================================================
-   DEBOUNCE
-   ========================================================= */
 function debouncedRenderTransactions() {
   clearTimeout(searchDebounceTimer);
   searchDebounceTimer = setTimeout(renderTransactions, 300);
@@ -662,6 +1184,16 @@ function updateCharts() {
    ========================================================= */
 function openModal(type = 'expense', id = null) {
   if (!requireAuth()) return;
+
+  if (type === 'charity' && !hasFeature('charity')) {
+    showToast('باب الخير غير متاح لدورك', 'error');
+    return;
+  }
+  if ((type === 'debt_receivable' || type === 'debt_payable') && !hasFeature('debts')) {
+    showToast('دفتر الديون غير متاح لدورك', 'error');
+    return;
+  }
+
   const modal = document.getElementById('transactionModal');
   const form = document.getElementById('transactionForm');
   editingId = id;
@@ -752,28 +1284,44 @@ function handleFormSubmit(event) {
   const date = document.getElementById('formDate').value;
   const category = document.getElementById('formCategory').value;
   const paymentMethod = document.getElementById('formPaymentMethod').value;
-  const reference = document.getElementById('formReference').value.trim();
-  const notes = document.getElementById('formNotes').value.trim();
+  const reference = sanitizeString(document.getElementById('formReference').value, 50);
+  const notes = sanitizeString(document.getElementById('formNotes').value, 200);
 
-  if (!amount || amount <= 0) { showToast('يرجى إدخال مبلغ صحيح', 'error'); return; }
-  if (!date) { showToast('يرجى اختيار التاريخ', 'error'); return; }
-  if (isDebt(type) && !notes) { showToast('اكتب اسم الشخص أو الجهة في البيان', 'error'); return; }
+  /* ✅ التحقق قبل الإضافة */
+  if (!amount || amount <= 0 || amount > 1e9) { 
+    showToast('يرجى إدخال مبلغ صحيح (أكبر من 0)', 'error'); 
+    return; 
+  }
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { 
+    showToast('يرجى اختيار تاريخ صحيح', 'error'); 
+    return; 
+  }
+  if (isDebt(type) && !notes) { 
+    showToast('اكتب اسم الشخص أو الجهة في البيان', 'error'); 
+    return; 
+  }
+
+  /* 🛡️ فحص الحد الأقصى — قبل الإضافة */
+  if (!wasEditing && !canAddMoreTransactions()) {
+    showToast(`وصلت للحد الأقصى (${getMaxTransactions()} عملية)`, 'error');
+    return;
+  }
 
   if (wasEditing) {
     const index = transactions.findIndex(t => t.id === editingId);
     if (index === -1) return;
     const old = transactions[index];
-    transactions[index] = {
+    transactions[index] = normalizeTransaction({
       ...old, type, amount, date, category,
       paymentMethod: isDebt(type) ? 'آجل / معلق' : paymentMethod,
       reference,
       notes: notes || (type === 'charity' ? 'صدقة لوجه الله' : category),
       status: isDebt(type) ? (old.status || 'pending') : undefined,
       _updatedAt: Date.now()
-    };
+    });
     showToast('تم تعديل العملية بنجاح', 'success');
   } else {
-    transactions.unshift({
+    transactions.unshift(normalizeTransaction({
       id: 'tx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
       type, amount, date, category,
       paymentMethod: isDebt(type) ? 'آجل / معلق' : paymentMethod,
@@ -781,7 +1329,7 @@ function handleFormSubmit(event) {
       notes: notes || (type === 'charity' ? 'صدقة لوجه الله' : category),
       status: isDebt(type) ? 'pending' : undefined,
       _updatedAt: Date.now()
-    });
+    }));
 
     if (type === 'charity') {
       if (typeof confetti === 'function') confetti({ particleCount: 100, spread: 80, origin: { y: .6 } });
@@ -880,6 +1428,10 @@ function getBudget() { return Number(localStorage.getItem(BUDGET_KEY) || 0); }
 
 function openBudgetModal() {
   if (!requireAuth()) return;
+  if (!hasFeature('budget')) {
+    showToast('الميزانية غير متاحة لدورك', 'error');
+    return;
+  }
   document.getElementById('budgetInput').value = getBudget() || '';
   const modal = document.getElementById('budgetModal');
   modal.classList.remove('hidden'); modal.classList.add('flex');
@@ -891,7 +1443,10 @@ function closeBudgetModal() {
 function saveBudget() {
   if (!requireAuth()) return;
   const value = Number(document.getElementById('budgetInput').value);
-  if (value < 0) return;
+  if (!isFinite(value) || value < 0 || value > 1e9) { 
+    showToast('قيمة الميزانية غير صحيحة', 'error'); 
+    return; 
+  }
   localStorage.setItem(BUDGET_KEY, value);
   closeBudgetModal();
   updateBudget();
@@ -941,6 +1496,10 @@ function updateBudget() {
    ========================================================= */
 function openBackupModal() {
   if (!requireAuth()) return;
+  if (!hasFeature('backup')) {
+    showToast('النسخ الاحتياطي غير متاح لدورك', 'error');
+    return;
+  }
   closeMenus();
   const modal = document.getElementById('backupModal');
   modal.classList.remove('hidden'); modal.classList.add('flex');
@@ -951,14 +1510,17 @@ function closeBackupModal() {
 }
 function downloadBackup() {
   if (!requireAuth()) return;
+  if (!hasFeature('backup')) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '2.2',
+    version: '5.0',
     createdAt: new Date().toISOString(),
     userEmail: currentUser.email,
+    userRole: userRole,
     transactions,
     budget: getBudget(),
-    theme: localStorage.getItem(THEME_KEY) || 'dark'
+    theme: localStorage.getItem(THEME_KEY) || 'dark',
+    count: transactions.length
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -967,33 +1529,50 @@ function downloadBackup() {
   a.download = `احسبلي_نسخة_احتياطية_${todayString()}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
-  showToast('تم تحميل النسخة الاحتياطية بنجاح', 'success');
+  showToast(`تم تحميل النسخة الاحتياطية (${transactions.length} عملية)`, 'success');
 }
 function restoreBackup(event) {
   if (!requireAuth()) { event.target.value = ''; return; }
+  if (!hasFeature('backup')) {
+    showToast('غير مصرح بالاستعادة', 'error');
+    event.target.value = '';
+    return;
+  }
   const file = event.target.files?.[0];
   if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { 
+    showToast('حجم الملف كبير جداً (أقصى 10MB)', 'error'); 
+    event.target.value = '';
+    return; 
+  }
   const reader = new FileReader();
   reader.onload = () => {
     try {
       const backup = JSON.parse(reader.result);
       let restored = Array.isArray(backup) ? backup : backup.transactions;
-      if (!restored) throw new Error('Invalid backup file');
+      if (!Array.isArray(restored)) throw new Error('Invalid backup');
 
-      openConfirm('استعادة النسخة؟', `سيتم استبدال العمليات الحالية بـ <strong>${restored.length}</strong> عملية من الملف.`, () => {
+      // 🛡️ تصفية وفحص كل عملية
+      restored = restored.filter(validateTransaction);
+      if (!restored.length) throw new Error('No valid transactions');
+
+      openConfirm('استعادة النسخة؟', `سيتم استبدال العمليات الحالية بـ <strong>${restored.length}</strong> عملية صحيحة من الملف.`, () => {
         const now = Date.now();
-        transactions = restored.map((item, i) => ({
+        transactions = restored.map((item, i) => normalizeTransaction({
           ...item,
-          amount: Number(item.amount) || 0,
           _updatedAt: item._updatedAt || (now + i)
         }));
-        if (backup.budget !== undefined) localStorage.setItem(BUDGET_KEY, Number(backup.budget) || 0);
+        if (backup.budget !== undefined) {
+          const b = Number(backup.budget);
+          if (isFinite(b) && b >= 0) localStorage.setItem(BUDGET_KEY, b);
+        }
         saveData({ force: true });
         refreshAll();
         closeBackupModal();
         showToast('تم استعادة النسخة الاحتياطية بنجاح', 'success');
       });
     } catch (error) {
+      console.error(error);
       showToast('ملف النسخة الاحتياطية غير صالح', 'error');
     }
     event.target.value = '';
@@ -1022,7 +1601,10 @@ function loadDemoData() {
   closeMenus();
   openConfirm('تحميل البيانات التجريبية؟', 'سيتم استبدال المعاملات الحالية بالبيانات النموذجية.', () => {
     const now = Date.now();
-    transactions = JSON.parse(JSON.stringify(DEMO_ITEMS)).map((t, i) => ({ ...t, _updatedAt: now + i }));
+    transactions = JSON.parse(JSON.stringify(DEMO_ITEMS)).map((t, i) => normalizeTransaction({ 
+      ...t, 
+      _updatedAt: now + i 
+    }));
     saveData({ force: true });
     refreshAll();
     showToast('تم تحميل البيانات التجريبية', 'success');
@@ -1034,6 +1616,10 @@ function loadDemoData() {
    ========================================================= */
 function exportToCSV() {
   if (!requireAuth()) return;
+  if (!hasFeature('export')) {
+    showToast('التصدير غير متاح لدورك', 'error');
+    return;
+  }
   closeMenus();
   const list = getActiveTransactions();
   if (!list.length) { showToast('لا توجد بيانات للتصدير', 'error'); return; }
@@ -1064,6 +1650,10 @@ function exportToCSV() {
    ========================================================= */
 function printReport() {
   if (!requireAuth()) return;
+  if (!hasFeature('reports')) {
+    showToast('التقارير غير متاحة لدورك', 'error');
+    return;
+  }
   closeMenus();
   const metrics = calculateMetrics();
   const periodName = document.getElementById('periodLabel').textContent;
@@ -1137,7 +1727,7 @@ function reportBox(title, value, color) {
 }
 
 /* =========================================================
-   PIN SECURITY
+   PIN
    ========================================================= */
 function openPinModal() {
   if (!requireAuth()) return;
@@ -1171,11 +1761,6 @@ async function handlePinAction() {
   showToast('تم حفظ PIN بنجاح', 'success');
   showPinLock();
 }
-function lockApp() {
-  if (!currentUser) return;
-  if (!getPin()) { showToast('قم بإنشاء PIN أولاً', 'info'); return; }
-  showPinLock();
-}
 async function unlockApp() {
   const input = document.getElementById('unlockPinInput');
   const entered = input.value.trim();
@@ -1190,10 +1775,8 @@ async function unlockApp() {
     ok = (await hashPin(entered)) === stored;
   }
 
-  if (ok) {
-    hidePinLock();
-    input.value = '';
-  } else {
+  if (ok) { hidePinLock(); input.value = ''; }
+  else {
     document.getElementById('unlockError').classList.remove('hidden');
     input.value = '';
     input.focus();
@@ -1204,6 +1787,10 @@ async function unlockApp() {
    TABS & TOASTS
    ========================================================= */
 function switchTab(tab) {
+  if (tab === 'debts' && !hasFeature('debts')) {
+    showToast('دفتر الديون غير متاح لدورك', 'error');
+    return;
+  }
   currentTab = tab;
   const isTx = tab === 'transactions';
   document.getElementById('panelTransactions').classList.toggle('hidden', !isTx);
@@ -1261,21 +1848,31 @@ function refreshAll() {
 
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
-    closeModal(); closeConfirm(); closeBackupModal(); closeBudgetModal(); closePinModal(); closeMenus();
+    closeModal(); closeConfirm(); closeBackupModal();
+    closeBudgetModal(); closePinModal(); closeMenus();
+    closeAdminPanel();
   }
 });
 
 /* =========================================================
    INITIAL BOOT
    ========================================================= */
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   loadLocalData();
   refreshAll();
   switchTab('transactions');
   document.getElementById('formDate').value = todayString();
 
+  try {
+    const cached = localStorage.getItem(PERMS_CACHE_KEY);
+    if (cached) rolePermissions = JSON.parse(cached);
+  } catch(e) {}
+  applyRoleUI();
+
   showAuthLoading();
+
+  await handleRedirectResult();
 
   setTimeout(() => {
     if (!authResolved) {

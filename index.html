@@ -51,9 +51,6 @@
           <div>
             <div class="flex items-center gap-2 flex-wrap">
               <h1 class="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">احسبلي</h1>
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30">
-                <i class="fa-solid fa-bolt"></i> PRO
-              </span>
               <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
                 <i class="fa-solid fa-user"></i> مجاني
               </span>
@@ -546,7 +543,7 @@
           <div>
             <label class="field-label">المبلغ (ج.م) *</label>
             <div class="relative">
-              <input type="number" step="0.01" min="0.01" required id="formAmount" placeholder="0.00" class="form-input pl-12">
+              <input type="number" step="0.01" min="0.01" max="999999999" required id="formAmount" placeholder="0.00" class="form-input pl-12">
               <span class="absolute left-3 top-3 text-xs font-black text-orange-500">ج.م</span>
             </div>
           </div>
@@ -577,12 +574,12 @@
 
         <div>
           <label class="field-label">رقم المرجع / الفاتورة</label>
-          <input type="text" id="formReference" placeholder="اختياري - مثال: INV-1025" class="form-input">
+          <input type="text" id="formReference" maxlength="50" placeholder="اختياري - مثال: INV-1025" class="form-input">
         </div>
 
         <div>
           <label id="notesLabel" class="field-label">البيان أو الملاحظات</label>
-          <input type="text" id="formNotes" placeholder="مثال: صيانة جهاز، سوفت وير، غداء..." class="form-input">
+          <input type="text" id="formNotes" maxlength="200" placeholder="مثال: صيانة جهاز، سوفت وير، غداء..." class="form-input">
         </div>
 
         <div id="barakaBox" class="hidden p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-orange-500/30 text-xs text-orange-600 dark:text-orange-400">
@@ -674,7 +671,7 @@
         </div>
       </div>
       <label class="field-label">الميزانية الشهرية بالجنيه</label>
-      <input id="budgetInput" type="number" min="0" step="0.01" placeholder="مثال: 15000" class="form-input">
+      <input id="budgetInput" type="number" min="0" step="0.01" max="99999999" placeholder="مثال: 15000" class="form-input">
       <div class="flex justify-end gap-2 mt-5">
         <button onclick="clearBudget()" class="px-4 py-2.5 rounded-xl text-xs font-bold text-rose-500">حذف الميزانية</button>
         <button onclick="saveBudget()" class="px-5 py-2.5 rounded-xl text-xs font-black bg-orange-500 text-white">حفظ</button>
@@ -720,7 +717,6 @@
         </button>
       </div>
 
-      <!-- Tabs -->
       <div class="flex border-b border-slate-100 dark:border-dark-800 px-6 shrink-0">
         <button id="adminTabUsers" onclick="switchAdminTab('users')" class="admin-tab active">
           <i class="fa-solid fa-users"></i> المستخدمين
@@ -730,12 +726,10 @@
         </button>
       </div>
 
-      <!-- Users Panel -->
       <div id="adminPanelUsers" class="p-6 overflow-y-auto">
         <div id="usersList" class="space-y-2"></div>
       </div>
 
-      <!-- Permissions Panel -->
       <div id="adminPanelPerms" class="hidden p-6 overflow-y-auto">
         <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-500 font-bold leading-relaxed mb-4">
           <i class="fa-solid fa-info-circle"></i>
