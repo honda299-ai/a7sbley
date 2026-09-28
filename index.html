@@ -94,6 +94,9 @@
               <button onclick="openBackupModal()" data-feature="backup" class="menu-item text-teal-500"><i class="fa-solid fa-database"></i> النسخ الاحتياطي والاستعادة</button>
               <button onclick="openBudgetModal()" data-feature="budget" class="menu-item text-orange-500"><i class="fa-solid fa-wallet"></i> الميزانية الشهرية</button>
               <button onclick="openPinModal()" class="menu-item text-purple-500"><i class="fa-solid fa-lock"></i> قفل التطبيق PIN</button>
+              <button id="removePinBtn" onclick="confirmRemovePin()" class="menu-item text-rose-400" style="display:none">
+                <i class="fa-solid fa-lock-open"></i> إزالة رمز القفل PIN
+              </button>
               <button onclick="printReport()" data-feature="reports" class="menu-item text-cyan-500"><i class="fa-solid fa-file-pdf"></i> تقرير وطباعة / PDF</button>
               <div class="my-1 border-t border-slate-100 dark:border-dark-800"></div>
               <button id="adminPanelBtn" onclick="openAdminPanel()" class="menu-item text-rose-500" style="display:none">
@@ -827,7 +830,16 @@
         placeholder="••••••" onkeydown="if(event.key==='Enter') unlockApp()">
       <button onclick="unlockApp()" class="w-full mt-3 py-3.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-black">فتح التطبيق</button>
       <p id="unlockError" class="hidden text-xs text-rose-400 font-bold mt-3">رمز PIN غير صحيح</p>
-      <button onclick="logoutFromLock()" class="mt-6 text-[11px] font-bold text-slate-500 hover:text-rose-400 transition">
+
+      <button onclick="forgotPinUnlock()" id="forgotPinBtn" class="w-full mt-5 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-black text-xs transition flex items-center justify-center gap-2">
+        <i class="fa-solid fa-key"></i>
+        نسيت الرمز؟ استعد قفل التطبيق
+      </button>
+      <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">
+        سيتم التحقق من هويتك بحساب Google
+      </p>
+
+      <button onclick="logoutFromLock()" class="mt-4 text-[11px] font-bold text-slate-500 hover:text-rose-400 transition">
         <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج من حساب آخر
       </button>
     </div>

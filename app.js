@@ -1,7 +1,7 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V6.1
+   EHSEBLI / HONDA FINANCIAL MANAGER V7.0
    Super Admin + Search + Individual Permissions + Live Sync
-   + Bug Fix: New users now properly saved to Firestore
+   + Remove PIN + Forgot PIN Recovery
    ========================================================= */
 
 /* =========================================================
@@ -59,6 +59,7 @@ let usersSearchQuery = '';
 let editingUserPermissions = null;
 let currentUserPermissionsOverride = null;
 let userDocUnsubscribe = null;
+let pendingPinRemoval = false;
 
 /* =========================================================
    ROLES META
@@ -250,17 +251,25 @@ function applyRoleUI() {
       badge.innerHTML = `<i class="fa-solid ${meta.icon}"></i> ${meta.name}`;
     }
   }
+  
+  updatePinUI();
+}
+
+function updatePinUI() {
+  const removeBtn = document.getElementById('removePinBtn');
+  if (removeBtn) {
+    removeBtn.style.display = getPin() ? '' : 'none';
+  }
 }
 
 /* =========================================================
-   USER ROLE LOAD (v6.1 - Fixed: No query for new users)
+   USER ROLE LOAD
    ========================================================= */
 async function loadUserRole(uid) {
   try {
     const userEmail = (currentUser.email || '').toLowerCase().trim();
     isSuperAdmin = isSuperAdminEmail(userEmail);
 
-    // 👑 Super Admin handling
     if (isSuperAdmin) {
       userRole = 'admin';
       currentUserPermissionsOverride = null;
@@ -274,27 +283,22 @@ async function loadUserRole(uid) {
       return;
     }
 
-    // 📄 Read existing user doc (own doc only — allowed by rules)
     const doc = await db.collection('users').doc(uid).get();
 
     if (doc.exists && doc.data().role && ROLES_META[doc.data().role]) {
-      // ✅ موجود بالفعل
       userRole = doc.data().role;
       currentUserPermissionsOverride = doc.data().permissionsOverride || null;
 
-      // 🛡️ حماية إضافية: بس Super Admin يقدر يبقى admin
       if (userRole === 'admin' && !isSuperAdmin) {
         userRole = 'free';
       }
 
-      // تحديث آخر تسجيل دخول بدون تغيير دور
       await db.collection('users').doc(uid).set({
         email: currentUser.email,
         displayName: currentUser.displayName || '',
         lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
     } else {
-      // 🆕 مستخدم جديد → افتراضي "مجاني" (بدون query على كل المستخدمين)
       userRole = 'free';
       currentUserPermissionsOverride = null;
 
@@ -916,6 +920,7 @@ auth.onAuthStateChanged(async user => {
     switchTab('transactions');
 
     subscribeToUserDoc(user.uid);
+    updatePinUI();
 
     loadCloudData(user.uid).finally(() => {
       if (getPin()) showPinLock();
@@ -1749,7 +1754,7 @@ function downloadBackup() {
   if (!hasFeature('backup')) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '6.1',
+    version: '7.0',
     createdAt: new Date().toISOString(),
     userEmail: currentUser.email,
     userRole: userRole,
@@ -1973,16 +1978,24 @@ function openPinModal() {
   document.getElementById('pinInput').value = '';
   document.getElementById('pinError').classList.add('hidden');
 
-  if (!getPin()) { title.textContent = 'إنشاء PIN'; action.textContent = 'تفعيل القفل'; }
-  else { title.textContent = 'تغيير PIN'; action.textContent = 'تغيير الرمز'; }
+  if (!getPin()) { 
+    title.textContent = 'إنشاء PIN'; 
+    action.textContent = 'تفعيل القفل'; 
+  } else { 
+    title.textContent = 'تغيير PIN'; 
+    action.textContent = 'تغيير الرمز'; 
+  }
 
-  modal.classList.remove('hidden'); modal.classList.add('flex');
+  modal.classList.remove('hidden'); 
+  modal.classList.add('flex');
   setTimeout(() => document.getElementById('pinInput').focus(), 100);
 }
+
 function closePinModal() {
   const modal = document.getElementById('pinModal');
   modal.classList.add('hidden'); modal.classList.remove('flex');
 }
+
 async function handlePinAction() {
   const pin = document.getElementById('pinInput').value.trim();
   const error = document.getElementById('pinError');
@@ -1993,9 +2006,80 @@ async function handlePinAction() {
   }
   localStorage.setItem(PIN_KEY, await hashPin(pin));
   closePinModal();
+  updatePinUI();
   showToast('تم حفظ PIN بنجاح', 'success');
   showPinLock();
 }
+
+function confirmRemovePin() {
+  if (!requireAuth()) return;
+  closeMenus();
+  
+  if (!getPin()) {
+    showToast('لا يوجد PIN لإزالته', 'info');
+    return;
+  }
+  
+  openConfirm(
+    'إزالة رمز القفل؟',
+    'سيتم إلغاء تفعيل قفل التطبيق PIN. يمكنك إنشاء واحد جديد في أي وقت من القائمة.',
+    () => {
+      localStorage.removeItem(PIN_KEY);
+      updatePinUI();
+      showToast('تمت إزالة رمز القفل بنجاح', 'success');
+    }
+  );
+}
+
+async function forgotPinUnlock() {
+  if (!currentUser) {
+    showToast('يرجى تسجيل الدخول أولاً', 'error');
+    return;
+  }
+  
+  const btn = document.getElementById('forgotPinBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري التحقق...';
+  }
+  
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ 
+      prompt: 'select_account',
+      login_hint: currentUser.email || ''
+    });
+    
+    const result = await currentUser.reauthenticateWithPopup(provider);
+    
+    if (result.user && result.user.uid === currentUser.uid) {
+      localStorage.removeItem(PIN_KEY);
+      updatePinUI();
+      hidePinLock();
+      showToast('تم التحقق بنجاح — تم إلغاء القفل', 'success');
+    } else {
+      showToast('الحساب مختلف — تم رفض الطلب', 'error');
+    }
+  } catch (error) {
+    console.error('Reauth error:', error);
+    
+    if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+      showToast('تم إلغاء التحقق', 'info');
+    } else if (error.code === 'auth/popup-blocked') {
+      showToast('المتصفح منع النافذة — حاول تاني', 'error');
+    } else if (error.code === 'auth/network-request-failed') {
+      showToast('مشكلة في الاتصال بالإنترنت', 'error');
+    } else {
+      showToast('تعذر التحقق: ' + (error.message || error.code), 'error');
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-key"></i> نسيت الرمز؟ استعد قفل التطبيق';
+    }
+  }
+}
+
 async function unlockApp() {
   const input = document.getElementById('unlockPinInput');
   const entered = input.value.trim();
@@ -2105,6 +2189,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (cached) rolePermissions = JSON.parse(cached);
   } catch(e) {}
   applyRoleUI();
+  updatePinUI();
 
   showAuthLoading();
 
