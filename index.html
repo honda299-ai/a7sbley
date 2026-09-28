@@ -4,14 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0f1117">
+  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
   <title>احسبلي | Honda Financial Manager</title>
 
-  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 
-  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -28,21 +27,14 @@
     };
   </script>
 
-  <!-- Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
-  <!-- Charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- Confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
 
-  <!-- Custom CSS -->
   <link rel="stylesheet" href="styles.css">
 </head>
 
@@ -57,10 +49,13 @@
             <i class="fa-solid fa-coins text-xl sm:text-2xl"></i>
           </div>
           <div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <h1 class="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">احسبلي</h1>
               <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30">
                 <i class="fa-solid fa-bolt"></i> PRO
+              </span>
+              <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
+                <i class="fa-solid fa-user"></i> مجاني
               </span>
             </div>
             <div class="flex items-center gap-1 mt-0.5">
@@ -97,13 +92,17 @@
               <i class="fa-solid fa-ellipsis-vertical"></i>
             </button>
             <div id="dropMenu" class="hidden absolute left-0 mt-2 w-56 rounded-2xl shadow-2xl bg-white dark:bg-dark-850 border border-slate-200 dark:border-dark-750 p-1.5 z-50">
-              <button onclick="exportToCSV()" class="menu-item text-emerald-500"><i class="fa-solid fa-file-excel"></i> تصدير شيت إكسيل (CSV)</button>
+              <button onclick="exportToCSV()" data-feature="export" class="menu-item text-emerald-500"><i class="fa-solid fa-file-excel"></i> تصدير شيت إكسيل (CSV)</button>
               <button onclick="loadDemoData()" class="menu-item text-blue-500"><i class="fa-solid fa-rotate"></i> تعبئة بيانات تجريبية</button>
-              <button onclick="openBackupModal()" class="menu-item text-teal-500"><i class="fa-solid fa-database"></i> النسخ الاحتياطي والاستعادة</button>
-              <button onclick="openBudgetModal()" class="menu-item text-orange-500"><i class="fa-solid fa-wallet"></i> الميزانية الشهرية</button>
+              <button onclick="openBackupModal()" data-feature="backup" class="menu-item text-teal-500"><i class="fa-solid fa-database"></i> النسخ الاحتياطي والاستعادة</button>
+              <button onclick="openBudgetModal()" data-feature="budget" class="menu-item text-orange-500"><i class="fa-solid fa-wallet"></i> الميزانية الشهرية</button>
               <button onclick="openPinModal()" class="menu-item text-purple-500"><i class="fa-solid fa-lock"></i> قفل التطبيق PIN</button>
-              <button onclick="printReport()" class="menu-item text-cyan-500"><i class="fa-solid fa-file-pdf"></i> تقرير وطباعة / PDF</button>
+              <button onclick="printReport()" data-feature="reports" class="menu-item text-cyan-500"><i class="fa-solid fa-file-pdf"></i> تقرير وطباعة / PDF</button>
               <div class="my-1 border-t border-slate-100 dark:border-dark-800"></div>
+              <button id="adminPanelBtn" onclick="openAdminPanel()" class="menu-item text-rose-500" style="display:none">
+                <i class="fa-solid fa-shield-halved"></i> لوحة تحكم المدير
+              </button>
+              <div id="adminDivider" class="my-1 border-t border-slate-100 dark:border-dark-800" style="display:none"></div>
               <button onclick="confirmClearData()" class="menu-item text-rose-600"><i class="fa-solid fa-trash-can"></i> تصفير جميع البيانات</button>
             </div>
           </div>
@@ -141,7 +140,7 @@
           </p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <button onclick="openModal('charity')"
+          <button onclick="openModal('charity')" data-feature="charity"
             class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg active:scale-95 transition">
             <i class="fa-solid fa-hand-holding-heart"></i> تسجيل خير
           </button>
@@ -272,7 +271,7 @@
               <p class="text-[10px] text-slate-400">متابعة المصاريف مقارنة بالميزانية</p>
             </div>
           </div>
-          <button onclick="openBudgetModal()" class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition">
+          <button onclick="openBudgetModal()" data-feature="budget" class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition">
             <i class="fa-solid fa-pen"></i>
           </button>
         </div>
@@ -322,7 +321,7 @@
       <button onclick="switchTab('transactions')" id="tabBtnTransactions" class="tab-btn active">
         <i class="fa-solid fa-list-check"></i> المعاملات <span id="badgeTxCount" class="badge">0</span>
       </button>
-      <button onclick="switchTab('debts')" id="tabBtnDebts" class="tab-btn">
+      <button onclick="switchTab('debts')" id="tabBtnDebts" data-feature="debts" class="tab-btn">
         <i class="fa-solid fa-users"></i> دفتر الديون <span id="badgeDebtCount" class="badge">0</span>
       </button>
     </div>
@@ -404,7 +403,7 @@
     </div>
   </footer>
 
-  <!-- ================= AUTH LOADING ================= -->
+  <!-- AUTH LOADING -->
   <div id="authLoading" class="fixed inset-0 z-[400] bg-dark-950 items-center justify-center flex">
     <div class="text-center text-white">
       <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 flex items-center justify-center mx-auto shadow-2xl glow-orange animate-float">
@@ -420,7 +419,7 @@
     </div>
   </div>
 
-  <!-- ================= LOGIN WALL ================= -->
+  <!-- LOGIN WALL -->
   <div id="loginWall" class="hidden fixed inset-0 z-[300] bg-gradient-to-br from-slate-950 via-dark-950 to-black text-white items-center justify-center p-4 overflow-y-auto">
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
       <div class="absolute -top-40 -right-40 w-96 h-96 bg-orange-500/20 rounded-full blur-3xl"></div>
@@ -702,6 +701,56 @@
     </div>
   </div>
 
+  <!-- Admin Modal -->
+  <div id="adminModal" class="fixed inset-0 z-[90] hidden items-center justify-center p-4">
+    <div class="fixed inset-0 bg-black/75 backdrop-blur-sm" onclick="closeAdminPanel()"></div>
+    <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-2xl w-full border border-slate-200 dark:border-dark-750 modal-enter max-h-[92vh] flex flex-col">
+      <div class="p-5 px-6 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black">لوحة تحكم المدير</h3>
+            <p class="text-[10px] text-slate-400">إدارة المستخدمين وصلاحيات الأدوار</p>
+          </div>
+        </div>
+        <button onclick="closeAdminPanel()" class="w-8 h-8 rounded-xl text-slate-400 hover:text-white hover:bg-dark-800 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex border-b border-slate-100 dark:border-dark-800 px-6 shrink-0">
+        <button id="adminTabUsers" onclick="switchAdminTab('users')" class="admin-tab active">
+          <i class="fa-solid fa-users"></i> المستخدمين
+        </button>
+        <button id="adminTabPerms" onclick="switchAdminTab('permissions')" class="admin-tab">
+          <i class="fa-solid fa-sliders"></i> صلاحيات الأدوار
+        </button>
+      </div>
+
+      <!-- Users Panel -->
+      <div id="adminPanelUsers" class="p-6 overflow-y-auto">
+        <div id="usersList" class="space-y-2"></div>
+      </div>
+
+      <!-- Permissions Panel -->
+      <div id="adminPanelPerms" class="hidden p-6 overflow-y-auto">
+        <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-500 font-bold leading-relaxed mb-4">
+          <i class="fa-solid fa-info-circle"></i>
+          أي تعديل على الصلاحيات بيتحفظ في السحابة وبيطبق على كل المستخدمين المسجلين بهذا الدور.
+          <br>دور <strong>المدير</strong> مقفول دائمًا على كل الصلاحيات.
+        </div>
+        <div id="permsList" class="space-y-4"></div>
+        <button onclick="saveRolePermissions()" class="w-full mt-6 py-3 rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-black text-sm shadow-lg flex items-center justify-center gap-2">
+          <i class="fa-solid fa-save"></i>
+          <span>حفظ التغييرات</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Lock Screen -->
   <div id="lockScreen" class="hidden fixed inset-0 z-[200] bg-dark-950 text-white items-center justify-center p-5">
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
@@ -727,7 +776,6 @@
 
   <div id="printReport" class="print-only"></div>
 
-  <!-- App JS -->
   <script src="app.js"></script>
 </body>
 </html>
