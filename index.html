@@ -71,6 +71,13 @@
             </button>
           </div>
 
+          <!-- Privacy Toggle Button -->
+          <button onclick="togglePrivacyMode()" id="privacyBtn" title="إخفاء/إظهار الأرقام للحماية"
+            class="p-2.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 hover:border-orange-500 text-slate-700 dark:text-slate-200 transition shadow-sm flex items-center gap-2 text-xs font-bold">
+            <i id="privacyIcon" class="fa-solid fa-eye text-orange-500"></i>
+            <span class="hidden md:inline">خصوصية</span>
+          </button>
+
           <button onclick="toggleTheme()"
             class="p-2.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 hover:border-orange-500 text-slate-700 dark:text-slate-200 transition shadow-sm flex items-center gap-2 text-xs font-bold">
             <i id="themeIcon" class="fa-solid fa-sun text-amber-500"></i>
@@ -152,6 +159,7 @@
       </div>
     </section>
 
+    <!-- PERIOD SELECTION & CUSTOM DATE -->
     <section class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div class="flex items-center gap-2">
@@ -163,16 +171,25 @@
             <div id="periodLabel" class="text-[10px] text-slate-400 font-bold">كل البيانات</div>
           </div>
         </div>
-        <div class="flex gap-1.5 overflow-x-auto mobile-scroll">
-          <button class="period-btn active" data-period="all" onclick="setPeriod('all')">الكل</button>
-          <button class="period-btn" data-period="today" onclick="setPeriod('today')">اليوم</button>
-          <button class="period-btn" data-period="week" onclick="setPeriod('week')">هذا الأسبوع</button>
-          <button class="period-btn" data-period="month" onclick="setPeriod('month')">هذا الشهر</button>
-          <button class="period-btn" data-period="year" onclick="setPeriod('year')">هذه السنة</button>
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <div class="flex gap-1.5 overflow-x-auto mobile-scroll">
+            <button class="period-btn active" data-period="all" onclick="setPeriod('all')">الكل</button>
+            <button class="period-btn" data-period="today" onclick="setPeriod('today')">اليوم</button>
+            <button class="period-btn" data-period="week" onclick="setPeriod('week')">هذا الأسبوع</button>
+            <button class="period-btn" data-period="month" onclick="setPeriod('month')">هذا الشهر</button>
+            <button class="period-btn" data-period="year" onclick="setPeriod('year')">هذه السنة</button>
+            <button class="period-btn" data-period="custom" onclick="setPeriod('custom')">مخصص 📅</button>
+          </div>
+          <div id="customDateBox" class="hidden items-center gap-1.5 mt-2 md:mt-0">
+            <input type="date" id="customStartDate" onchange="applyCustomDates()" class="text-[11px] font-bold px-2 py-1 rounded-lg border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850">
+            <span class="text-xs text-slate-400">إلى</span>
+            <input type="date" id="customEndDate" onchange="applyCustomDates()" class="text-[11px] font-bold px-2 py-1 rounded-lg border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850">
+          </div>
         </div>
       </div>
     </section>
 
+    <!-- METRICS CARDS -->
     <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 no-print">
       <div class="glow-card bg-white dark:bg-dark-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-dark-800 shadow-sm">
         <div class="flex items-center justify-between mb-3">
@@ -182,7 +199,7 @@
           </div>
         </div>
         <div class="flex items-baseline gap-1">
-          <span id="statIncome" class="text-xl sm:text-3xl font-black">0</span>
+          <span id="statIncome" class="money-val text-xl sm:text-3xl font-black">0</span>
           <span class="text-[10px] font-black text-slate-400">ج.م</span>
         </div>
         <div class="mt-2 text-[10px] font-bold text-emerald-500"><i class="fa-solid fa-arrow-trend-up"></i> الأموال الداخلة</div>
@@ -196,7 +213,7 @@
           </div>
         </div>
         <div class="flex items-baseline gap-1">
-          <span id="statExpense" class="text-xl sm:text-3xl font-black">0</span>
+          <span id="statExpense" class="money-val text-xl sm:text-3xl font-black">0</span>
           <span class="text-[10px] font-black text-slate-400">ج.م</span>
         </div>
         <div class="mt-2 text-[10px] font-bold text-rose-500"><i class="fa-solid fa-arrow-trend-down"></i> بدون الصدقات</div>
@@ -210,7 +227,7 @@
           </div>
         </div>
         <div class="flex items-baseline gap-1">
-          <span id="statNet" class="text-xl sm:text-3xl font-black text-orange-500">0</span>
+          <span id="statNet" class="money-val text-xl sm:text-3xl font-black text-orange-500">0</span>
           <span class="text-[10px] font-black text-slate-400">ج.م</span>
         </div>
         <div id="statNetTag" class="mt-2 text-[10px] font-bold text-slate-500">الدخل - المصاريف - الخير</div>
@@ -224,7 +241,7 @@
           </div>
         </div>
         <div class="flex items-baseline gap-1">
-          <span id="statCharity" class="text-xl sm:text-3xl font-black text-orange-500">0</span>
+          <span id="statCharity" class="money-val text-xl sm:text-3xl font-black text-orange-500">0</span>
           <span class="text-[10px] font-black text-slate-400">ج.م</span>
         </div>
         <div class="mt-2 flex items-center justify-between text-[10px] font-bold">
@@ -232,6 +249,18 @@
           <span id="statCharityRatio" class="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-500 border border-orange-500/30">0%</span>
         </div>
       </div>
+    </section>
+
+    <!-- WALLETS / CASH FLOW BREAKDOWN -->
+    <section class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-4 no-print shadow-sm">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-vault text-orange-500"></i>
+          <h3 class="text-xs font-black">أرصدة الخزينة وطرق الدفع (صافي الفترة)</h3>
+        </div>
+        <span class="text-[10px] text-slate-400 font-bold">دخل - صرف</span>
+      </div>
+      <div id="walletsContainer" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5"></div>
     </section>
 
     <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 no-print">
@@ -251,11 +280,11 @@
         <div class="grid grid-cols-2 gap-3">
           <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
             <div class="text-[10px] font-bold text-emerald-500">لي عند الناس</div>
-            <div id="statDebtReceivable" class="text-lg font-black text-emerald-500 mt-1">0 ج.م</div>
+            <div id="statDebtReceivable" class="money-val text-lg font-black text-emerald-500 mt-1">0 ج.م</div>
           </div>
           <div class="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
             <div class="text-[10px] font-bold text-rose-500">عليّ للناس</div>
-            <div id="statDebtPayable" class="text-lg font-black text-rose-500 mt-1">0 ج.م</div>
+            <div id="statDebtPayable" class="money-val text-lg font-black text-rose-500 mt-1">0 ج.م</div>
           </div>
         </div>
       </div>
@@ -277,11 +306,11 @@
         </div>
         <div class="flex items-end justify-between mb-2">
           <div>
-            <span id="budgetUsed" class="text-lg font-black">0</span>
+            <span id="budgetUsed" class="money-val text-lg font-black">0</span>
             <span class="text-[10px] text-slate-400">ج.م مستخدمة</span>
           </div>
           <div class="text-left">
-            <span id="budgetTotal" class="text-sm font-black">غير محددة</span>
+            <span id="budgetTotal" class="money-val text-sm font-black">غير محددة</span>
           </div>
         </div>
         <div class="h-3 rounded-full bg-slate-100 dark:bg-dark-800 overflow-hidden">
@@ -326,6 +355,7 @@
       </button>
     </div>
 
+    <!-- TRANSACTIONS PANEL -->
     <section id="panelTransactions" class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 shadow-sm overflow-hidden no-print">
       <div class="p-4 border-b border-slate-100 dark:border-dark-800 bg-slate-50/50 dark:bg-dark-850/50">
         <div class="flex flex-col lg:flex-row gap-3 justify-between">
@@ -336,7 +366,7 @@
             <button class="filter-pill" data-filter="charity" onclick="filterTransactions('charity')"><i class="fa-solid fa-heart text-orange-500"></i> خير</button>
           </div>
           <div class="relative w-full lg:w-80">
-            <input type="text" id="searchInput" oninput="debouncedRenderTransactions()" placeholder="ابحث في البيان أو التصنيف أو الدفع..."
+            <input type="text" id="searchInput" oninput="debouncedRenderTransactions()" placeholder="ابحث في البيان، الوقت، المرجع، التصنيف..."
               class="w-full text-xs font-medium pr-9 pl-3 py-2.5 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500">
             <i class="fa-solid fa-magnifying-glass text-slate-400 absolute right-3 top-3"></i>
           </div>
@@ -349,9 +379,9 @@
               <th class="py-3 px-4">النوع / البيان</th>
               <th class="py-3 px-4">التصنيف</th>
               <th class="py-3 px-4">الدفع</th>
-              <th class="py-3 px-4">التاريخ</th>
+              <th class="py-3 px-4">التاريخ والوقت</th>
               <th class="py-3 px-4">المبلغ</th>
-              <th class="py-3 px-4">إجراء</th>
+              <th class="py-3 px-4 text-center">إجراءات</th>
             </tr>
           </thead>
           <tbody id="transactionsTbody" class="divide-y divide-slate-100 dark:divide-dark-800 text-xs font-medium"></tbody>
@@ -366,11 +396,12 @@
       </div>
     </section>
 
+    <!-- DEBTS PANEL -->
     <section id="panelDebts" class="hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 shadow-sm overflow-hidden no-print">
       <div class="p-4 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between gap-3">
         <div>
           <h3 class="text-sm font-black">سجل الديون والمستحقات</h3>
-          <p class="text-[10px] text-slate-400">تابع ما لك وما عليك</p>
+          <p class="text-[10px] text-slate-400">تابع ما لك وما عليك وسدد على دفعات</p>
         </div>
         <button onclick="openModal('debt_receivable')"
           class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition">
@@ -439,7 +470,6 @@
         </p>
       </div>
 
-      <!-- Tabs: Login Methods -->
       <div class="grid grid-cols-3 gap-1.5 mt-7 p-1 rounded-2xl bg-white/5 border border-white/10">
         <button id="loginTabGoogle" onclick="switchLoginMethod('google')" class="login-method-tab active">
           <i class="fa-brands fa-google"></i>
@@ -455,7 +485,6 @@
         </button>
       </div>
 
-      <!-- Panel: Google -->
       <div id="loginPanelGoogle" class="login-panel mt-5">
         <button onclick="loginWithGoogle()"
           class="w-full py-4 rounded-2xl bg-white text-slate-900 font-black text-sm shadow-2xl flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition">
@@ -467,9 +496,7 @@
         </p>
       </div>
 
-      <!-- Panel: Email -->
       <div id="loginPanelEmail" class="login-panel hidden mt-5">
-        <!-- Toggle: Sign In / Sign Up -->
         <div class="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10 mb-4">
           <button id="emailModeSignin" onclick="setEmailMode('signin')" class="email-mode-tab active">تسجيل دخول</button>
           <button id="emailModeSignup" onclick="setEmailMode('signup')" class="email-mode-tab">حساب جديد</button>
@@ -523,7 +550,6 @@
         </button>
       </div>
 
-      <!-- Panel: Phone -->
       <div id="loginPanelPhone" class="login-panel hidden mt-5">
         <div id="phoneStep1">
           <p class="text-[10px] text-slate-400 mb-3 text-center leading-relaxed">
@@ -588,21 +614,11 @@
         </div>
 
         <div id="phoneError" class="hidden mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-[10px] text-rose-400 font-bold leading-relaxed"></div>
-
-        <p class="text-[10px] text-slate-500 text-center mt-5 leading-relaxed">
-          بالدخول، بيتم إرسال كود SMS لتأكيد رقمك. الرسائل قد تُحسب عليك من شركة الاتصالات.
-        </p>
-      </div>
-
-      <div class="mt-6 flex items-center justify-center gap-4 text-[10px] text-slate-500 font-bold">
-        <span class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-emerald-500"></i> اتصال آمن</span>
-        <span class="flex items-center gap-1.5"><i class="fa-solid fa-cloud text-cyan-500"></i> مزامنة سحابية</span>
-        <span class="flex items-center gap-1.5"><i class="fa-solid fa-user-lock text-purple-500"></i> خصوصية كاملة</span>
       </div>
     </div>
   </div>
 
-  <!-- Transaction Modal -->
+  <!-- TRANSACTION MODAL (WITH ACTUAL TIME FIELD) -->
   <div id="transactionModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
     <div class="fixed inset-0 bg-black/75 backdrop-blur-sm" onclick="closeModal()"></div>
     <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200 dark:border-dark-750 z-10 modal-enter max-h-[92vh] overflow-y-auto">
@@ -613,7 +629,7 @@
           </div>
           <div>
             <h3 id="modalTitle" class="text-base font-black">إضافة عملية</h3>
-            <span class="text-[10px] font-bold text-slate-400">سيتم حفظ العملية سحابياً وتحديث الأرقام تلقائياً</span>
+            <span class="text-[10px] font-bold text-slate-400">سيتم حفظ العملية وتوقيتها الفعلي سحابياً</span>
           </div>
         </div>
         <button onclick="closeModal()" class="w-8 h-8 rounded-xl text-slate-400 hover:text-white hover:bg-dark-800 flex items-center justify-center">
@@ -658,7 +674,7 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label class="field-label">المبلغ (ج.م) *</label>
             <div class="relative">
@@ -670,6 +686,10 @@
             <label class="field-label">التاريخ *</label>
             <input type="date" required id="formDate" class="form-input">
           </div>
+          <div>
+            <label class="field-label">الوقت الفعلي *</label>
+            <input type="time" required id="formTime" class="form-input">
+          </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -678,7 +698,7 @@
             <select id="formCategory" class="form-input"></select>
           </div>
           <div>
-            <label class="field-label">طريقة الدفع</label>
+            <label class="field-label">طريقة الدفع / الحساب</label>
             <select id="formPaymentMethod" class="form-input">
               <option value="كاش نقدي">كاش نقدي 💵</option>
               <option value="إنستاباي (InstaPay)">إنستاباي ⚡</option>
@@ -719,6 +739,41 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- PARTIAL DEBT PAYMENT MODAL -->
+  <div id="debtPaymentModal" class="fixed inset-0 z-[65] hidden items-center justify-center p-4">
+    <div class="fixed inset-0 bg-black/75 backdrop-blur-sm" onclick="closeDebtPaymentModal()"></div>
+    <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-sm w-full border border-slate-200 dark:border-dark-750 p-6 modal-enter">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center">
+          <i class="fa-solid fa-money-bill-transfer"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-black">تسديد دفعة من الدين</h3>
+          <p id="debtPayModalSubtitle" class="text-[10px] text-slate-400"></p>
+        </div>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="field-label">المبلغ المدفوع (ج.م) *</label>
+          <input type="number" id="partialPayAmount" step="0.01" min="1" placeholder="0.00" class="form-input">
+        </div>
+        <div>
+          <label class="field-label">طريقة استلام/دفع الدفعة</label>
+          <select id="partialPayMethod" class="form-input">
+            <option value="كاش نقدي">كاش نقدي 💵</option>
+            <option value="إنستاباي (InstaPay)">إنستاباي ⚡</option>
+            <option value="فودافون كاش / محفظة">محفظة 📱</option>
+            <option value="فيزا / بطاقة بنكية">فيزا / بطاقة 💳</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button onclick="closeDebtPaymentModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400">إلغاء</button>
+        <button onclick="submitPartialDebtPayment()" class="px-5 py-2.5 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-600 text-white">تأكيد السداد</button>
+      </div>
     </div>
   </div>
 
@@ -860,7 +915,6 @@
         <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-500 font-bold leading-relaxed mb-4">
           <i class="fa-solid fa-info-circle"></i>
           أي تعديل على الصلاحيات بيتحفظ في السحابة وبيطبق على كل المستخدمين المسجلين بهذا الدور.
-          <br>دور <strong>المدير</strong> مقفول دائمًا على كل الصلاحيات.
         </div>
         <div id="permsList" class="space-y-4"></div>
         <button onclick="saveRolePermissions()" class="w-full mt-6 py-3 rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-black text-sm shadow-lg flex items-center justify-center gap-2">
@@ -900,9 +954,6 @@
             <option value="pro">برو</option>
             <option value="admin">مدير</option>
           </select>
-          <p class="text-[10px] text-slate-400 mt-1.5">
-            <i class="fa-solid fa-info-circle"></i> الدور بيحدد الصلاحيات الافتراضية
-          </p>
         </div>
 
         <div>
@@ -912,9 +963,6 @@
               <i class="fa-solid fa-rotate-left"></i> إعادة الكل للدور
             </button>
           </div>
-          <p class="text-[10px] text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
-            الصلاحيات دي بتتجاوز صلاحيات الدور <strong>للمستخدم ده بالتحديد</strong>.
-          </p>
           <div id="userPermOverrides" class="space-y-2"></div>
         </div>
       </div>
@@ -951,9 +999,6 @@
         <i class="fa-solid fa-key"></i>
         نسيت الرمز؟ استعد قفل التطبيق
       </button>
-      <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">
-        سيتم التحقق من هويتك
-      </p>
 
       <button onclick="logoutFromLock()" class="mt-4 text-[11px] font-bold text-slate-500 hover:text-rose-400 transition">
         <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج من حساب آخر

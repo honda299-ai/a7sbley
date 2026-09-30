@@ -1,5 +1,5 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V8
+   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V8.5
    ========================================================= */
 
 * { box-sizing: border-box; }
@@ -378,9 +378,6 @@ body.not-authed #appFooter { display: none !important; }
   box-shadow: 0 0 0 3px rgba(249, 115, 22, .12);
 }
 
-/* =========================================================
-   LOGIN WALL TABS & PANELS
-   ========================================================= */
 .login-method-tab {
   padding: 10px 8px;
   border-radius: 12px;
@@ -423,7 +420,12 @@ body.not-authed #appFooter { display: none !important; }
   color: #f97316;
 }
 
-/* reCAPTCHA badge tweaks */
-.grecaptcha-badge {
-  visibility: hidden;
+/* Privacy Mode Effect */
+body.privacy-active .money-val {
+  filter: blur(6px);
+  user-select: none;
+  transition: filter .2s ease;
+}
+body.privacy-active .money-val:hover {
+  filter: blur(0px);
 }
