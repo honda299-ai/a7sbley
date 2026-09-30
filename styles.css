@@ -1,5 +1,5 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V8.6
+   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V8.7
    ========================================================= */
 
 * { box-sizing: border-box; }
@@ -50,7 +50,7 @@ body { min-height: 100vh; }
 .print-only { display: none; }
 @media print {
   body * { visibility: hidden !important; }
-  #printReport, #printReport * { visibility: visible !important; }
+  #printReport, #printReport *, #clientPortalView, #clientPortalView * { visibility: visible !important; }
   #printReport {
     display: block !important;
     position: absolute;
@@ -74,6 +74,13 @@ body.auth-pending #appFooter { display: none !important; }
 body.not-authed #appHeader,
 body.not-authed #appMain,
 body.not-authed #appFooter { display: none !important; }
+
+body.portal-mode #appHeader,
+body.portal-mode #appMain,
+body.portal-mode #appFooter,
+body.portal-mode #loginWall,
+body.portal-mode #lockScreen,
+body.portal-mode #cloudStatus { display: none !important; }
 
 .menu-item {
   width: 100%;
@@ -420,7 +427,6 @@ body.not-authed #appFooter { display: none !important; }
   color: #f97316;
 }
 
-/* وضع الخصوصية وتعتيم الأرقام */
 body.privacy-active .money-val {
   filter: blur(6px);
   user-select: none;

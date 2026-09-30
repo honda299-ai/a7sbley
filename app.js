@@ -1,6 +1,6 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V8.6
-   Client Ledger System + Camera & Image Upload + Time Tracking
+   EHSEBLI / HONDA FINANCIAL MANAGER V8.7
+   Public Client Portal View + Custom Date Range + Image Upload 
    + Privacy Mode + Wallets Breakdown + Partial Debt + WhatsApp
    ========================================================= */
 
@@ -47,7 +47,8 @@ let isSuperAdmin = false;
 let isPrivacyMode = false;
 let partialPaymentDebtId = null;
 let currentReceiptData = null;
-let activeClientName = null; // اسم العميل المعروض حالياً في كشف الحساب
+let activeClientName = null;
+let isPortalModeActive = false; // هل الرابط مفتوح كصفحة خاصة بالعميل
 
 let categoryChartInstance = null;
 let balanceChartInstance = null;
@@ -184,7 +185,7 @@ function normalizeTransaction(t) {
     paidAmount: Number(t.paidAmount) || 0,
     date: t.date,
     time: sanitizeString(t.time || formatTimeTo12Hour(currentInputTimeString()), 20),
-    client: sanitizeString(t.client || '', 60), // حفظ اسم العميل
+    client: sanitizeString(t.client || '', 60),
     category: sanitizeString(t.category, 100),
     paymentMethod: sanitizeString(t.paymentMethod, 50),
     reference: sanitizeString(t.reference, 50),
@@ -197,7 +198,7 @@ function normalizeTransaction(t) {
 }
 
 /* =========================================================
-   RECEIPT IMAGE UPLOAD & RESIZE (CAMERA & GALLERY)
+   RECEIPT IMAGE UPLOAD & RESIZE
    ========================================================= */
 function handleReceiptSelected(event) {
   const file = event.target.files?.[0];
@@ -308,7 +309,7 @@ function applyPrivacyModeUI() {
 }
 
 /* =========================================================
-   CLIENTS AUTOCOMPLETE & DATALIST
+   CLIENTS AUTOCOMPLETE
    ========================================================= */
 function updateClientsDatalist() {
   const dl = document.getElementById('clientsDatalist');
@@ -328,6 +329,126 @@ function getAllClientNames() {
     if (t.client && t.client.trim()) set.add(t.client.trim());
   });
   return Array.from(set).sort();
+}
+
+/* =========================================================
+   PUBLIC CLIENT PORTAL ROUTING
+   ========================================================= */
+async function checkPublicPortalMode() {
+  const params = new URLSearchParams(window.location.search);
+  const clientParam = params.get('client');
+  const uidParam = params.get('uid');
+
+  if (!clientParam) return false;
+
+  isPortalModeActive = true;
+  document.body.classList.add('portal-mode');
+  hideAuthLoading();
+
+  let clientTransactions = [];
+
+  // إذا توفر uid نقرأ من سحابة صاحب الحساب، وإلا نقرأ من التخزين المحلي
+  if (uidParam) {
+    try {
+      const doc = await db.collection('users').doc(uidParam).get();
+      if (doc.exists && doc.data().transactions) {
+        const raw = doc.data().transactions || [];
+        clientTransactions = raw.filter(validateTransaction);
+      }
+    } catch(e) {
+      console.warn("Could not load from cloud, reading local:", e);
+    }
+  }
+
+  if (!clientTransactions.length) {
+    loadLocalData();
+    clientTransactions = transactions;
+  }
+
+  renderPublicPortal(clientParam, clientTransactions);
+  return true;
+}
+
+function renderPublicPortal(clientName, sourceTransactions) {
+  const portalView = document.getElementById('clientPortalView');
+  portalView.classList.remove('hidden');
+
+  document.getElementById('portalClientName').textContent = clientName;
+  document.getElementById('portalInitial').textContent = clientName.charAt(0).toUpperCase();
+
+  const txs = sourceTransactions.filter(t => !t._deleted && t.client && t.client.trim().toLowerCase() === clientName.toLowerCase())
+    .sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
+
+  let income = 0, debtRec = 0, debtPay = 0;
+  const tbody = document.getElementById('portalTransactionsTbody');
+  const empty = document.getElementById('portalEmptyState');
+  tbody.innerHTML = '';
+
+  document.getElementById('portalTxCount').textContent = `${txs.length} معاملة مسجلة`;
+
+  if (!txs.length) {
+    empty.classList.remove('hidden');
+  } else {
+    empty.classList.add('hidden');
+    txs.forEach(t => {
+      const amt = Number(t.amount) || 0;
+      const paid = Number(t.paidAmount) || 0;
+      const rem = Math.max(0, amt - paid);
+
+      if (t.type === 'income') income += amt;
+      else if (t.type === 'debt_receivable' && t.status !== 'paid') debtRec += rem;
+      else if (t.type === 'debt_payable' && t.status !== 'paid') debtPay += rem;
+
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 dark:hover:bg-dark-850/60';
+      tr.innerHTML = `
+        <td class="py-3 px-4">
+          <div class="font-bold text-slate-700 dark:text-slate-200">${escapeHTML(t.date)}</div>
+          <div class="text-[10px] text-orange-500 font-bold mt-0.5">${escapeHTML(formatTimeTo12Hour(t.time || ''))}</div>
+        </td>
+        <td class="py-3 px-4">
+          <div class="font-bold text-slate-800 dark:text-slate-100">${escapeHTML(t.notes || t.category)}</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">${escapeHTML(typeName(t.type))} ${t.status === 'paid' ? '• مسدد بالكامل' : ''}</div>
+        </td>
+        <td class="py-3 px-4 text-slate-500 dark:text-slate-400">${escapeHTML(t.paymentMethod || 'كاش')}</td>
+        <td class="py-3 px-4 font-black ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">
+          ${t.type === 'income' ? '+' : '-'}${money(t.amount)} ج.م
+        </td>
+        <td class="py-3 px-4 text-center">
+          ${t.receipt ? `<button onclick="viewReceiptImage('${t.receipt}')" class="text-orange-500 hover:underline font-bold"><i class="fa-solid fa-paperclip"></i> معاينة</button>` : '-'}
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById('portalTotalIncome').textContent = money(income) + ' ج.م';
+  document.getElementById('portalTotalDue').textContent = money(debtRec) + ' ج.م';
+  document.getElementById('portalTotalPayable').textContent = money(debtPay) + ' ج.م';
+}
+
+function getClientPortalLink(clientName) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('client', clientName);
+  if (currentUser) url.searchParams.set('uid', currentUser.uid);
+  return url.toString();
+}
+
+function copyClientPortalLink() {
+  if (!activeClientName) return;
+  const link = getClientPortalLink(activeClientName);
+  navigator.clipboard.writeText(link).then(() => {
+    showToast('تم نسخ رابط صفحة العميل بنجاح ✓', 'success');
+  }).catch(() => {
+    prompt('انسخ هذا الرابط وأرسله للعميل:', link);
+  });
+}
+
+function shareClientPortalWhatsApp() {
+  if (!activeClientName) return;
+  const link = getClientPortalLink(activeClientName);
+  const text = `مرحباً يا ${activeClientName}، تفضل رابط صفحة كشف حسابك المباشر لمتابعة كافة المعاملات المشتركة بيننا أولاً بأول:\n${link}\n\n— Honda Store`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
 
 /* =========================================================
@@ -1159,6 +1280,7 @@ function hideAuthLoading() {
   document.getElementById('authLoading').style.display = 'none';
 }
 function showLoginWall() {
+  if (isPortalModeActive) return;
   document.body.classList.add('not-authed');
   document.getElementById('loginWall').classList.remove('hidden');
   document.getElementById('loginWall').classList.add('flex');
@@ -1169,6 +1291,7 @@ function hideLoginWall() {
   document.getElementById('loginWall').classList.add('hidden');
 }
 function showPinLock() {
+  if (isPortalModeActive) return;
   document.getElementById('lockScreen').classList.remove('hidden');
   document.getElementById('lockScreen').classList.add('flex');
   document.getElementById('unlockPinInput').value = '';
@@ -1195,6 +1318,8 @@ function handleUserSwitch(uid) {
    AUTH STATE CHANGE
    ========================================================= */
 auth.onAuthStateChanged(async user => {
+  if (isPortalModeActive) return;
+
   hideAuthLoading();
   authResolved = true;
 
@@ -1356,15 +1481,17 @@ function applyTheme(theme) {
   document.documentElement.classList.toggle('dark', isDark);
   const icon = document.getElementById('themeIcon');
   const text = document.getElementById('themeText');
-  if (isDark) { icon.className = 'fa-solid fa-sun text-amber-500'; text.textContent = 'الوضع النهاري'; }
-  else { icon.className = 'fa-solid fa-moon text-slate-700'; text.textContent = 'الوضع الليلي'; }
+  if (icon && text) {
+    if (isDark) { icon.className = 'fa-solid fa-sun text-amber-500'; text.textContent = 'الوضع النهاري'; }
+    else { icon.className = 'fa-solid fa-moon text-slate-700'; text.textContent = 'الوضع الليلي'; }
+  }
 }
 function toggleTheme() {
   const isDark = document.documentElement.classList.contains('dark');
   const next = isDark ? 'light' : 'dark';
   localStorage.setItem(THEME_KEY, next);
   applyTheme(next);
-  updateCharts();
+  if (!isPortalModeActive) updateCharts();
 }
 
 /* =========================================================
@@ -1785,7 +1912,7 @@ function submitPartialDebtPayment() {
 }
 
 /* =========================================================
-   CLIENTS LEDGER (دفتر حسابات العملاء)
+   CLIENTS LEDGER & PORTAL SHARING
    ========================================================= */
 function renderClients() {
   const container = document.getElementById('clientsContainer');
@@ -1849,7 +1976,7 @@ function renderClients() {
         </div>
       </div>
       <div class="mt-3 pt-2 text-[10px] font-black text-orange-500 flex items-center justify-between">
-        <span>فتح كشف الحساب</span>
+        <span>فتح كشف الحساب والرابط</span>
         <i class="fa-solid fa-folder-open"></i>
       </div>
     `;
@@ -1928,40 +2055,6 @@ function openModalForSpecificClient() {
   setTimeout(() => {
     document.getElementById('formClient').value = name;
   }, 100);
-}
-
-function shareClientStatementWhatsApp() {
-  if (!activeClientName) return;
-  const name = activeClientName;
-  const txs = getActiveTransactions().filter(t => t.client && t.client.trim().toLowerCase() === name.toLowerCase())
-    .sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
-
-  let income = 0, debtRec = 0;
-  txs.forEach(t => {
-    const amt = Number(t.amount) || 0;
-    const paid = Number(t.paidAmount) || 0;
-    if (t.type === 'income') income += amt;
-    else if (t.type === 'debt_receivable' && t.status !== 'paid') debtRec += Math.max(0, amt - paid);
-  });
-
-  let text = `📋 *كشف حساب مالي | Honda Financial Manager*\n`;
-  text += `👤 *العميل:* ${name}\n`;
-  text += `📅 *تاريخ التقرير:* ${todayString()}\n`;
-  text += `----------------------------------------\n`;
-  text += `💰 *إجمالي الخدمات المستلمة:* ${money(income)} ج.م\n`;
-  text += `📌 *المبلغ المتبقي المعلق:* ${money(debtRec)} ج.م\n`;
-  text += `----------------------------------------\n`;
-  text += `*آخر العمليات المسجلة:*\n`;
-
-  txs.slice(0, 5).forEach((t, idx) => {
-    text += `${idx + 1}. ${t.date} - ${t.notes || t.category}: ${money(t.amount)} ج.م\n`;
-  });
-
-  text += `----------------------------------------\n`;
-  text += `شكراً لحسن تعاملكم معنا ✨`;
-
-  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank');
 }
 
 /* =========================================================
@@ -2391,7 +2484,7 @@ function downloadBackup() {
   if (!requireAuth()) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '8.6',
+    version: '8.7',
     createdAt: new Date().toISOString(),
     transactions,
     budget: getBudget(),
@@ -2702,6 +2795,7 @@ function loadDemoData() {
 }
 
 function refreshAll() {
+  if (isPortalModeActive) return;
   updateMetrics();
   renderTransactions();
   renderDebts();
@@ -2727,6 +2821,11 @@ document.addEventListener('keydown', event => {
    ========================================================= */
 window.addEventListener('DOMContentLoaded', async () => {
   initTheme();
+
+  // فحص ما إذا كان الرابط مفتوحاً كصفحة عميل مستقلة
+  const isPortal = await checkPublicPortalMode();
+  if (isPortal) return; // تم الانتقال لوضع صفحة العميل، لن تفتح شاشات تسجيل الدخول والداشبورد
+
   initPrivacyMode();
   loadLocalData();
   refreshAll();
