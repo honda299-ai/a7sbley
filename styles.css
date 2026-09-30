@@ -1,5 +1,5 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V8.5
+   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V8.6
    ========================================================= */
 
 * { box-sizing: border-box; }
@@ -420,7 +420,7 @@ body.not-authed #appFooter { display: none !important; }
   color: #f97316;
 }
 
-/* Privacy Mode Effect */
+/* وضع الخصوصية وتعتيم الأرقام */
 body.privacy-active .money-val {
   filter: blur(6px);
   user-select: none;

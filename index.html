@@ -71,8 +71,7 @@
             </button>
           </div>
 
-          <!-- Privacy Toggle Button -->
-          <button onclick="togglePrivacyMode()" id="privacyBtn" title="إخفاء/إظهار الأرقام للحماية"
+          <button onclick="togglePrivacyMode()" id="privacyBtn" title="إخفاء / إظهار المبالغ"
             class="p-2.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 hover:border-orange-500 text-slate-700 dark:text-slate-200 transition shadow-sm flex items-center gap-2 text-xs font-bold">
             <i id="privacyIcon" class="fa-solid fa-eye text-orange-500"></i>
             <span class="hidden md:inline">خصوصية</span>
@@ -143,7 +142,7 @@
           </div>
           <h2 class="text-2xl sm:text-3xl font-black tracking-tight">تحكّم في كل قرش.. ورصيد البركة يزيد!</h2>
           <p class="text-xs sm:text-sm text-slate-300 max-w-2xl font-medium leading-relaxed">
-            إدارة مصاريفك وإيراداتك وديونك وميزانيتك وصدقاتك في مكان واحد، محفوظة سحابياً على حسابك الخاص.
+            إدارة مصاريفك وإيراداتك وديونك وميزانيتك وحسابات عملائك في مكان واحد، سحابياً وآمناً.
           </p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
@@ -159,7 +158,7 @@
       </div>
     </section>
 
-    <!-- PERIOD SELECTION & CUSTOM DATE -->
+    <!-- الفترات الزمنية + اختيار فترة مخصصة -->
     <section class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div class="flex items-center gap-2">
@@ -189,7 +188,7 @@
       </div>
     </section>
 
-    <!-- METRICS CARDS -->
+    <!-- بطاقات الإحصائيات -->
     <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 no-print">
       <div class="glow-card bg-white dark:bg-dark-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-dark-800 shadow-sm">
         <div class="flex items-center justify-between mb-3">
@@ -251,14 +250,14 @@
       </div>
     </section>
 
-    <!-- WALLETS / CASH FLOW BREAKDOWN -->
+    <!-- تفصيل أرصدة الخزينة وطرق الدفع -->
     <section class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-4 no-print shadow-sm">
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-2">
           <i class="fa-solid fa-vault text-orange-500"></i>
           <h3 class="text-xs font-black">أرصدة الخزينة وطرق الدفع (صافي الفترة)</h3>
         </div>
-        <span class="text-[10px] text-slate-400 font-bold">دخل - صرف</span>
+        <span class="text-[10px] text-slate-400 font-bold">المتبقي بكل وسيلة</span>
       </div>
       <div id="walletsContainer" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5"></div>
     </section>
@@ -346,16 +345,20 @@
       </div>
     </section>
 
+    <!-- شريط التبويبات الرئيسي -->
     <div class="flex items-center gap-1 border-b border-slate-200 dark:border-dark-800 overflow-x-auto mobile-scroll no-print">
       <button onclick="switchTab('transactions')" id="tabBtnTransactions" class="tab-btn active">
         <i class="fa-solid fa-list-check"></i> المعاملات <span id="badgeTxCount" class="badge">0</span>
       </button>
       <button onclick="switchTab('debts')" id="tabBtnDebts" data-feature="debts" class="tab-btn">
-        <i class="fa-solid fa-users"></i> دفتر الديون <span id="badgeDebtCount" class="badge">0</span>
+        <i class="fa-solid fa-handshake"></i> دفتر الديون <span id="badgeDebtCount" class="badge">0</span>
+      </button>
+      <button onclick="switchTab('clients')" id="tabBtnClients" class="tab-btn">
+        <i class="fa-solid fa-users"></i> دفتر العملاء <span id="badgeClientCount" class="badge">0</span>
       </button>
     </div>
 
-    <!-- TRANSACTIONS PANEL -->
+    <!-- لوحة المعاملات -->
     <section id="panelTransactions" class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 shadow-sm overflow-hidden no-print">
       <div class="p-4 border-b border-slate-100 dark:border-dark-800 bg-slate-50/50 dark:bg-dark-850/50">
         <div class="flex flex-col lg:flex-row gap-3 justify-between">
@@ -366,17 +369,18 @@
             <button class="filter-pill" data-filter="charity" onclick="filterTransactions('charity')"><i class="fa-solid fa-heart text-orange-500"></i> خير</button>
           </div>
           <div class="relative w-full lg:w-80">
-            <input type="text" id="searchInput" oninput="debouncedRenderTransactions()" placeholder="ابحث في البيان، الوقت، المرجع، التصنيف..."
+            <input type="text" id="searchInput" oninput="debouncedRenderTransactions()" placeholder="ابحث في البيان، العميل، الوقت، المرجع..."
               class="w-full text-xs font-medium pr-9 pl-3 py-2.5 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500">
             <i class="fa-solid fa-magnifying-glass text-slate-400 absolute right-3 top-3"></i>
           </div>
         </div>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full text-right border-collapse min-w-[850px]">
+        <table class="w-full text-right border-collapse min-w-[900px]">
           <thead>
             <tr class="text-[10px] font-black text-slate-400 bg-slate-50 dark:bg-dark-850 border-b border-slate-100 dark:border-dark-800">
               <th class="py-3 px-4">النوع / البيان</th>
+              <th class="py-3 px-4">العميل / الطرف</th>
               <th class="py-3 px-4">التصنيف</th>
               <th class="py-3 px-4">الدفع</th>
               <th class="py-3 px-4">التاريخ والوقت</th>
@@ -396,12 +400,12 @@
       </div>
     </section>
 
-    <!-- DEBTS PANEL -->
+    <!-- لوحة الديون -->
     <section id="panelDebts" class="hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 shadow-sm overflow-hidden no-print">
       <div class="p-4 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between gap-3">
         <div>
           <h3 class="text-sm font-black">سجل الديون والمستحقات</h3>
-          <p class="text-[10px] text-slate-400">تابع ما لك وما عليك وسدد على دفعات</p>
+          <p class="text-[10px] text-slate-400">تابع ما لك وما عليك مع ميزة الدفعات الجزئية</p>
         </div>
         <button onclick="openModal('debt_receivable')"
           class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition">
@@ -415,6 +419,29 @@
         </div>
         <p class="text-sm font-black">دفتر الديون نظيف</p>
         <p class="text-xs text-slate-400 mt-1">لا توجد ديون معلقة</p>
+      </div>
+    </section>
+
+    <!-- لوحة دفتر العملاء (الجديدة) -->
+    <section id="panelClients" class="hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 shadow-sm overflow-hidden no-print">
+      <div class="p-4 border-b border-slate-100 dark:border-dark-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-black">دفتر حسابات العملاء</h3>
+          <p class="text-[10px] text-slate-400">قائمة منفصلة لكل شخص لمتابعة كشف حسابه الخاص</p>
+        </div>
+        <div class="relative w-full sm:w-64">
+          <input type="text" id="clientSearchInput" oninput="renderClients()" placeholder="ابحث باسم العميل..."
+            class="w-full text-xs font-medium pr-8 pl-3 py-2 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500">
+          <i class="fa-solid fa-magnifying-glass text-slate-400 absolute right-3 top-2.5 text-xs"></i>
+        </div>
+      </div>
+      <div id="clientsContainer" class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      <div id="emptyClientsState" class="hidden py-14 text-center">
+        <div class="w-14 h-14 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mx-auto mb-3">
+          <i class="fa-solid fa-user-group text-2xl"></i>
+        </div>
+        <p class="text-sm font-black">لا توجد حسابات عملاء مسجلة</p>
+        <p class="text-xs text-slate-400 mt-1">سجل اسم العميل عند إضافة أي دخل أو دين ليظهر حسابه هنا تلقائياً</p>
       </div>
     </section>
 
@@ -618,7 +645,7 @@
     </div>
   </div>
 
-  <!-- TRANSACTION MODAL (WITH ACTUAL TIME FIELD) -->
+  <!-- نافذة إضافة وتعديل العملية (مع حقل العميل والوقت والصورة) -->
   <div id="transactionModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
     <div class="fixed inset-0 bg-black/75 backdrop-blur-sm" onclick="closeModal()"></div>
     <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200 dark:border-dark-750 z-10 modal-enter max-h-[92vh] overflow-y-auto">
@@ -629,7 +656,7 @@
           </div>
           <div>
             <h3 id="modalTitle" class="text-base font-black">إضافة عملية</h3>
-            <span class="text-[10px] font-bold text-slate-400">سيتم حفظ العملية وتوقيتها الفعلي سحابياً</span>
+            <span class="text-[10px] font-bold text-slate-400">سيتم حفظ العملية وتوقيتها الفعلي والعميل سحابياً</span>
           </div>
         </div>
         <button onclick="closeModal()" class="w-8 h-8 rounded-xl text-slate-400 hover:text-white hover:bg-dark-800 flex items-center justify-center">
@@ -692,6 +719,19 @@
           </div>
         </div>
 
+        <!-- حقل اسم العميل (مع اقتراحات الأسماء السابقة) -->
+        <div>
+          <label class="field-label flex items-center justify-between">
+            <span>اسم العميل / الطرف الآخر (اختياري)</span>
+            <span class="text-[9px] text-slate-400">مثال: أحمد، محل السلام...</span>
+          </label>
+          <div class="relative">
+            <input type="text" id="formClient" list="clientsDatalist" maxlength="60" placeholder="اكتب اسم العميل لربطه بصفحته الخاصة" class="form-input pr-9">
+            <i class="fa-solid fa-user absolute right-3 top-3.5 text-slate-400 text-xs"></i>
+          </div>
+          <datalist id="clientsDatalist"></datalist>
+        </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="field-label">التصنيف *</label>
@@ -721,6 +761,26 @@
           <input type="text" id="formNotes" maxlength="200" placeholder="مثال: صيانة جهاز، سوفت وير، غداء..." class="form-input">
         </div>
 
+        <!-- حقل تصوير أو رفع صورة الفاتورة / الإيصال -->
+        <div>
+          <label class="field-label flex items-center justify-between">
+            <span>صورة الفاتورة / الإيصال (اختياري)</span>
+            <button type="button" id="removeReceiptBtn" onclick="clearReceiptImage()" class="hidden text-[10px] text-rose-500 font-bold hover:underline">
+              <i class="fa-solid fa-trash-can"></i> إزالة الصورة
+            </button>
+          </label>
+          <div class="flex items-center gap-3">
+            <label class="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-slate-300 dark:border-dark-750 bg-slate-50 dark:bg-dark-850 hover:border-orange-500 cursor-pointer transition text-xs font-bold text-slate-500 dark:text-slate-400">
+              <i class="fa-solid fa-camera text-orange-500"></i>
+              <span id="receiptUploadText">تصوير بالكاميرا أو اختيار صورة</span>
+              <input type="file" id="formReceiptFile" accept="image/*" capture="environment" class="hidden" onchange="handleReceiptSelected(event)">
+            </label>
+            <div id="receiptPreviewBox" class="hidden w-11 h-11 rounded-xl overflow-hidden border border-orange-500/40 shrink-0 cursor-pointer shadow-sm" onclick="viewReceiptImage(currentReceiptData)">
+              <img id="receiptPreviewImg" src="" class="w-full h-full object-cover" alt="معاينة">
+            </div>
+          </div>
+        </div>
+
         <div id="barakaBox" class="hidden p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-orange-500/30 text-xs text-orange-600 dark:text-orange-400">
           <div class="flex items-start gap-2.5">
             <i class="fa-solid fa-sparkles text-amber-500 mt-0.5"></i>
@@ -742,7 +802,92 @@
     </div>
   </div>
 
-  <!-- PARTIAL DEBT PAYMENT MODAL -->
+  <!-- نافذة كشف حساب العميل المخصص (بينك وبينه فقط) -->
+  <div id="clientLedgerModal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4">
+    <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" onclick="closeClientLedger()"></div>
+    <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-3xl w-full border border-slate-200 dark:border-dark-750 modal-enter max-h-[92vh] flex flex-col z-10 overflow-hidden">
+      <div class="p-5 px-6 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between bg-slate-50/50 dark:bg-dark-850/50 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center text-xl font-black shadow-lg">
+            <span id="clientModalInitial">A</span>
+          </div>
+          <div>
+            <h3 id="clientModalName" class="text-base font-black">كشف حساب</h3>
+            <p class="text-[10px] text-slate-400 font-bold">المعاملات المشتركة المسجلة مع هذا الطرف فقط</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="shareClientStatementWhatsApp()" title="إرسال كشف الحساب واتساب" class="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 transition">
+            <i class="fa-brands fa-whatsapp text-sm"></i>
+            <span class="hidden sm:inline">إرسال للعميل</span>
+          </button>
+          <button onclick="closeClientLedger()" class="w-8 h-8 rounded-xl text-slate-400 hover:text-white hover:bg-dark-800 flex items-center justify-center">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- ملخص مالي للعميل -->
+      <div class="p-4 grid grid-cols-3 gap-2 border-b border-slate-100 dark:border-dark-800 bg-slate-50/30 dark:bg-dark-950/40 shrink-0">
+        <div class="p-3 rounded-xl border border-slate-200 dark:border-dark-800 bg-white dark:bg-dark-900 text-center">
+          <div class="text-[10px] text-slate-400 font-bold">إجمالي الخدمات المنجزة</div>
+          <div id="clientTotalIncome" class="money-val text-sm sm:text-base font-black text-emerald-500 mt-1">0 ج.م</div>
+        </div>
+        <div class="p-3 rounded-xl border border-slate-200 dark:border-dark-800 bg-white dark:bg-dark-900 text-center">
+          <div class="text-[10px] text-slate-400 font-bold">باقي دين عليه (لك)</div>
+          <div id="clientTotalReceivable" class="money-val text-sm sm:text-base font-black text-cyan-500 mt-1">0 ج.م</div>
+        </div>
+        <div class="p-3 rounded-xl border border-slate-200 dark:border-dark-800 bg-white dark:bg-dark-900 text-center">
+          <div class="text-[10px] text-slate-400 font-bold">مستحق له (عليك)</div>
+          <div id="clientTotalPayable" class="money-val text-sm sm:text-base font-black text-purple-500 mt-1">0 ج.م</div>
+        </div>
+      </div>
+
+      <!-- قائمة العمليات المشتركة -->
+      <div class="p-4 flex-1 overflow-y-auto">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="text-xs font-black">سجل العمليات المشتركة</h4>
+          <button onclick="openModalForSpecificClient()" class="text-xs font-bold text-orange-500 hover:underline flex items-center gap-1">
+            <i class="fa-solid fa-plus text-[10px]"></i> إضافة عملية لهذا العميل
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-right text-xs">
+            <thead>
+              <tr class="text-[10px] font-black text-slate-400 border-b border-slate-100 dark:border-dark-800">
+                <th class="py-2.5 px-3">التاريخ والوقت</th>
+                <th class="py-2.5 px-3">النوع / البيان</th>
+                <th class="py-2.5 px-3">الدفع</th>
+                <th class="py-2.5 px-3">المبلغ</th>
+                <th class="py-2.5 px-3 text-center">فحص</th>
+              </tr>
+            </thead>
+            <tbody id="clientTransactionsTbody" class="divide-y divide-slate-100 dark:divide-dark-800"></tbody>
+          </table>
+        </div>
+        <div id="emptyClientTxState" class="hidden py-8 text-center text-xs text-slate-400 font-bold">
+          لا توجد عمليات مسجلة مع هذا الطرف حتى الآن
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- نافذة تكبير وفحص صورة الإيصال -->
+  <div id="receiptViewerModal" class="fixed inset-0 z-[110] hidden items-center justify-center p-4 bg-black/90 backdrop-blur-md" onclick="closeReceiptViewer()">
+    <div class="relative max-w-2xl w-full max-h-[90vh] flex flex-col items-center justify-center" onclick="event.stopPropagation()">
+      <button onclick="closeReceiptViewer()" class="absolute -top-12 left-0 text-white hover:text-orange-500 text-xl font-bold flex items-center gap-2 bg-dark-800/80 px-3 py-1.5 rounded-xl">
+        <i class="fa-solid fa-xmark"></i> إغلاق
+      </button>
+      <img id="viewerImageFull" src="" class="max-w-full max-h-[80vh] rounded-2xl object-contain shadow-2xl border border-white/10" alt="فاتورة">
+      <div class="mt-4 flex gap-2">
+        <a id="downloadReceiptLink" href="" download="receipt.jpg" class="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs flex items-center gap-2">
+          <i class="fa-solid fa-download"></i> تحميل الصورة
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- نافذة السداد الجزئي للديون -->
   <div id="debtPaymentModal" class="fixed inset-0 z-[65] hidden items-center justify-center p-4">
     <div class="fixed inset-0 bg-black/75 backdrop-blur-sm" onclick="closeDebtPaymentModal()"></div>
     <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-sm w-full border border-slate-200 dark:border-dark-750 p-6 modal-enter">
@@ -958,7 +1103,7 @@
 
         <div>
           <div class="flex items-center justify-between mb-3">
-            <label class="field-label mb-0">🎛️ صلاحيات فردية</label>
+            <label class="field-label mb-0">🎛 صلاحيات فردية</label>
             <button onclick="resetUserPermissionsOverride()" class="text-[10px] font-black text-rose-500 hover:underline">
               <i class="fa-solid fa-rotate-left"></i> إعادة الكل للدور
             </button>

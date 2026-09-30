@@ -1,7 +1,7 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V8.5
-   Time Tracking + Ghost/Privacy Mode + Wallets Breakdown 
-   + Partial Debt Settlement + WhatsApp Sharing + Custom Dates
+   EHSEBLI / HONDA FINANCIAL MANAGER V8.6
+   Client Ledger System + Camera & Image Upload + Time Tracking
+   + Privacy Mode + Wallets Breakdown + Partial Debt + WhatsApp
    ========================================================= */
 
 const SUPER_ADMIN_EMAILS = [
@@ -46,6 +46,8 @@ let userRole = 'free';
 let isSuperAdmin = false;
 let isPrivacyMode = false;
 let partialPaymentDebtId = null;
+let currentReceiptData = null;
+let activeClientName = null; // اسم العميل المعروض حالياً في كشف الحساب
 
 let categoryChartInstance = null;
 let balanceChartInstance = null;
@@ -96,7 +98,7 @@ const DEFAULT_PERMISSIONS = {
 let rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
 
 /* =========================================================
-   DATE & TIME HELPERS
+   DATE, TIME & IMAGE HELPERS
    ========================================================= */
 function todayString() {
   const d = new Date();
@@ -182,14 +184,104 @@ function normalizeTransaction(t) {
     paidAmount: Number(t.paidAmount) || 0,
     date: t.date,
     time: sanitizeString(t.time || formatTimeTo12Hour(currentInputTimeString()), 20),
+    client: sanitizeString(t.client || '', 60), // حفظ اسم العميل
     category: sanitizeString(t.category, 100),
     paymentMethod: sanitizeString(t.paymentMethod, 50),
     reference: sanitizeString(t.reference, 50),
     notes: sanitizeString(t.notes, 200),
+    receipt: t.receipt || null,
     status: t.status === 'paid' || t.status === 'pending' ? t.status : undefined,
     _deleted: t._deleted === true ? true : undefined,
     _updatedAt: Number(t._updatedAt) || Date.now()
   };
+}
+
+/* =========================================================
+   RECEIPT IMAGE UPLOAD & RESIZE (CAMERA & GALLERY)
+   ========================================================= */
+function handleReceiptSelected(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    showToast('يرجى اختيار ملف صورة صالح', 'error');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const MAX_WIDTH = 1000;
+      const MAX_HEIGHT = 1000;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+      } else {
+        if (height > MAX_HEIGHT) {
+          width *= MAX_HEIGHT / height;
+          height = MAX_HEIGHT;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      currentReceiptData = canvas.toDataURL('image/jpeg', 0.7);
+      setReceiptUI(currentReceiptData);
+      showToast('تم إرفاق صورة الإيصال بنجاح ✓', 'success');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setReceiptUI(base64) {
+  const box = document.getElementById('receiptPreviewBox');
+  const img = document.getElementById('receiptPreviewImg');
+  const text = document.getElementById('receiptUploadText');
+  const removeBtn = document.getElementById('removeReceiptBtn');
+
+  if (base64) {
+    img.src = base64;
+    box.classList.remove('hidden');
+    removeBtn.classList.remove('hidden');
+    text.textContent = 'تم اختيار صورة (اضغط للتغيير)';
+  } else {
+    img.src = '';
+    box.classList.add('hidden');
+    removeBtn.classList.add('hidden');
+    text.textContent = 'تصوير بالكاميرا أو اختيار صورة';
+    document.getElementById('formReceiptFile').value = '';
+  }
+}
+
+function clearReceiptImage() {
+  currentReceiptData = null;
+  setReceiptUI(null);
+}
+
+function viewReceiptImage(src) {
+  if (!src) return;
+  document.getElementById('viewerImageFull').src = src;
+  document.getElementById('downloadReceiptLink').href = src;
+  const modal = document.getElementById('receiptViewerModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function closeReceiptViewer() {
+  const modal = document.getElementById('receiptViewerModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
 }
 
 /* =========================================================
@@ -213,6 +305,29 @@ function applyPrivacyModeUI() {
   if (icon) {
     icon.className = isPrivacyMode ? 'fa-solid fa-eye-slash text-rose-500' : 'fa-solid fa-eye text-orange-500';
   }
+}
+
+/* =========================================================
+   CLIENTS AUTOCOMPLETE & DATALIST
+   ========================================================= */
+function updateClientsDatalist() {
+  const dl = document.getElementById('clientsDatalist');
+  if (!dl) return;
+  dl.innerHTML = '';
+  const clients = getAllClientNames();
+  clients.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c;
+    dl.appendChild(opt);
+  });
+}
+
+function getAllClientNames() {
+  const set = new Set();
+  getActiveTransactions().forEach(t => {
+    if (t.client && t.client.trim()) set.add(t.client.trim());
+  });
+  return Array.from(set).sort();
 }
 
 /* =========================================================
@@ -875,7 +990,7 @@ async function submitEmailAuth() {
       }
       showToast(`أهلاً بك يا ${displayName || 'صديقنا'} 🎉`, 'success');
     } else {
-      const cred = await auth.signInWithEmailAndPassword(email, password);
+      await auth.signInWithEmailAndPassword(email, password);
       showToast(`أهلاً بعودتك 👋`, 'success');
     }
   } catch (error) {
@@ -999,13 +1114,13 @@ const CATEGORIES = {
 };
 
 const DEMO_ITEMS = [
-  { id:'demo-1', type:'income', amount:1200, category:'خدمات سوفت وير وصيانة', paymentMethod:'كاش نقدي', notes:'إصلاح بوت لودر وفلاش 3 أجهزة', reference:'INV-1001', date:offsetDate(-1), time:'02:30 PM' },
-  { id:'demo-2', type:'charity', amount:150, category:'مساعدة محتاج وتفريج كربة', paymentMethod:'كاش نقدي', notes:'صدقة شكر بنية الرزق والبركة', reference:'', date:offsetDate(-1), time:'03:15 PM' },
-  { id:'demo-3', type:'expense', amount:380, category:'تفعيل وسيرفرات وكريدت', paymentMethod:'إنستاباي (InstaPay)', notes:'تفعيل باقة دونجل وسيرفر شاومي', reference:'EXP-3001', date:offsetDate(-2), time:'05:40 PM' },
-  { id:'demo-4', type:'income', amount:950, category:'شغل ريموت أونلاين', paymentMethod:'إنستاباي (InstaPay)', notes:'خدمة ريموت لمحل المنصورة', reference:'INV-1002', date:offsetDate(-2), time:'08:10 PM' },
-  { id:'demo-5', type:'expense', amount:90, category:'أكل ومشروبات', paymentMethod:'فودافون كاش / محفظة', notes:'غداء ومشروبات الشغل', reference:'', date:offsetDate(-3), time:'01:00 PM' },
-  { id:'demo-6', type:'debt_receivable', amount:650, paidAmount:200, category:'حساب محل صيانة', paymentMethod:'آجل / معلق', notes:'محل البرنس - باقي حساب فلاش 4 أجهزة', reference:'', status:'pending', date:offsetDate(-4), time:'11:20 AM' },
-  { id:'demo-7', type:'debt_payable', amount:400, paidAmount:0, category:'دين لمورد / موزّع سيرفر', paymentMethod:'آجل / معلق', notes:'كريدت سيرفر من الموزع محمد', reference:'', status:'pending', date:offsetDate(-5), time:'04:15 PM' }
+  { id:'demo-1', type:'income', amount:1200, category:'خدمات سوفت وير وصيانة', client:'أحمد', paymentMethod:'كاش نقدي', notes:'إصلاح بوت لودر وفلاش 3 أجهزة', reference:'INV-1001', date:offsetDate(-1), time:'02:30 PM' },
+  { id:'demo-2', type:'charity', amount:150, category:'مساعدة محتاج وتفريج كربة', client:'', paymentMethod:'كاش نقدي', notes:'صدقة شكر بنية الرزق والبركة', reference:'', date:offsetDate(-1), time:'03:15 PM' },
+  { id:'demo-3', type:'expense', amount:380, category:'تفعيل وسيرفرات وكريدت', client:'موزع سيرفر محمد', paymentMethod:'إنستاباي (InstaPay)', notes:'تفعيل باقة دونجل وسيرفر شاومي', reference:'EXP-3001', date:offsetDate(-2), time:'05:40 PM' },
+  { id:'demo-4', type:'income', amount:950, category:'شغل ريموت أونلاين', client:'محل المنصورة', paymentMethod:'إنستاباي (InstaPay)', notes:'خدمة ريموت لمحل المنصورة', reference:'INV-1002', date:offsetDate(-2), time:'08:10 PM' },
+  { id:'demo-5', type:'expense', amount:90, category:'أكل ومشروبات', client:'', paymentMethod:'فودافون كاش / محفظة', notes:'غداء ومشروبات الشغل', reference:'', date:offsetDate(-3), time:'01:00 PM' },
+  { id:'demo-6', type:'debt_receivable', amount:650, paidAmount:200, category:'حساب محل صيانة', client:'أحمد', paymentMethod:'آجل / معلق', notes:'باقي حساب فلاش 4 أجهزة', reference:'', status:'pending', date:offsetDate(-4), time:'11:20 AM' },
+  { id:'demo-7', type:'debt_payable', amount:400, paidAmount:0, category:'دين لمورد / موزّع سيرفر', client:'موزع سيرفر محمد', paymentMethod:'آجل / معلق', notes:'كريدت سيرفر', reference:'', status:'pending', date:offsetDate(-5), time:'04:15 PM' }
 ];
 
 /* =========================================================
@@ -1388,6 +1503,7 @@ function updateMetrics() {
   const debts = getActiveTransactions().filter(t => isDebt(t.type) && t.status !== 'paid');
   document.getElementById('badgeTxCount').textContent = daily.length;
   document.getElementById('badgeDebtCount').textContent = debts.length;
+  document.getElementById('badgeClientCount').textContent = getAllClientNames().length;
 
   renderWalletsBreakdown(metrics.wallets);
 }
@@ -1430,7 +1546,7 @@ function debouncedRenderTransactions() {
 }
 
 /* =========================================================
-   TRANSACTIONS RENDER (WITH ACTUAL TIME DISPLAY)
+   TRANSACTIONS RENDER
    ========================================================= */
 function filterTransactions(filter) {
   activeFilter = filter;
@@ -1451,7 +1567,7 @@ function renderTransactions() {
     if (isDebt(t.type)) return false;
     if (activeFilter !== 'all' && t.type !== activeFilter) return false;
     if (!search) return true;
-    const text = [t.category, t.notes, t.paymentMethod, t.reference, t.time, typeName(t.type)].join(' ').toLowerCase();
+    const text = [t.category, t.notes, t.client, t.paymentMethod, t.reference, t.time, typeName(t.type)].join(' ').toLowerCase();
     return text.includes(search);
   });
 
@@ -1483,10 +1599,24 @@ function renderTransactions() {
         <div class="flex items-center gap-2.5">
           ${badge}
           <div>
-            <div class="font-bold text-slate-800 dark:text-slate-100">${escapeHTML(item.notes || 'بدون بيان')}</div>
+            <div class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+              <span>${escapeHTML(item.notes || 'بدون بيان')}</span>
+              ${item.receipt ? `
+                <button onclick="viewReceiptImage('${item.receipt}')" title="عرض الفاتورة / الإيصال" class="text-orange-500 hover:text-orange-400">
+                  <i class="fa-solid fa-paperclip text-xs"></i>
+                </button>
+              ` : ''}
+            </div>
             ${item.reference ? `<div class="text-[9px] text-slate-400 mt-0.5">مرجع: ${escapeHTML(item.reference)}</div>` : ''}
           </div>
         </div>
+      </td>
+      <td class="py-3 px-4">
+        ${item.client ? `
+          <button onclick="openClientLedger('${escapeHTML(item.client)}')" class="inline-flex items-center gap-1 text-xs font-black text-orange-500 hover:underline">
+            <i class="fa-solid fa-user-circle"></i> ${escapeHTML(item.client)}
+          </button>
+        ` : '<span class="text-slate-400 text-[10px]">-</span>'}
       </td>
       <td class="py-3 px-4"><span class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-slate-300 font-bold text-[10px]">${escapeHTML(item.category)}</span></td>
       <td class="py-3 px-4 text-slate-500 dark:text-slate-400 font-semibold">${escapeHTML(item.paymentMethod || 'كاش نقدي')}</td>
@@ -1510,7 +1640,7 @@ function renderTransactions() {
 }
 
 /* =========================================================
-   DEBTS RENDER (WITH PARTIAL PAYMENTS)
+   DEBTS RENDER (WITH PARTIAL PAYMENTS & CLIENTS)
    ========================================================= */
 function renderDebts() {
   const container = document.getElementById('debtsContainer');
@@ -1549,8 +1679,16 @@ function renderDebts() {
             <i class="fa-solid ${isReceivable ? 'fa-user-plus' : 'fa-user-minus'}"></i>
           </div>
           <div class="min-w-0">
-            <h4 class="text-sm font-black truncate">${escapeHTML(d.notes || 'دين بدون بيان')}</h4>
+            <h4 class="text-sm font-black truncate flex items-center gap-1.5">
+              <span>${escapeHTML(d.notes || 'دين بدون بيان')}</span>
+              ${d.receipt ? `
+                <button onclick="viewReceiptImage('${d.receipt}')" title="عرض الفاتورة المرفقة" class="text-orange-500 hover:text-orange-400">
+                  <i class="fa-solid fa-paperclip text-xs"></i>
+                </button>
+              ` : ''}
+            </h4>
             <p class="text-[10px] text-slate-400 font-semibold mt-0.5">
+              ${d.client ? `<span class="text-orange-500 font-black cursor-pointer" onclick="openClientLedger('${escapeHTML(d.client)}')"><i class="fa-solid fa-user"></i> ${escapeHTML(d.client)} • </span>` : ''}
               ${escapeHTML(d.category)} • ${escapeHTML(d.date)} ${d.time ? '• ' + escapeHTML(formatTimeTo12Hour(d.time)) : ''}
             </p>
           </div>
@@ -1561,7 +1699,6 @@ function renderDebts() {
         </div>
       </div>
 
-      <!-- Debt Progress Bar -->
       ${!paid && paidAmt > 0 ? `
         <div class="mt-3">
           <div class="h-1.5 rounded-full bg-slate-200 dark:bg-dark-750 overflow-hidden">
@@ -1648,6 +1785,186 @@ function submitPartialDebtPayment() {
 }
 
 /* =========================================================
+   CLIENTS LEDGER (دفتر حسابات العملاء)
+   ========================================================= */
+function renderClients() {
+  const container = document.getElementById('clientsContainer');
+  const empty = document.getElementById('emptyClientsState');
+  const q = (document.getElementById('clientSearchInput')?.value || '').trim().toLowerCase();
+  container.innerHTML = '';
+
+  let clientNames = getAllClientNames();
+  if (q) clientNames = clientNames.filter(name => name.toLowerCase().includes(q));
+
+  if (!clientNames.length) {
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  clientNames.forEach(name => {
+    const txs = getActiveTransactions().filter(t => t.client && t.client.trim().toLowerCase() === name.toLowerCase());
+    let totalIncome = 0;
+    let totalDebtReceivable = 0;
+    let totalDebtPayable = 0;
+
+    txs.forEach(t => {
+      const amt = Number(t.amount) || 0;
+      const paid = Number(t.paidAmount) || 0;
+      if (t.type === 'income') totalIncome += amt;
+      else if (t.type === 'debt_receivable' && t.status !== 'paid') totalDebtReceivable += Math.max(0, amt - paid);
+      else if (t.type === 'debt_payable' && t.status !== 'paid') totalDebtPayable += Math.max(0, amt - paid);
+    });
+
+    const card = document.createElement('div');
+    card.className = 'glow-card bg-slate-50 dark:bg-dark-850 p-4 rounded-2xl border border-slate-200 dark:border-dark-750 cursor-pointer flex flex-col justify-between';
+    card.onclick = () => openClientLedger(name);
+
+    const initial = name.charAt(0).toUpperCase();
+
+    card.innerHTML = `
+      <div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center font-black text-sm">
+              ${escapeHTML(initial)}
+            </div>
+            <div>
+              <h4 class="font-black text-sm text-slate-800 dark:text-slate-100">${escapeHTML(name)}</h4>
+              <p class="text-[10px] text-slate-400 font-bold">${txs.length} معاملة مسجلة</p>
+            </div>
+          </div>
+          <span class="text-orange-500 text-xs"><i class="fa-solid fa-chevron-left"></i></span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-200/60 dark:border-dark-800">
+          <div class="text-[10px]">
+            <span class="text-slate-400 block font-bold">باقي عليه (لك):</span>
+            <span class="money-val font-black ${totalDebtReceivable > 0 ? 'text-cyan-500' : 'text-slate-500'}">${money(totalDebtReceivable)} ج.م</span>
+          </div>
+          <div class="text-[10px]">
+            <span class="text-slate-400 block font-bold">إجمالي الخدمات:</span>
+            <span class="money-val font-black text-emerald-500">${money(totalIncome)} ج.م</span>
+          </div>
+        </div>
+      </div>
+      <div class="mt-3 pt-2 text-[10px] font-black text-orange-500 flex items-center justify-between">
+        <span>فتح كشف الحساب</span>
+        <i class="fa-solid fa-folder-open"></i>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function openClientLedger(clientName) {
+  activeClientName = clientName;
+  document.getElementById('clientModalName').textContent = `كشف حساب: ${clientName}`;
+  document.getElementById('clientModalInitial').textContent = clientName.charAt(0).toUpperCase();
+
+  const txs = getActiveTransactions().filter(t => t.client && t.client.trim().toLowerCase() === clientName.toLowerCase())
+    .sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
+
+  let income = 0, debtRec = 0, debtPay = 0;
+  const tbody = document.getElementById('clientTransactionsTbody');
+  const empty = document.getElementById('emptyClientTxState');
+  tbody.innerHTML = '';
+
+  if (!txs.length) {
+    empty.classList.remove('hidden');
+  } else {
+    empty.classList.add('hidden');
+    txs.forEach(t => {
+      const amt = Number(t.amount) || 0;
+      const paid = Number(t.paidAmount) || 0;
+      const rem = Math.max(0, amt - paid);
+
+      if (t.type === 'income') income += amt;
+      else if (t.type === 'debt_receivable' && t.status !== 'paid') debtRec += rem;
+      else if (t.type === 'debt_payable' && t.status !== 'paid') debtPay += rem;
+
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 dark:hover:bg-dark-850/60';
+      tr.innerHTML = `
+        <td class="py-2.5 px-3">
+          <div class="font-bold">${escapeHTML(t.date)}</div>
+          <div class="text-[9px] text-orange-500 font-bold">${escapeHTML(formatTimeTo12Hour(t.time || ''))}</div>
+        </td>
+        <td class="py-2.5 px-3">
+          <div class="font-bold">${escapeHTML(t.notes || t.category)}</div>
+          <div class="text-[9px] text-slate-400">${escapeHTML(typeName(t.type))} ${t.status === 'paid' ? '• مسدد' : ''}</div>
+        </td>
+        <td class="py-2.5 px-3 text-slate-400 font-semibold">${escapeHTML(t.paymentMethod || 'كاش')}</td>
+        <td class="py-2.5 px-3 font-black ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">
+          ${t.type === 'income' ? '+' : '-'}${money(t.amount)} ج.م
+        </td>
+        <td class="py-2.5 px-3 text-center">
+          ${t.receipt ? `<button onclick="viewReceiptImage('${t.receipt}')" class="text-orange-500 hover:underline text-[10px] font-bold"><i class="fa-solid fa-image"></i> الفاتورة</button>` : '-'}
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById('clientTotalIncome').textContent = money(income) + ' ج.م';
+  document.getElementById('clientTotalReceivable').textContent = money(debtRec) + ' ج.م';
+  document.getElementById('clientTotalPayable').textContent = money(debtPay) + ' ج.م';
+
+  const modal = document.getElementById('clientLedgerModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function closeClientLedger() {
+  document.getElementById('clientLedgerModal').classList.add('hidden');
+  document.getElementById('clientLedgerModal').classList.remove('flex');
+  activeClientName = null;
+}
+
+function openModalForSpecificClient() {
+  const name = activeClientName;
+  closeClientLedger();
+  openModal('income');
+  setTimeout(() => {
+    document.getElementById('formClient').value = name;
+  }, 100);
+}
+
+function shareClientStatementWhatsApp() {
+  if (!activeClientName) return;
+  const name = activeClientName;
+  const txs = getActiveTransactions().filter(t => t.client && t.client.trim().toLowerCase() === name.toLowerCase())
+    .sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
+
+  let income = 0, debtRec = 0;
+  txs.forEach(t => {
+    const amt = Number(t.amount) || 0;
+    const paid = Number(t.paidAmount) || 0;
+    if (t.type === 'income') income += amt;
+    else if (t.type === 'debt_receivable' && t.status !== 'paid') debtRec += Math.max(0, amt - paid);
+  });
+
+  let text = `📋 *كشف حساب مالي | Honda Financial Manager*\n`;
+  text += `👤 *العميل:* ${name}\n`;
+  text += `📅 *تاريخ التقرير:* ${todayString()}\n`;
+  text += `----------------------------------------\n`;
+  text += `💰 *إجمالي الخدمات المستلمة:* ${money(income)} ج.م\n`;
+  text += `📌 *المبلغ المتبقي المعلق:* ${money(debtRec)} ج.م\n`;
+  text += `----------------------------------------\n`;
+  text += `*آخر العمليات المسجلة:*\n`;
+
+  txs.slice(0, 5).forEach((t, idx) => {
+    text += `${idx + 1}. ${t.date} - ${t.notes || t.category}: ${money(t.amount)} ج.م\n`;
+  });
+
+  text += `----------------------------------------\n`;
+  text += `شكراً لحسن تعاملكم معنا ✨`;
+
+  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank');
+}
+
+/* =========================================================
    WHATSAPP SHARE RECEIPT
    ========================================================= */
 function shareViaWhatsApp(id) {
@@ -1658,6 +1975,7 @@ function shareViaWhatsApp(id) {
   const text = 
 `🧾 *إشعار عملية مالية | Honda Financial Manager*
 ----------------------------------------
+👤 *العميل:* ${item.client || 'عميل محترم'}
 📌 *البيان:* ${item.notes || item.category}
 💰 *المبلغ:* ${money(item.amount)} ج.م
 📅 *التاريخ:* ${item.date} ${timeStr ? `(${timeStr})` : ''}
@@ -1740,7 +2058,7 @@ function updateCharts() {
 }
 
 /* =========================================================
-   TRANSACTION MODAL & TIME HANDLING
+   TRANSACTION MODAL & TIME / IMAGE / CLIENT HANDLING
    ========================================================= */
 function openModal(type = 'expense', id = null) {
   if (!requireAuth()) return;
@@ -1752,8 +2070,12 @@ function openModal(type = 'expense', id = null) {
   editingId = id;
   form.reset();
 
+  currentReceiptData = null;
+  setReceiptUI(null);
+
   document.getElementById('formDate').value = todayString();
   document.getElementById('formTime').value = currentInputTimeString();
+  updateClientsDatalist();
 
   if (id) {
     const item = transactions.find(t => t.id === id);
@@ -1764,10 +2086,17 @@ function openModal(type = 'expense', id = null) {
     document.getElementById('formAmount').value = item.amount;
     document.getElementById('formDate').value = item.date;
     document.getElementById('formTime').value = format12To24(item.time);
+    document.getElementById('formClient').value = item.client || '';
     document.getElementById('formCategory').value = item.category;
     document.getElementById('formPaymentMethod').value = item.paymentMethod || 'كاش نقدي';
     document.getElementById('formReference').value = item.reference || '';
     document.getElementById('formNotes').value = item.notes || '';
+
+    if (item.receipt) {
+      currentReceiptData = item.receipt;
+      setReceiptUI(item.receipt);
+    }
+
     document.getElementById('submitText').textContent = 'حفظ التعديل';
   } else {
     const radio = document.querySelector(`input[name="txType"][value="${type}"]`);
@@ -1786,6 +2115,7 @@ function closeModal() {
   modal.classList.add('hidden');
   modal.classList.remove('flex');
   editingId = null;
+  currentReceiptData = null;
 }
 
 function onTypeChange() {
@@ -1813,15 +2143,15 @@ function onTypeChange() {
     icon.innerHTML = '<i class="fa-solid fa-heart text-orange-500"></i>';
   } else if (type === 'income') {
     title.textContent = editingId ? 'تعديل الدخل' : 'تسجيل دخل / إيراد جديد';
-    notes.textContent = 'بيان الخدمة أو اسم العميل';
+    notes.textContent = 'بيان الخدمة بالتفصيل';
     icon.innerHTML = '<i class="fa-solid fa-arrow-trend-up text-emerald-500"></i>';
   } else if (type === 'debt_receivable') {
     title.textContent = editingId ? 'تعديل دين مستحق لي' : 'تسجيل دين مستحق لي';
-    notes.textContent = 'اسم الشخص / المحل مع التفاصيل *';
+    notes.textContent = 'بيان الدين والخدمة *';
     icon.innerHTML = '<i class="fa-solid fa-user-plus text-cyan-500"></i>';
   } else if (type === 'debt_payable') {
     title.textContent = editingId ? 'تعديل دين عليّ' : 'تسجيل دين مستحق عليّ';
-    notes.textContent = 'اسم الشخص / الجهة مع التفاصيل *';
+    notes.textContent = 'بيان الدين والالتزام *';
     icon.innerHTML = '<i class="fa-solid fa-user-minus text-purple-500"></i>';
   } else {
     title.textContent = editingId ? 'تعديل مصروف' : 'تسجيل مصروف جديد';
@@ -1840,6 +2170,7 @@ function handleFormSubmit(event) {
   const date = document.getElementById('formDate').value;
   const timeInput = document.getElementById('formTime').value;
   const time = formatTimeTo12Hour(timeInput || currentInputTimeString());
+  const client = sanitizeString(document.getElementById('formClient').value, 60);
   const category = document.getElementById('formCategory').value;
   const paymentMethod = document.getElementById('formPaymentMethod').value;
   const reference = sanitizeString(document.getElementById('formReference').value, 50);
@@ -1851,8 +2182,8 @@ function handleFormSubmit(event) {
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { 
     showToast('يرجى اختيار تاريخ صحيح', 'error'); return; 
   }
-  if (isDebt(type) && !notes) { 
-    showToast('اكتب اسم الشخص أو الجهة في البيان', 'error'); return; 
+  if (isDebt(type) && !notes && !client) { 
+    showToast('اكتب اسم العميل أو البيان لحفظ الدين', 'error'); return; 
   }
 
   if (!wasEditing && !canAddMoreTransactions()) {
@@ -1865,10 +2196,11 @@ function handleFormSubmit(event) {
     if (index === -1) return;
     const old = transactions[index];
     transactions[index] = normalizeTransaction({
-      ...old, type, amount, date, time, category,
+      ...old, type, amount, date, time, client, category,
       paymentMethod: isDebt(type) ? 'آجل / معلق' : paymentMethod,
       reference,
       notes: notes || (type === 'charity' ? 'صدقة لوجه الله' : category),
+      receipt: currentReceiptData,
       status: isDebt(type) ? (old.status || 'pending') : undefined,
       _updatedAt: Date.now()
     });
@@ -1876,11 +2208,12 @@ function handleFormSubmit(event) {
   } else {
     transactions.unshift(normalizeTransaction({
       id: 'tx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-      type, amount, date, time, category,
+      type, amount, date, time, client, category,
       paidAmount: 0,
       paymentMethod: isDebt(type) ? 'آجل / معلق' : paymentMethod,
       reference,
       notes: notes || (type === 'charity' ? 'صدقة لوجه الله' : category),
+      receipt: currentReceiptData,
       status: isDebt(type) ? 'pending' : undefined,
       _updatedAt: Date.now()
     }));
@@ -2058,7 +2391,7 @@ function downloadBackup() {
   if (!requireAuth()) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '8.5',
+    version: '8.6',
     createdAt: new Date().toISOString(),
     transactions,
     budget: getBudget(),
@@ -2111,10 +2444,10 @@ function exportToCSV() {
   if (!list.length) { showToast('لا توجد بيانات للتصدير', 'error'); return; }
 
   let csv = '\uFEFF';
-  csv += 'المعرف,النوع,المبلغ,التصنيف,طريقة الدفع,التاريخ,الوقت,المرجع,البيان,الحالة\n';
+  csv += 'المعرف,النوع,المبلغ,العميل,التصنيف,طريقة الدفع,التاريخ,الوقت,المرجع,البيان,الحالة\n';
   list.forEach(t => {
     const row = [
-      t.id, typeName(t.type), t.amount, t.category,
+      t.id, typeName(t.type), t.amount, t.client || '', t.category,
       t.paymentMethod || '', t.date, t.time || '', t.reference || '', t.notes || '',
       t.status === 'paid' ? 'مسدد' : t.status === 'pending' ? 'معلق' : 'منجز'
     ];
@@ -2164,6 +2497,7 @@ function printReport() {
           <thead>
             <tr style="background:#f97316;color:white;">
               <th style="padding:9px;border:1px solid #ddd;">التاريخ والوقت</th>
+              <th style="padding:9px;border:1px solid #ddd;">العميل</th>
               <th style="padding:9px;border:1px solid #ddd;">النوع</th>
               <th style="padding:9px;border:1px solid #ddd;">البيان</th>
               <th style="padding:9px;border:1px solid #ddd;">التصنيف</th>
@@ -2176,6 +2510,7 @@ function printReport() {
               .map(t => `
                 <tr>
                   <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.date)}${escapeHTML(t.time || '')}</td>
+                  <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.client || '-')}</td>
                   <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(typeName(t.type))}</td>
                   <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.notes || '')}</td>
                   <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.category || '')}</td>
@@ -2289,11 +2624,20 @@ async function forgotPinUnlock() {
 function switchTab(tab) {
   if (tab === 'debts' && !hasFeature('debts')) { showToast('دفتر الديون غير متاح لدورك', 'error'); return; }
   currentTab = tab;
+  
   const isTx = tab === 'transactions';
+  const isDebts = tab === 'debts';
+  const isClients = tab === 'clients';
+
   document.getElementById('panelTransactions').classList.toggle('hidden', !isTx);
-  document.getElementById('panelDebts').classList.toggle('hidden', isTx);
+  document.getElementById('panelDebts').classList.toggle('hidden', !isDebts);
+  document.getElementById('panelClients').classList.toggle('hidden', !isClients);
+
   document.getElementById('tabBtnTransactions').classList.toggle('active', isTx);
-  document.getElementById('tabBtnDebts').classList.toggle('active', !isTx);
+  document.getElementById('tabBtnDebts').classList.toggle('active', isDebts);
+  document.getElementById('tabBtnClients').classList.toggle('active', isClients);
+
+  if (isClients) renderClients();
 }
 
 let toastTimer = null;
@@ -2361,8 +2705,10 @@ function refreshAll() {
   updateMetrics();
   renderTransactions();
   renderDebts();
+  renderClients();
   updateCharts();
   updateBudget();
+  updateClientsDatalist();
   applyPrivacyModeUI();
 }
 
@@ -2371,7 +2717,8 @@ document.addEventListener('keydown', event => {
     closeModal(); closeConfirm(); closeBackupModal();
     closeBudgetModal(); closePinModal(); closeMenus();
     closeAdminPanel(); closeUserPermissionsModal();
-    closeDebtPaymentModal();
+    closeDebtPaymentModal(); closeReceiptViewer();
+    closeClientLedger();
   }
 });
 
