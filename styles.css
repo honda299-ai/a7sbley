@@ -1,77 +1,31 @@
-/* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER — Styles Mobile-First V15.0
-   ========================================================= */
-
-* { 
-  box-sizing: border-box; 
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-}
-
-input, textarea, select {
-  user-select: auto;
-}
-
-html { 
-  scroll-behavior: smooth; 
-  touch-action: manipulation;
-}
-
-body { 
-  min-height: 100vh; 
-  min-height: -webkit-fill-available;
-}
-
-/* دعم مناطق الآمان في الآيفون */
-.safe-bottom {
-  padding-bottom: max(10px, env(safe-area-inset-bottom));
-}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+input, textarea, select { user-select: auto; }
+html { scroll-behavior: smooth; touch-action: manipulation; }
+body { min-height: 100vh; min-height: -webkit-fill-available; }
 
 ::selection { background: #f97316; color: white; }
 ::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-thumb { background: #2a2e3d; border-radius: 999px; }
 
 .glow-orange { box-shadow: 0 0 25px -4px rgba(249, 115, 22, .45); }
-.text-brand-title {
-  background: linear-gradient(135deg, #ffffff 0%, #ffedd5 35%, #f97316 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 8px rgba(249, 115, 22, 0.4));
-}
-.dark .text-brand-title {
-  background: linear-gradient(135deg, #ffffff 10%, #fed7aa 55%, #ea580c 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.glow-card { transition: all 0.2s ease; }
-.glow-card:active { transform: scale(0.97); }
-
 .glass-dark { background: rgba(15, 17, 23, .92); backdrop-filter: blur(14px); }
 .glass-light { background: rgba(255, 255, 255, .94); backdrop-filter: blur(14px); }
 
 .modal-enter { animation: modalIn .2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-@keyframes modalIn { 
-  from { opacity: 0; transform: scale(.95) translateY(12px); } 
-  to { opacity: 1; transform: scale(1) translateY(0); } 
-}
+@keyframes modalIn { from { opacity: 0; transform: scale(.95) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 
 @keyframes floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 .animate-float { animation: floatY 3s ease-in-out infinite; }
 
-.splash-loader-bar { animation: loaderProgress 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
-@keyframes loaderProgress { 0% { width: 0%; transform: translateX(100%); } 50% { width: 70%; transform: translateX(0%); } 100% { width: 100%; transform: translateX(-100%); } }
+.safe-bottom { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
 
-.mobile-scroll { overflow-x: auto; scrollbar-width: none; }
-.mobile-scroll::-webkit-scrollbar { display: none; }
-
-body.not-authed #appHeader, 
-body.not-authed #appMain, 
-body.not-authed #appFooter, 
-body.not-authed #bottomAppNav { display: none !important; }
-
-.menu-item { width: 100%; text-align: right; padding: 10px 12px; border-radius: 12px; display: flex; align-items: center; gap: 9px; font-size: 11px; font-weight: 800; cursor: pointer; transition: .15s; }
-.menu-item:active { background: rgba(249, 115, 22, .12); }
+/* تصميم المستطيلات التفاعلية */
+.app-card-box {
+  transition: all 0.2s ease;
+}
+.app-card-box:active {
+  transform: scale(0.97);
+  background-color: rgba(249, 115, 22, 0.04);
+}
 
 .field-label { display: block; font-size: 11px; font-weight: 900; color: #64748b; margin-bottom: 5px; }
 .dark .field-label { color: #cbd5e1; }
@@ -80,55 +34,17 @@ body.not-authed #bottomAppNav { display: none !important; }
 .dark .form-input { background: #1e222d; border-color: #262b38; color: white; }
 .form-input:focus { border-color: #f97316; }
 
-.type-tile { min-height: 48px; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-size: 11px; font-weight: 900; background: rgba(255,255,255,0.03); transition: .15s; }
+.type-tile { min-height: 42px; border: 1px solid #e2e8f0; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 10px; font-weight: 900; background: rgba(255,255,255,0.03); }
 .dark .type-tile { border-color: #262b38; }
 
-.tab-btn { padding: 12px 18px; font-size: 12px; font-weight: 800; color: #64748b; border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 8px; cursor: pointer; background: transparent; }
-.tab-btn.active { color: #f97316; border-bottom-color: #f97316; }
+.badge { font-size: 9px; padding: 2px 7px; border-radius: 999px; background: rgba(249, 115, 22, .12); color: #f97316; font-weight: 900; }
 
-.badge { font-size: 9px; padding: 2px 7px; border-radius: 999px; background: rgba(249, 115, 22, .12); color: #f97316; }
-
-.filter-pill { padding: 6px 12px; border-radius: 10px; font-size: 10px; font-weight: 800; border: 1px solid #e2e8f0; background: white; color: #64748b; cursor: pointer; transition: .15s; }
-.dark .filter-pill { border-color: #262b38; background: #1e222d; color: #cbd5e1; }
-.filter-pill.active { background: #f97316; border-color: #f97316; color: white; }
-.filter-pill:active { transform: scale(0.95); }
-
-.period-btn { padding: 6px 12px; border-radius: 10px; background: #f8fafc; color: #64748b; font-size: 10px; font-weight: 800; border: none; cursor: pointer; transition: .15s; }
+.period-btn { padding: 6px 12px; border-radius: 10px; background: #f8fafc; color: #64748b; font-size: 10px; font-weight: 800; border: none; cursor: pointer; }
 .dark .period-btn { background: #1e222d; color: #94a3b8; }
 .period-btn.active { background: #f97316; color: white; }
-.period-btn:active { transform: scale(0.95); }
 
-/* أزرار شريط الموبايل السفلي */
-.app-nav-item { 
-  display: flex; 
-  flex-direction: column; 
-  align-items: center; 
-  justify-content: center; 
-  gap: 3px; 
-  font-size: 9px; 
-  font-weight: 800; 
-  color: #94a3b8; 
-  background: transparent; 
-  border: none; 
-  cursor: pointer; 
-  width: 55px; 
-  transition: transform .15s ease, color .15s ease;
-}
+.app-nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 9px; font-weight: 800; color: #94a3b8; background: transparent; border: none; cursor: pointer; width: 55px; }
 .app-nav-item.active { color: #f97316; }
 .app-nav-item i { font-size: 16px; }
-.app-nav-item:active { transform: scale(0.85); }
 
-/* كروت المعاملات الأصلية في الهاتف */
-.mobile-tx-card { 
-  padding: 10px 12px; 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-  transition: background .15s ease;
-}
-.mobile-tx-card:active { background: rgba(249, 115, 22, 0.06); }
-
-body.privacy-active .money-val {
-  filter: blur(6px);
-  transition: filter .2s ease;
-}
+.mobile-tx-card { padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; }
