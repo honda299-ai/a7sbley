@@ -1,5 +1,5 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V9.4
+   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V9.6
    Mobile App Native Look + Adaptive Splash Screen
    ========================================================= */
 
@@ -92,11 +92,7 @@ body {
 }
 .mobile-scroll::-webkit-scrollbar { display: none; }
 
-body.auth-pending #appHeader,
-body.auth-pending #appMain,
-body.auth-pending #appFooter,
-body.auth-pending #bottomAppNav { display: none !important; }
-
+/* لا نحجب عناصر الصفحة بالكامل حتى لا تعلق الشاشة */
 body.not-authed #appHeader,
 body.not-authed #appMain,
 body.not-authed #appFooter,

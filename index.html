@@ -9,6 +9,7 @@
   <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
   <title>احسبلي | a7sbley</title>
 
+  <!-- Favicon & App Icon -->
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
 
@@ -44,7 +45,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 
-<body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans min-h-screen flex flex-col transition-colors duration-300 auth-pending pb-24 md:pb-8">
+<body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans min-h-screen flex flex-col transition-colors duration-300 pb-24 md:pb-8">
 
   <!-- ================= SPLASH & LOADING SCREEN ================= -->
   <div id="splashScreen" class="fixed inset-0 z-[500] flex flex-col items-center justify-center transition-all duration-500 bg-white dark:bg-dark-950 text-slate-900 dark:text-white select-none">
@@ -56,10 +57,11 @@
       <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">احسبلي</h1>
       <span class="text-[11px] font-bold text-orange-500 tracking-widest mt-1">HONDA FINANCIAL MANAGER</span>
 
+      <!-- شريط التحميل -->
       <div class="w-44 h-1.5 bg-slate-200 dark:bg-dark-800 rounded-full mt-7 overflow-hidden relative">
         <div class="splash-loader-bar h-full bg-gradient-to-r from-orange-600 via-orange-500 to-amber-400 rounded-full"></div>
       </div>
-      <span id="splashStatusText" class="text-[10px] font-bold text-slate-400 mt-2.5">جاري مزامنة بياناتك...</span>
+      <span id="splashStatusText" class="text-[10px] font-bold text-slate-400 mt-2.5">جاري التحميل...</span>
     </div>
   </div>
 
@@ -68,7 +70,7 @@
     <div class="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between min-h-16 py-2.5 gap-2">
         
-        <!-- اللوجو مظبوط بنسبة 100% بدون قص أطراف -->
+        <!-- اللوجو -->
         <div class="flex items-center gap-2.5 shrink-0">
           <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl p-0.5 bg-black/40 border border-orange-500/30 flex items-center justify-center overflow-hidden shadow-sm">
             <img src="logo.png" alt="احسبلي" class="w-full h-full object-contain">
@@ -108,7 +110,7 @@
             <span>إضافة عملية</span>
           </button>
 
-          <!-- زر الثلاث نقاط مع صورة المستخدم وزر الخروج بداخله -->
+          <!-- زر الثلاث نقاط -->
           <div class="relative">
             <button onclick="toggleMenu()" id="menuBtn"
               class="p-1.5 sm:p-2 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-slate-600 dark:text-slate-300 hover:text-orange-500 transition flex items-center gap-1.5">
@@ -470,7 +472,7 @@
 
   </main>
 
-  <!-- ================= BOTTOM NAVIGATION BAR (MOBILE NATIVE APP) ================= -->
+  <!-- ================= BOTTOM NAVIGATION BAR (MOBILE APP) ================= -->
   <nav id="bottomAppNav" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-dark-900/95 backdrop-blur-md border-t border-slate-200 dark:border-dark-800 px-3 py-2 flex items-center justify-around no-print shadow-2xl">
     <button onclick="switchTab('transactions')" id="mNavTx" class="app-nav-item active">
       <i class="fa-solid fa-receipt"></i>
@@ -481,7 +483,7 @@
       <span>الديون</span>
     </button>
 
-    <!-- زر إضافة عملية العائم (FAB) -->
+    <!-- زر إضافة عملية العائم في المنتصف (FAB) -->
     <button onclick="openModal('expense')" class="w-12 h-12 -mt-6 rounded-full bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 text-white flex items-center justify-center text-lg shadow-xl glow-orange active:scale-90 transition">
       <i class="fa-solid fa-plus"></i>
     </button>
@@ -491,7 +493,7 @@
       <span>العملاء</span>
     </button>
     
-    <!-- زر المزيد شغال 100% ويفتح القائمة كاملة -->
+    <!-- زر المزيد -->
     <button onclick="toggleMobileMoreMenu(event)" id="mNavMore" class="app-nav-item">
       <i class="fa-solid fa-bars"></i>
       <span>المزيد</span>
@@ -515,18 +517,7 @@
 
   <!-- ================= MODALS & OVERLAYS ================= -->
 
-  <!-- AUTH LOADING -->
-  <div id="authLoading" class="fixed inset-0 z-[400] bg-dark-950 items-center justify-center flex">
-    <div class="text-center text-white">
-      <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 flex items-center justify-center mx-auto shadow-2xl glow-orange animate-float">
-        <i class="fa-solid fa-coins text-3xl"></i>
-      </div>
-      <div class="mt-6 text-base font-black">احسبلي</div>
-      <div class="mt-1 text-[11px] font-bold text-slate-400">جاري التحقق من الحساب...</div>
-    </div>
-  </div>
-
-  <!-- LOGIN WALL (كامل) -->
+  <!-- LOGIN WALL (كامل بكل طرق الدخول) -->
   <div id="loginWall" class="hidden fixed inset-0 z-[300] bg-gradient-to-br from-slate-950 via-dark-950 to-black text-white items-center justify-center p-4 overflow-y-auto">
     <div class="relative w-full max-w-md py-8">
       <div class="text-center">
@@ -1110,7 +1101,6 @@
 
   <div id="printReport" class="print-only"></div>
 
-  <!-- رقم إصدار كسر الكاش لضمان التحديث المباشر -->
-  <script src="app.js?v=9.5"></script>
+  <script src="app.js?v=9.6"></script>
 </body>
 </html>
