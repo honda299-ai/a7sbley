@@ -9,6 +9,7 @@
   <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
   <title>احسبلي | a7sbley</title>
 
+  <!-- Favicon & App Icon -->
   <link rel="icon" type="image/jpg" href="https://l.top4top.io/s_3926i5al91.jpg">
   <link rel="apple-touch-icon" href="https://l.top4top.io/p_3926i5al91.jpg">
 
@@ -36,6 +37,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
@@ -45,7 +47,7 @@
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans min-h-screen flex flex-col transition-colors duration-300 pb-24 md:pb-8">
 
-  <!-- شاشة التحميل -->
+  <!-- شاشة التحميل المتجاوبة السلسة -->
   <div id="splashScreen" class="fixed inset-0 z-[500] flex flex-col items-center justify-center transition-all duration-500 bg-white dark:bg-dark-950 text-slate-900 dark:text-white select-none">
     <div class="relative flex flex-col items-center">
       <div class="relative w-28 h-28 sm:w-32 sm:h-32 mb-5">
@@ -67,7 +69,7 @@
     <div class="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between min-h-16 py-2.5 gap-2">
         
-        <!-- اللوجو والعنوان بتدرج النيون البرتقالي والأبيض المتفاعل -->
+        <!-- اللوجو والعنوان بتدرج متفاعل وتوهج نيون -->
         <div class="flex items-center gap-2.5 shrink-0 group cursor-pointer" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
           <div class="relative w-10 h-10 sm:w-11 sm:h-11 rounded-2xl p-0.5 bg-black/60 border border-orange-500/40 flex items-center justify-center overflow-hidden shadow-lg group-hover:border-orange-400 group-hover:shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all duration-300">
             <img src="https://l.top4top.io/s_3926i5al91.jpg" alt="احسبلي" class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300">
@@ -88,7 +90,7 @@
           </div>
         </div>
 
-        <!-- أزرار التحكم في الهيدر -->
+        <!-- أزرار الهيدر -->
         <div class="flex items-center gap-1.5 sm:gap-2">
           <button onclick="togglePrivacyMode()" id="privacyBtn" title="إخفاء / إظهار المبالغ"
             class="p-2 sm:px-3 sm:py-2 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 hover:border-orange-500 text-slate-700 dark:text-slate-200 transition shadow-sm flex items-center gap-1.5 text-xs font-bold">
@@ -102,7 +104,8 @@
             <span id="themeText" class="hidden lg:inline">الوضع النهاري</span>
           </button>
 
-          <button type="button" id="headerAddBtn"
+          <!-- زر إضافة عملية المكتبي -->
+          <button type="button" onclick="openModal('expense')"
             class="hidden md:flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 active:scale-95 text-white font-black text-xs sm:text-sm shadow-lg glow-orange transition cursor-pointer">
             <i class="fa-solid fa-circle-plus"></i>
             <span>إضافة عملية</span>
@@ -150,7 +153,7 @@
     </div>
   </header>
 
-  <!-- كشف حساب العميل الإلكتروني -->
+  <!-- كشف حساب العميل الإلكتروني المباشر -->
   <div id="clientPortalView" class="hidden max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-6">
     <div class="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-dark-900 to-black text-white border border-dark-800 shadow-2xl relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="flex items-center gap-4">
@@ -227,7 +230,7 @@
       <span id="syncUserEmail" class="text-[10px] text-slate-400"></span>
     </div>
 
-    <!-- الفترات الزمنية -->
+    <!-- الفترات الزمنية السريعة -->
     <section class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-2.5 sm:p-3 shadow-sm no-print">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
         <div class="flex items-center gap-2">
@@ -309,7 +312,7 @@
       </div>
     </section>
 
-    <!-- الخزينة وطرق الدفع -->
+    <!-- الخزينة والمحافظ -->
     <section class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3.5 no-print shadow-sm">
       <div class="flex items-center justify-between mb-2.5">
         <div class="flex items-center gap-1.5">
@@ -372,6 +375,30 @@
         <div class="h-2 rounded-full bg-slate-100 dark:bg-dark-800 overflow-hidden">
           <div id="budgetBar" class="h-full rounded-full bg-gradient-to-r from-orange-600 to-amber-400 transition-all duration-500" style="width:0%"></div>
         </div>
+      </div>
+    </section>
+
+    <!-- الرسوم البيانية كاملة -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-5 no-print">
+      <div class="bg-white dark:bg-dark-900 p-5 rounded-2xl border border-slate-200 dark:border-dark-800 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-black flex items-center gap-2"><i class="fa-solid fa-chart-pie text-orange-500"></i> توزيع الخارج</h3>
+          <span class="text-[10px] text-slate-400 font-bold">حسب البند</span>
+        </div>
+        <div class="relative h-64">
+          <canvas id="categoryChart"></canvas>
+          <div id="noDataCategory" class="hidden absolute inset-0 items-center justify-center text-xs text-slate-400 font-bold">لا توجد بيانات</div>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-dark-900 p-5 rounded-2xl border border-slate-200 dark:border-dark-800 shadow-sm lg:col-span-2">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-sm font-black flex items-center gap-2"><i class="fa-solid fa-chart-column text-orange-500"></i> ملخص الفترة</h3>
+            <p class="text-[10px] text-slate-400">دخل مقابل مصاريف وخير</p>
+          </div>
+        </div>
+        <div class="relative h-64"><canvas id="balanceBarChart"></canvas></div>
       </div>
     </section>
 
@@ -438,7 +465,7 @@
           <p class="text-[9px] text-slate-400">تابع ما لك وما عليك</p>
         </div>
         <button onclick="openModal('debt_receivable')"
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition">
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition cursor-pointer">
           <i class="fa-solid fa-plus text-[10px]"></i> دين جديد
         </button>
       </div>
@@ -480,8 +507,8 @@
       <span>الديون</span>
     </button>
 
-    <!-- زر البلس العائم في المنتصف (FAB) يعمل فوراً بدون أي شروط حجب -->
-    <button type="button" id="mobileFabBtn" class="w-12 h-12 -mt-6 rounded-full bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 text-white flex items-center justify-center text-lg shadow-xl glow-orange active:scale-90 transition cursor-pointer">
+    <!-- زر البلس العائم في المنتصف (FAB) -->
+    <button type="button" onclick="openModal('expense')" class="w-12 h-12 -mt-6 rounded-full bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 text-white flex items-center justify-center text-lg shadow-xl glow-orange active:scale-90 transition cursor-pointer">
       <i class="fa-solid fa-plus"></i>
     </button>
 
@@ -770,7 +797,7 @@
     </div>
   </div>
 
-  <!-- نافذة كشف حساب العميل المخصص -->
+  <!-- نافذة كشف حساب العميل -->
   <div id="clientLedgerModal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4">
     <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" onclick="closeClientLedger()"></div>
     <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-3xl w-full border border-slate-200 dark:border-dark-750 modal-enter max-h-[92vh] flex flex-col z-10 overflow-hidden">
@@ -1095,7 +1122,7 @@
 
   <div id="printReport" class="print-only"></div>
 
-  <!-- رقم إصدار كسر الكاش لضمان التحديث المباشر للكونسول -->
-  <script src="app.js?v=10.0"></script>
+  <!-- رقم إصدار كسر الكاش لضمان سحب النسخة النظيفة فورا -->
+  <script src="app.js?v=11.0"></script>
 </body>
 </html>

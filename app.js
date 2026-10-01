@@ -1,10 +1,15 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V10.0
-   Clean Event Handlers + Instant Modal Triggers
+   EHSEBLI / HONDA FINANCIAL MANAGER V11.0
+   Clean Code: Complete Admin Panel + Role Permissions
+   Zero Undefined Data + Instant Realtime Sync + Days Filters
+   Smooth Adaptive Splash Screen + User Avatar Integration
    ========================================================= */
 
-const SUPER_ADMIN_EMAILS = ['hondastore299@gmail.com'];
+const SUPER_ADMIN_EMAILS = [
+  'hondastore299@gmail.com'
+];
 
+/* ---------- Firebase Config ---------- */
 const firebaseConfig = {
   apiKey: "AIzaSyAlPUHguP1juNajN0Y9dM3CFAJ-48Hlr0Y",
   authDomain: "a7sble.firebaseapp.com",
@@ -20,6 +25,7 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+/* ---------- Storage Keys ---------- */
 const STORAGE_KEY = 'ehsebli_honda_data_v2';
 const THEME_KEY = 'ehsebli_theme_v2';
 const BUDGET_KEY = 'ehsebli_budget_v2';
@@ -28,6 +34,7 @@ const PRIVACY_KEY = 'ehsebli_privacy_v1';
 const LAST_UID_KEY = 'ehsebli_last_uid';
 const PERMS_CACHE_KEY = 'ehsebli_perms_cache';
 
+/* ---------- State ---------- */
 let currentUser = null;
 let transactions = [];
 let activeFilter = 'all';
@@ -63,6 +70,7 @@ let emailMode = 'signin';
 let confirmationResult = null;
 let recaptchaVerifier = null;
 
+/* ---------- Roles Metadata ---------- */
 const ROLES_META = {
   free:     { name: 'مجاني',  icon: 'fa-user',           badgeClasses: 'bg-slate-500/10 border-slate-500/30 text-slate-400' },
   personal: { name: 'شخصي',   icon: 'fa-user-circle',    badgeClasses: 'bg-purple-500/10 border-purple-500/30 text-purple-400' },
@@ -90,22 +98,31 @@ const DEFAULT_PERMISSIONS = {
 
 let rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
 
+/* =========================================================
+   DATE, TIME & SANITIZATION HELPERS
+   ========================================================= */
 function todayString() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
+
 function yesterdayString() {
-  const d = new Date(); d.setDate(d.getDate() - 1);
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
+
 function beforeYesterdayString() {
-  const d = new Date(); d.setDate(d.getDate() - 2);
+  const d = new Date();
+  d.setDate(d.getDate() - 2);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
+
 function currentInputTimeString() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
+
 function formatTimeTo12Hour(timeStr) {
   if (!timeStr) return '';
   if (/am|pm/i.test(timeStr)) return timeStr;
@@ -117,6 +134,7 @@ function formatTimeTo12Hour(timeStr) {
   h = h % 12 || 12;
   return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
 }
+
 function format12To24(time12) {
   if (!time12) return currentInputTimeString();
   const match = time12.match(/(\d+):(\d+)\s*(AM|PM)/i);
@@ -128,22 +146,35 @@ function format12To24(time12) {
   if (ampm === 'AM' && h === 12) h = 0;
   return `${String(h).padStart(2, '0')}:${m}`;
 }
+
 function offsetDate(days) {
-  const d = new Date(); d.setDate(d.getDate() + days);
+  const d = new Date();
+  d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-function money(value) { return Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
-function escapeHTML(value) {
-  return String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+
+function money(value) { 
+  return Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }); 
 }
+
+function escapeHTML(value) {
+  return String(value ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
 function sanitizeString(str, maxLength = 500) {
   return String(str || '').replace(/[\u0000-\u001F\u007F]/g, '').slice(0, maxLength).trim();
 }
+
 function isDebt(type) { return String(type || '').startsWith('debt_'); }
+
 function typeName(type) {
   return ({ income:'دخل', expense:'مصروف', charity:'باب الخير', debt_receivable:'دين ليا', debt_payable:'دين عليا' })[type] || type;
 }
+
 function getActiveTransactions() { return transactions.filter(t => !t._deleted); }
+
 function isSuperAdminEmail(email) {
   return SUPER_ADMIN_EMAILS.map(e => e.toLowerCase().trim()).includes(String(email || '').toLowerCase().trim());
 }
@@ -186,7 +217,9 @@ const CATEGORIES = {
   debt_payable: ['دين لمورد / موزّع سيرفر','سلف مستحق للغير','فاتورة مؤجلة','شراء آجل','أخرى']
 };
 
-/* فتح وإغلاق مودال العملية مباشرة وبدون شروط تمنع الظهور */
+/* =========================================================
+   OPEN & CLOSE TRANSACTION MODAL (مباشر وبدون شروط حجب)
+   ========================================================= */
 function openModal(type = 'expense', id = null) {
   const modal = document.getElementById('transactionModal');
   const form = document.getElementById('transactionForm');
@@ -282,8 +315,12 @@ function handleFormSubmit(event) {
   const paymentMethod = document.getElementById('formPaymentMethod')?.value || 'كاش نقدي';
   const notes = sanitizeString(document.getElementById('formNotes')?.value, 200);
 
-  if (!amount || amount <= 0 || amount > 1e9) { showToast('يرجى إدخال مبلغ صحيح', 'error'); return; }
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { showToast('يرجى اختيار تاريخ صحيح', 'error'); return; }
+  if (!amount || amount <= 0 || amount > 1e9) { 
+    showToast('يرجى إدخال مبلغ صحيح', 'error'); return; 
+  }
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { 
+    showToast('يرجى اختيار تاريخ صحيح', 'error'); return; 
+  }
 
   if (wasEditing) {
     const index = transactions.findIndex(t => t.id === editingId);
@@ -800,34 +837,52 @@ function renderTransactions() {
   empty?.classList.add('hidden');
 
   list.forEach(item => {
-    const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-50 dark:hover:bg-dark-850/60';
-    tr.innerHTML = `
-      <td class="py-3 px-4 font-bold">${escapeHTML(item.notes || item.category)}</td>
-      <td class="py-3 px-4 text-orange-500 font-bold">${escapeHTML(item.client || '-')}</td>
-      <td class="py-3 px-4">${escapeHTML(item.category)}</td>
-      <td class="py-3 px-4 text-slate-400">${escapeHTML(item.paymentMethod)}</td>
-      <td class="py-3 px-4 font-bold text-xs">${escapeHTML(item.date)}</td>
-      <td class="py-3 px-4 font-black ${item.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">${item.type === 'income' ? '+' : '-'}${money(item.amount)} ج.م</td>
-      <td class="py-3 px-4 text-center">
-        <button onclick="editTransaction('${item.id}')" class="p-1.5 text-slate-400 hover:text-orange-500"><i class="fa-solid fa-pen"></i></button>
-        <button onclick="deleteTransaction('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash-can"></i></button>
-      </td>
-    `;
-    tbody?.appendChild(tr);
+    let badge = '', amount = '', isInc = item.type === 'income', isCharity = item.type === 'charity';
+    if (isInc) {
+      badge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-black bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">دخل</span>`;
+      amount = `<span class="money-val font-black text-emerald-500">+${money(item.amount)} ج.م</span>`;
+    } else if (isCharity) {
+      badge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-black bg-orange-500/10 text-orange-500 border border-orange-500/20">خير</span>`;
+      amount = `<span class="money-val font-black text-orange-500">-${money(item.amount)} ج.م</span>`;
+    } else {
+      badge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-black bg-rose-500/10 text-rose-500 border border-rose-500/20">مصروف</span>`;
+      amount = `<span class="money-val font-black text-rose-500">-${money(item.amount)} ج.م</span>`;
+    }
 
-    const card = document.createElement('div');
-    card.className = 'mobile-tx-card border-b border-slate-100 dark:border-dark-800 p-2.5';
-    card.innerHTML = `
-      <div class="flex justify-between items-center">
-        <div>
-          <div class="font-bold text-xs">${escapeHTML(item.notes || item.category)}</div>
-          <div class="text-[10px] text-slate-400">${escapeHTML(item.date)} • ${escapeHTML(item.client || 'عام')}</div>
+    const timeFormatted = item.time ? formatTimeTo12Hour(item.time) : '';
+
+    if (tbody) {
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 dark:hover:bg-dark-850/60';
+      tr.innerHTML = `
+        <td class="py-3 px-4 font-bold">${escapeHTML(item.notes || item.category)}</td>
+        <td class="py-3 px-4 text-orange-500 font-bold">${escapeHTML(item.client || '-')}</td>
+        <td class="py-3 px-4">${escapeHTML(item.category)}</td>
+        <td class="py-3 px-4 text-slate-400">${escapeHTML(item.paymentMethod)}</td>
+        <td class="py-3 px-4 font-bold text-xs">${escapeHTML(item.date)}</td>
+        <td class="py-3 px-4 font-black ${item.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">${amount}</td>
+        <td class="py-3 px-4 text-center">
+          <button onclick="editTransaction('${item.id}')" class="p-1.5 text-slate-400 hover:text-orange-500"><i class="fa-solid fa-pen"></i></button>
+          <button onclick="deleteTransaction('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash-can"></i></button>
+        </td>
+      `;
+      tbody?.appendChild(tr);
+    }
+
+    if (mobileList) {
+      const card = document.createElement('div');
+      card.className = 'mobile-tx-card border-b border-slate-100 dark:border-dark-800 p-2.5';
+      card.innerHTML = `
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="font-bold text-xs">${escapeHTML(item.notes || item.category)}</div>
+            <div class="text-[10px] text-slate-400">${escapeHTML(item.date)} • ${escapeHTML(item.client || 'عام')}</div>
+          </div>
+          <div class="font-black text-sm ${item.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">${amount}</div>
         </div>
-        <div class="font-black text-sm ${item.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">${item.type === 'income' ? '+' : '-'}${money(item.amount)}</div>
-      </div>
-    `;
-    mobileList?.appendChild(card);
+      `;
+      mobileList?.appendChild(card);
+    }
   });
 }
 
@@ -947,14 +1002,41 @@ function saveBudget() {
   const val = Number(document.getElementById('budgetInput').value);
   localStorage.setItem(BUDGET_KEY, val);
   closeBudgetModal();
-  saveData();
+  updateBudget();
+  syncToCloud();
   showToast('تم حفظ الميزانية', 'success');
 }
 function clearBudget() {
   localStorage.removeItem(BUDGET_KEY);
   closeBudgetModal();
-  saveData();
+  updateBudget();
+  syncToCloud();
   showToast('تم حذف الميزانية', 'info');
+}
+
+function updateBudget() {
+  const budget = getBudget();
+  const monthItems = getActiveTransactions().filter(t => isInPeriod(t.date, 'month'));
+  let used = 0;
+  monthItems.forEach(t => {
+    if (t.type === 'expense' || t.type === 'charity') used += Number(t.amount || 0);
+  });
+
+  const bUsed = document.getElementById('budgetUsed');
+  if (bUsed) bUsed.textContent = money(used);
+
+  const bTotal = document.getElementById('budgetTotal');
+  const bBar = document.getElementById('budgetBar');
+
+  if (!budget) {
+    if (bTotal) bTotal.textContent = 'غير محددة';
+    if (bBar) bBar.style.width = '0%';
+    return;
+  }
+
+  if (bTotal) bTotal.textContent = money(budget) + ' ج.م';
+  const percent = Math.min(100, (used / budget) * 100);
+  if (bBar) bBar.style.width = percent + '%';
 }
 
 function openBackupModal() {
@@ -1026,9 +1108,13 @@ function refreshAll() {
   renderTransactions();
   renderDebts();
   renderClients();
+  updateBudget();
+  updateCharts();
 }
 
-/* ربط فوري لأزرار الإضافة في الصفحة لضمان الاستجابة من أول لمسة */
+/* =========================================================
+   INITIAL BOOT
+   ========================================================= */
 window.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   const isPortal = await checkPublicPortalMode();
@@ -1037,10 +1123,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   initPrivacyMode();
   loadLocalData();
   refreshAll();
-
-  // ربط أزرار الإضافة مباشرة
-  document.getElementById('headerAddBtn')?.addEventListener('click', () => openModal('expense'));
-  document.getElementById('mobileFabBtn')?.addEventListener('click', () => openModal('expense'));
 
   setTimeout(() => { hideAuthLoading(); }, 1200);
 });
