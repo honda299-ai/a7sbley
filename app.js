@@ -1,7 +1,7 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V8.7
-   Public Client Portal View + Custom Date Range + Image Upload 
-   + Privacy Mode + Wallets Breakdown + Partial Debt + WhatsApp
+   EHSEBLI / HONDA FINANCIAL MANAGER V8.8
+   Realtime Live Sync (Firestore onSnapshot)
+   Fast Image Compression + Client Portal + Time Tracking
    ========================================================= */
 
 const SUPER_ADMIN_EMAILS = [
@@ -48,7 +48,7 @@ let isPrivacyMode = false;
 let partialPaymentDebtId = null;
 let currentReceiptData = null;
 let activeClientName = null;
-let isPortalModeActive = false; // هل الرابط مفتوح كصفحة خاصة بالعميل
+let isPortalModeActive = false;
 
 let categoryChartInstance = null;
 let balanceChartInstance = null;
@@ -64,6 +64,7 @@ let usersSearchQuery = '';
 let editingUserPermissions = null;
 let currentUserPermissionsOverride = null;
 let userDocUnsubscribe = null;
+let transactionsUnsubscribe = null; // لاشتراك المزامنة اللحظية للعمليات
 
 let currentLoginMethod = 'google';
 let emailMode = 'signin';
@@ -198,7 +199,7 @@ function normalizeTransaction(t) {
 }
 
 /* =========================================================
-   RECEIPT IMAGE UPLOAD & RESIZE
+   RECEIPT IMAGE UPLOAD & FAST COMPRESSION
    ========================================================= */
 function handleReceiptSelected(event) {
   const file = event.target.files?.[0];
@@ -214,8 +215,9 @@ function handleReceiptSelected(event) {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const MAX_WIDTH = 1000;
-      const MAX_HEIGHT = 1000;
+      // تقليل الحجم لـ 600px وجودة 0.5 لسرعة النقل وتفادي امتلاء المستند
+      const MAX_WIDTH = 600;
+      const MAX_HEIGHT = 600;
       let width = img.width;
       let height = img.height;
 
@@ -236,9 +238,9 @@ function handleReceiptSelected(event) {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
 
-      currentReceiptData = canvas.toDataURL('image/jpeg', 0.7);
+      currentReceiptData = canvas.toDataURL('image/jpeg', 0.5);
       setReceiptUI(currentReceiptData);
-      showToast('تم إرفاق صورة الإيصال بنجاح ✓', 'success');
+      showToast('تم ضغط وإرفاق الصورة بنجاح ✓', 'success');
     };
     img.src = e.target.result;
   };
@@ -347,7 +349,6 @@ async function checkPublicPortalMode() {
 
   let clientTransactions = [];
 
-  // إذا توفر uid نقرأ من سحابة صاحب الحساب، وإلا نقرأ من التخزين المحلي
   if (uidParam) {
     try {
       const doc = await db.collection('users').doc(uidParam).get();
@@ -1315,7 +1316,7 @@ function handleUserSwitch(uid) {
 }
 
 /* =========================================================
-   AUTH STATE CHANGE
+   AUTH STATE CHANGE (WITH REALTIME LISTENER)
    ========================================================= */
 auth.onAuthStateChanged(async user => {
   if (isPortalModeActive) return;
@@ -1358,6 +1359,7 @@ auth.onAuthStateChanged(async user => {
     switchTab('transactions');
 
     subscribeToUserDoc(user.uid);
+    subscribeToCloudTransactions(user.uid); // تفعيل المزامنة اللحظية الحية هنا
     updatePinUI();
 
     loadCloudData(user.uid).finally(() => {
@@ -1375,6 +1377,10 @@ auth.onAuthStateChanged(async user => {
       try { userDocUnsubscribe(); } catch(e) {}
       userDocUnsubscribe = null;
     }
+    if (transactionsUnsubscribe) {
+      try { transactionsUnsubscribe(); } catch(e) {}
+      transactionsUnsubscribe = null;
+    }
     
     hidePinLock();
     showLoginWall();
@@ -1391,6 +1397,32 @@ function logout() {
   });
 }
 function logoutFromLock() { auth.signOut(); }
+
+/* =========================================================
+   REALTIME TRANSACTIONS LISTENER
+   ========================================================= */
+function subscribeToCloudTransactions(uid) {
+  if (transactionsUnsubscribe) {
+    try { transactionsUnsubscribe(); } catch(e) {}
+    transactionsUnsubscribe = null;
+  }
+
+  // الاستماع اللحظي الفوري لأي إضافة أو تعديل من أي جهاز
+  transactionsUnsubscribe = db.collection('users').doc(uid).onSnapshot(doc => {
+    if (!doc.exists) return;
+    const data = doc.data();
+    if (Array.isArray(data.transactions)) {
+      transactions = mergeTransactions(transactions, data.transactions);
+      if (data.budget !== undefined) {
+        localStorage.setItem(BUDGET_KEY, data.budget);
+      }
+      saveLocalData();
+      refreshAll();
+    }
+  }, err => {
+    console.warn("Realtime transactions sync warning:", err);
+  });
+}
 
 /* =========================================================
    CLOUD SYNC & MERGE
@@ -2151,7 +2183,7 @@ function updateCharts() {
 }
 
 /* =========================================================
-   TRANSACTION MODAL & TIME / IMAGE / CLIENT HANDLING
+   TRANSACTION MODAL & FORM SUBMIT
    ========================================================= */
 function openModal(type = 'expense', id = null) {
   if (!requireAuth()) return;
@@ -2484,7 +2516,7 @@ function downloadBackup() {
   if (!requireAuth()) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '8.7',
+    version: '8.8',
     createdAt: new Date().toISOString(),
     transactions,
     budget: getBudget(),
@@ -2824,7 +2856,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // فحص ما إذا كان الرابط مفتوحاً كصفحة عميل مستقلة
   const isPortal = await checkPublicPortalMode();
-  if (isPortal) return; // تم الانتقال لوضع صفحة العميل، لن تفتح شاشات تسجيل الدخول والداشبورد
+  if (isPortal) return;
 
   initPrivacyMode();
   loadLocalData();
