@@ -1,25 +1,14 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V9.4
+   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V8.7
    ========================================================= */
 
-* { 
-  box-sizing: border-box; 
-  -webkit-tap-highlight-color: transparent;
-}
-
-html { 
-  scroll-behavior: smooth; 
-  touch-action: manipulation;
-}
-
-body { 
-  min-height: 100vh;
-  min-height: -webkit-fill-available;
-}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { min-height: 100vh; }
 
 ::selection { background: #f97316; color: white; }
 
-::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2a2e3d; border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: #f97316; }
@@ -33,15 +22,14 @@ body {
   box-shadow: 0 10px 30px -10px rgba(249, 115, 22, .25);
   border-color: rgba(249, 115, 22, .4);
 }
-.glow-card:active { transform: scale(0.98); }
 
 .glass-dark {
-  background: rgba(15, 17, 23, .9);
+  background: rgba(15, 17, 23, .86);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
 .glass-light {
-  background: rgba(255, 255, 255, .92);
+  background: rgba(255, 255, 255, .9);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
@@ -59,15 +47,6 @@ body {
 }
 .animate-float { animation: floatY 3s ease-in-out infinite; }
 
-.splash-loader-bar {
-  animation: loaderProgress 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-}
-@keyframes loaderProgress {
-  0% { width: 0%; transform: translateX(100%); }
-  50% { width: 70%; transform: translateX(0%); }
-  100% { width: 100%; transform: translateX(-100%); }
-}
-
 .print-only { display: none; }
 @media print {
   body * { visibility: hidden !important; }
@@ -83,27 +62,22 @@ body {
   .no-print { display: none !important; }
 }
 
-.mobile-scroll { 
-  overflow-x: auto; 
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+@media (max-width: 640px) {
+  .mobile-scroll { overflow-x: auto; }
+  .mobile-scroll > * { min-width: max-content; }
 }
-.mobile-scroll::-webkit-scrollbar { display: none; }
 
 body.auth-pending #appHeader,
 body.auth-pending #appMain,
-body.auth-pending #appFooter,
-body.auth-pending #bottomAppNav { display: none !important; }
+body.auth-pending #appFooter { display: none !important; }
 
 body.not-authed #appHeader,
 body.not-authed #appMain,
-body.not-authed #appFooter,
-body.not-authed #bottomAppNav { display: none !important; }
+body.not-authed #appFooter { display: none !important; }
 
 body.portal-mode #appHeader,
 body.portal-mode #appMain,
 body.portal-mode #appFooter,
-body.portal-mode #bottomAppNav,
 body.portal-mode #loginWall,
 body.portal-mode #lockScreen,
 body.portal-mode #cloudStatus { display: none !important; }
@@ -119,7 +93,6 @@ body.portal-mode #cloudStatus { display: none !important; }
   font-size: 11px;
   font-weight: 800;
   transition: .2s;
-  cursor: pointer;
 }
 .menu-item:hover { background: rgba(249, 115, 22, .08); }
 
@@ -168,7 +141,7 @@ body.portal-mode #cloudStatus { display: none !important; }
   transition: .2s;
 }
 .dark .type-tile { border-color: #262b38; }
-.type-tile:active { transform: scale(0.95); }
+.type-tile:hover { border-color: rgba(249, 115, 22, .5); }
 
 .tab-btn {
   padding: 12px 18px;
@@ -235,7 +208,7 @@ body.portal-mode #cloudStatus { display: none !important; }
   background: #1e222d;
   color: #94a3b8;
 }
-.period-btn:active { transform: scale(0.95); }
+.period-btn:hover { color: #f97316; }
 .period-btn.active { background: #f97316; color: white; }
 
 .admin-tab {
@@ -361,6 +334,7 @@ body.portal-mode #cloudStatus { display: none !important; }
   grid-template-columns: 1fr;
   gap: 8px;
 }
+
 @media (min-width: 640px) {
   .perm-grid { grid-template-columns: 1fr 1fr; }
 }
@@ -382,6 +356,10 @@ body.portal-mode #cloudStatus { display: none !important; }
   border-color: #262b38;
   color: white;
 }
+.perm-max-input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, .12);
+}
 
 .perm-override-select {
   padding: 6px 10px;
@@ -393,6 +371,7 @@ body.portal-mode #cloudStatus { display: none !important; }
   font-weight: 800;
   cursor: pointer;
   outline: none;
+  transition: .2s;
   min-width: 130px;
   text-align: center;
 }
@@ -400,6 +379,10 @@ body.portal-mode #cloudStatus { display: none !important; }
   background: #1e222d;
   border-color: #262b38;
   color: white;
+}
+.perm-override-select:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, .12);
 }
 
 .login-method-tab {
@@ -417,6 +400,7 @@ body.portal-mode #cloudStatus { display: none !important; }
   gap: 4px;
   transition: .2s;
 }
+.login-method-tab i { font-size: 14px; }
 .login-method-tab:hover { background: rgba(255,255,255,.05); color: white; }
 .login-method-tab.active {
   background: linear-gradient(135deg, #ea580c, #f97316);
@@ -441,39 +425,6 @@ body.portal-mode #cloudStatus { display: none !important; }
 .email-mode-tab.active {
   background: rgba(249, 115, 22, .15);
   color: #f97316;
-}
-
-.app-nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  font-size: 9px;
-  font-weight: 800;
-  color: #94a3b8;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: .15s;
-  width: 55px;
-}
-.app-nav-item.active {
-  color: #f97316;
-}
-.app-nav-item i {
-  font-size: 15px;
-}
-
-.mobile-tx-card {
-  padding: 11px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  transition: .15s;
-}
-.mobile-tx-card:active {
-  background: rgba(249, 115, 22, 0.04);
 }
 
 body.privacy-active .money-val {
