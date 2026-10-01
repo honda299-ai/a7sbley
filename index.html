@@ -9,7 +9,6 @@
   <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
   <title>احسبلي | a7sbley</title>
 
-  <!-- Favicon & App Icon -->
   <link rel="icon" type="image/jpg" href="https://l.top4top.io/s_3926i5al91.jpg">
   <link rel="apple-touch-icon" href="https://l.top4top.io/p_3926i5al91.jpg">
 
@@ -37,7 +36,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
@@ -47,7 +45,7 @@
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans min-h-screen flex flex-col transition-colors duration-300 pb-24 md:pb-8">
 
-  <!-- ================= SPLASH SCREEN ================= -->
+  <!-- شاشة التحميل -->
   <div id="splashScreen" class="fixed inset-0 z-[500] flex flex-col items-center justify-center transition-all duration-500 bg-white dark:bg-dark-950 text-slate-900 dark:text-white select-none">
     <div class="relative flex flex-col items-center">
       <div class="relative w-28 h-28 sm:w-32 sm:h-32 mb-5">
@@ -64,19 +62,19 @@
     </div>
   </div>
 
-  <!-- ================= HEADER ================= -->
+  <!-- الهيدر العلوي -->
   <header id="appHeader" class="sticky top-0 z-40 border-b border-slate-200 dark:border-dark-800 glass-light dark:glass-dark shadow-sm no-print">
     <div class="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between min-h-16 py-2.5 gap-2">
         
-        <!-- اللوجو والعنوان بتدرج متفاعل وتوهج نيون -->
+        <!-- اللوجو والعنوان بتدرج النيون البرتقالي والأبيض المتفاعل -->
         <div class="flex items-center gap-2.5 shrink-0 group cursor-pointer" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
           <div class="relative w-10 h-10 sm:w-11 sm:h-11 rounded-2xl p-0.5 bg-black/60 border border-orange-500/40 flex items-center justify-center overflow-hidden shadow-lg group-hover:border-orange-400 group-hover:shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all duration-300">
             <img src="https://l.top4top.io/s_3926i5al91.jpg" alt="احسبلي" class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300">
           </div>
           <div>
             <div class="flex items-center gap-2 flex-wrap">
-              <h1 class="text-xl sm:text-2xl font-black tracking-tight bg-gradient-to-r from-white via-orange-100 to-orange-400 bg-clip-text text-transparent group-hover:from-white group-hover:via-orange-300 group-hover:to-orange-500 transition-all duration-300 filter drop-shadow-[0_2px_10px_rgba(249,115,22,0.25)]">
+              <h1 class="text-xl sm:text-2xl font-black tracking-tight text-brand-title">
                 احسبلي
               </h1>
               <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black border border-amber-500/40 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]">
@@ -90,7 +88,7 @@
           </div>
         </div>
 
-        <!-- أزرار الهيدر -->
+        <!-- أزرار التحكم في الهيدر -->
         <div class="flex items-center gap-1.5 sm:gap-2">
           <button onclick="togglePrivacyMode()" id="privacyBtn" title="إخفاء / إظهار المبالغ"
             class="p-2 sm:px-3 sm:py-2 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 hover:border-orange-500 text-slate-700 dark:text-slate-200 transition shadow-sm flex items-center gap-1.5 text-xs font-bold">
@@ -104,14 +102,13 @@
             <span id="themeText" class="hidden lg:inline">الوضع النهاري</span>
           </button>
 
-          <!-- زر إضافة عملية المكتبي -->
-          <button type="button" onclick="openModal('expense')"
+          <button type="button" id="headerAddBtn"
             class="hidden md:flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 active:scale-95 text-white font-black text-xs sm:text-sm shadow-lg glow-orange transition cursor-pointer">
             <i class="fa-solid fa-circle-plus"></i>
             <span>إضافة عملية</span>
           </button>
 
-          <!-- زر القائمة المنسدلة -->
+          <!-- قائمة الثلاث نقاط -->
           <div class="relative">
             <button onclick="toggleMenu()" id="menuBtn"
               class="p-1.5 sm:p-2 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-slate-600 dark:text-slate-300 hover:text-orange-500 transition flex items-center gap-1.5">
@@ -153,7 +150,7 @@
     </div>
   </header>
 
-  <!-- ================= PUBLIC CLIENT PORTAL VIEW ================= -->
+  <!-- كشف حساب العميل الإلكتروني -->
   <div id="clientPortalView" class="hidden max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-6">
     <div class="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-dark-900 to-black text-white border border-dark-800 shadow-2xl relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="flex items-center gap-4">
@@ -215,7 +212,7 @@
     </div>
   </div>
 
-  <!-- ================= MAIN DASHBOARD ================= -->
+  <!-- الواجهة الرئيسية -->
   <main id="appMain" class="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6 flex-1 w-full">
 
     <div id="toastBox" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] pointer-events-none opacity-0 -translate-y-5 transition-all duration-300">
@@ -230,7 +227,7 @@
       <span id="syncUserEmail" class="text-[10px] text-slate-400"></span>
     </div>
 
-    <!-- فلاتر الأيام السريعة -->
+    <!-- الفترات الزمنية -->
     <section class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-2.5 sm:p-3 shadow-sm no-print">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
         <div class="flex items-center gap-2">
@@ -312,7 +309,7 @@
       </div>
     </section>
 
-    <!-- أرصدة الخزينة وطرق الدفع -->
+    <!-- الخزينة وطرق الدفع -->
     <section class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3.5 no-print shadow-sm">
       <div class="flex items-center justify-between mb-2.5">
         <div class="flex items-center gap-1.5">
@@ -378,7 +375,7 @@
       </div>
     </section>
 
-    <!-- شريط التبويبات الرئيسي للكمبيوتر -->
+    <!-- شريط التبويبات للكمبيوتر -->
     <div class="hidden md:flex items-center gap-1 border-b border-slate-200 dark:border-dark-800 no-print">
       <button onclick="switchTab('transactions')" id="tabBtnTransactions" class="tab-btn active">
         <i class="fa-solid fa-list-check"></i> المعاملات <span id="badgeTxCount" class="badge">0</span>
@@ -472,7 +469,7 @@
 
   </main>
 
-  <!-- ================= BOTTOM NAVIGATION BAR (MOBILE APP) ================= -->
+  <!-- شريط الموبايل السفلي المحسن -->
   <nav id="bottomAppNav" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-dark-900/95 backdrop-blur-md border-t border-slate-200 dark:border-dark-800 px-3 py-2 flex items-center justify-around no-print shadow-2xl">
     <button onclick="switchTab('transactions')" id="mNavTx" class="app-nav-item active">
       <i class="fa-solid fa-receipt"></i>
@@ -483,8 +480,8 @@
       <span>الديون</span>
     </button>
 
-    <!-- زر إضافة عملية العائم (FAB) -->
-    <button type="button" onclick="openModal('expense')" class="w-12 h-12 -mt-6 rounded-full bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 text-white flex items-center justify-center text-lg shadow-xl glow-orange active:scale-90 transition cursor-pointer">
+    <!-- زر البلس العائم في المنتصف (FAB) يعمل فوراً بدون أي شروط حجب -->
+    <button type="button" id="mobileFabBtn" class="w-12 h-12 -mt-6 rounded-full bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 text-white flex items-center justify-center text-lg shadow-xl glow-orange active:scale-90 transition cursor-pointer">
       <i class="fa-solid fa-plus"></i>
     </button>
 
@@ -499,7 +496,7 @@
     </button>
   </nav>
 
-  <!-- FOOTER -->
+  <!-- فوتر الموقع -->
   <footer id="appFooter" class="bg-white dark:bg-dark-900 border-t border-slate-200 dark:border-dark-800 py-6 mt-auto no-print">
     <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
       <div class="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
@@ -514,9 +511,7 @@
     </div>
   </footer>
 
-  <!-- ================= MODALS & OVERLAYS ================= -->
-
-  <!-- LOGIN WALL -->
+  <!-- نافذة تسجيل الدخول -->
   <div id="loginWall" class="hidden fixed inset-0 z-[300] bg-gradient-to-br from-slate-950 via-dark-950 to-black text-white items-center justify-center p-4 overflow-y-auto">
     <div class="relative w-full max-w-md py-8">
       <div class="text-center">
@@ -775,7 +770,7 @@
     </div>
   </div>
 
-  <!-- نافذة كشف حساب العميل -->
+  <!-- نافذة كشف حساب العميل المخصص -->
   <div id="clientLedgerModal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4">
     <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" onclick="closeClientLedger()"></div>
     <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-3xl w-full border border-slate-200 dark:border-dark-750 modal-enter max-h-[92vh] flex flex-col z-10 overflow-hidden">
@@ -1100,6 +1095,7 @@
 
   <div id="printReport" class="print-only"></div>
 
-  <script src="app.js?v=9.8"></script>
+  <!-- رقم إصدار كسر الكاش لضمان التحديث المباشر للكونسول -->
+  <script src="app.js?v=10.0"></script>
 </body>
 </html>
