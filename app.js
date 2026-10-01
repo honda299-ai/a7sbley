@@ -1,5 +1,6 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V14.0 — SECURE SYNC
+   EHSEBLI / HONDA FINANCIAL MANAGER V15.0
+   Full Engine: Mobile Experience + Secure Firestore Guard
    ========================================================= */
 
 const SUPER_ADMIN_EMAILS = ['hondastore299@gmail.com'];
@@ -19,10 +20,10 @@ if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-const STORAGE_KEY = 'ehsebli_honda_data_v3';
-const THEME_KEY = 'ehsebli_theme_v3';
-const BUDGET_KEY = 'ehsebli_budget_v3';
-const PRIVACY_KEY = 'ehsebli_privacy_v2';
+const STORAGE_KEY = 'ehsebli_honda_data_v4';
+const THEME_KEY = 'ehsebli_theme_v4';
+const BUDGET_KEY = 'ehsebli_budget_v4';
+const PRIVACY_KEY = 'ehsebli_privacy_v4';
 
 let currentUser = null;
 let transactions = [];
@@ -32,12 +33,15 @@ let currentTab = 'transactions';
 let editingId = null;
 let isPrivacyMode = false;
 let activeClientName = null;
+let searchDebounceTimer = null;
 let transactionsUnsubscribe = null;
 
 const CATEGORIES = {
   expense: ['شغل وأدوات صيانة','تفعيل وسيرفرات وكريدت','أكل ومشروبات','مواصلات وبنزين','فواتير والتزامات','أخرى'],
   income: ['خدمات سوفت وير وصيانة','شحن رصيد وتفعيل أدوات','أرباح أخرى'],
-  charity: ['صدقة جارية لوجه الله','مساعدة محتاج وتفريج كربة','أخرى']
+  charity: ['صدقة جارية لوجه الله','مساعدة محتاج وتفريج كربة','أخرى'],
+  debt_receivable: ['دين ليا'],
+  debt_payable: ['دين عليا']
 };
 
 function todayString() {
@@ -75,7 +79,7 @@ function normalizeTransaction(t) {
 }
 
 /* =========================================================
-   التخزين المحلي الآمن والمزامنة اللحظية
+   LOCAL & CLOUD SYNC WITH ANTI-DATA-LOSS GUARD
    ========================================================= */
 function loadLocalData() {
   try {
@@ -86,54 +90,42 @@ function loadLocalData() {
         transactions = arr.map(normalizeTransaction);
       }
     }
-  } catch(e) { console.warn("Local storage read error:", e); }
+  } catch(e) { console.warn("Local read warning:", e); }
 }
 
 function saveLocalData() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
-  } catch(e) { console.warn("Local storage write error:", e); }
+  } catch(e) { console.warn("Local save warning:", e); }
 }
 
 async function saveData() {
   saveLocalData();
   if (currentUser) {
     try {
-      // حماية سحابية: لا يتم إرسال مصفوفة فارغة أبداً إذا كان هناك داتا محلية
       if (transactions.length === 0) return;
-
-      const cleanTransactions = transactions.map(normalizeTransaction);
       await db.collection('users').doc(currentUser.uid).set({
-        transactions: cleanTransactions,
+        transactions: transactions.map(normalizeTransaction),
         budget: Number(localStorage.getItem(BUDGET_KEY)) || 0,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
-    } catch(e) {
-      console.warn("Cloud save warning:", e);
-    }
+    } catch(e) { console.warn("Cloud save warning:", e); }
   }
 }
 
-/* دمج ذكي يمنع مسح البيانات القديمة عند جلب سحابة فارغة بالخطأ */
 function mergeTransactions(local, cloud) {
   const map = new Map();
-  // إذا كانت السحابة فارغة والمحلي مليان، نعتمد المحلي ولا نحذفه
   if (!Array.isArray(cloud) || cloud.length === 0) {
     if (Array.isArray(local)) local.forEach(t => map.set(t.id, normalizeTransaction(t)));
     return Array.from(map.values());
   }
-
   cloud.forEach(t => { if (t && t.id) map.set(t.id, normalizeTransaction(t)); });
   if (Array.isArray(local)) {
     local.forEach(t => {
       if (!t || !t.id) return;
       const existing = map.get(t.id);
-      if (!existing) {
+      if (!existing || (Number(t._updatedAt) || 0) > (Number(existing._updatedAt) || 0)) {
         map.set(t.id, normalizeTransaction(t));
-      } else {
-        const a = Number(existing._updatedAt) || 0;
-        const b = Number(t._updatedAt) || 0;
-        if (b > a) map.set(t.id, normalizeTransaction(t));
       }
     });
   }
@@ -146,29 +138,19 @@ async function loadCloudData(uid) {
     if (doc.exists) {
       const data = doc.data();
       const cloudTx = Array.isArray(data.transactions) ? data.transactions : [];
-      
-      // صمام أمان: إذا كانت سحابة فايربيس فارغة، نقوم برفع البيانات المحلية فوراً لتعبئتها ولا نستبدلها بـ "فاضي"
       if (cloudTx.length === 0 && transactions.length > 0) {
         await saveData();
         return;
       }
-
       transactions = mergeTransactions(transactions, cloudTx);
-      if (data.budget !== undefined && !localStorage.getItem(BUDGET_KEY)) {
-        localStorage.setItem(BUDGET_KEY, data.budget);
-      }
       saveLocalData();
       refreshAll();
-    } else if (transactions.length > 0) {
-      await saveData();
     }
-  } catch(e) {
-    console.warn("Cloud load warning:", e);
-  }
+  } catch(e) { console.warn("Cloud load warning:", e); }
 }
 
 /* =========================================================
-   التحكم بالواجهة والمودالات
+   UI & MODAL CONTROLS
    ========================================================= */
 function openModal(type = 'expense', id = null) {
   const modal = document.getElementById('transactionModal');
@@ -178,7 +160,6 @@ function openModal(type = 'expense', id = null) {
   editingId = id;
   form?.reset();
   document.getElementById('formDate').value = todayString();
-  document.getElementById('formTime').value = currentInputTimeString();
   updateClientsDatalist();
 
   const radio = document.querySelector(`input[name="txType"][value="${type}"]`);
@@ -214,34 +195,23 @@ function handleFormSubmit(event) {
   const type = document.querySelector('input[name="txType"]:checked')?.value || 'expense';
   const amount = Number(document.getElementById('formAmount')?.value);
   const date = document.getElementById('formDate')?.value;
-  const time = document.getElementById('formTime')?.value;
   const client = document.getElementById('formClient')?.value || '';
   const category = document.getElementById('formCategory')?.value || 'عام';
   const paymentMethod = document.getElementById('formPaymentMethod')?.value || 'كاش نقدي';
   const notes = document.getElementById('formNotes')?.value || '';
 
-  if (!amount || amount <= 0) { showToast('أدخل مبلغ صحيح', 'error'); return; }
+  if (!amount || amount <= 0) { showToast('يرجى كتابة مبلغ صحيح', 'error'); return; }
 
-  if (editingId) {
-    const index = transactions.findIndex(t => t.id === editingId);
-    if (index !== -1) {
-      transactions[index] = normalizeTransaction({
-        ...transactions[index], type, amount, date, time, client, category, paymentMethod, notes, _updatedAt: Date.now()
-      });
-      showToast('تم التعديل بنجاح', 'success');
-    }
-  } else {
-    transactions.unshift(normalizeTransaction({
-      id: 'tx-' + Date.now(),
-      type, amount, date, time, client, category, paymentMethod, notes,
-      _updatedAt: Date.now()
-    }));
-    showToast('تمت الإضافة بنجاح ✓', 'success');
-  }
+  transactions.unshift(normalizeTransaction({
+    id: 'tx-' + Date.now(),
+    type, amount, date, client, category, paymentMethod, notes,
+    _updatedAt: Date.now()
+  }));
 
   saveData();
   refreshAll();
   closeModal();
+  showToast('تم تسجيل العملية بنجاح ✓', 'success');
 }
 
 function initTheme() {
@@ -263,7 +233,7 @@ function togglePrivacyMode() {
   isPrivacyMode = !isPrivacyMode;
   localStorage.setItem(PRIVACY_KEY, isPrivacyMode);
   document.body.classList.toggle('privacy-active', isPrivacyMode);
-  showToast(isPrivacyMode ? 'تم إخفاء الأرقام 🔒' : 'تم إظهار الأرقام 👁️️', 'info');
+  showToast(isPrivacyMode ? 'تم تفعيل وضع الخصوصية 🔒' : 'تم إظهار الأرقام 👁️', 'info');
 }
 
 function updateClientsDatalist() {
@@ -283,7 +253,7 @@ function hideAuthLoading() {
   const splash = document.getElementById('splashScreen');
   if (splash) {
     splash.style.opacity = '0';
-    setTimeout(() => { splash.style.display = 'none'; }, 400);
+    setTimeout(() => { splash.style.display = 'none'; }, 300);
   }
 }
 function showLoginWall() {
@@ -362,19 +332,42 @@ function updateMetrics() {
   document.getElementById('statNet').textContent = money(income - expense - charity);
 }
 
+function debouncedRenderTransactions() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(renderTransactions, 200);
+}
+
+function filterTransactions(filter) {
+  activeFilter = filter;
+  document.querySelectorAll('.filter-pill').forEach(btn => btn.classList.toggle('active', btn.dataset.filter === filter));
+  renderTransactions();
+}
+
 function renderTransactions() {
   const tbody = document.getElementById('transactionsTbody');
+  const mobileList = document.getElementById('mobileTransactionsList');
   const empty = document.getElementById('emptyTransactionsState');
-  if (tbody) tbody.innerHTML = '';
+  const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
 
-  const list = getPeriodTransactions();
+  if (tbody) tbody.innerHTML = '';
+  if (mobileList) mobileList.innerHTML = '';
+
+  let list = getPeriodTransactions().filter(t => {
+    if (activeFilter !== 'all' && t.type !== activeFilter) return false;
+    if (q && ![t.category, t.notes, t.client].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  });
+
   if (!list.length) { empty?.classList.remove('hidden'); return; }
   empty?.classList.add('hidden');
 
   list.forEach(item => {
     const isInc = item.type === 'income';
-    const amountStr = `${isInc ? '+' : '-'}${money(item.amount)} ج.م`;
-    
+    const isCharity = item.type === 'charity';
+    const colorClass = isInc ? 'text-emerald-500' : (isCharity ? 'text-orange-500' : 'text-rose-500');
+    const sign = isInc ? '+' : '-';
+
+    // 1. جدول شاشات الكمبيوتر
     if (tbody) {
       const tr = document.createElement('tr');
       tr.className = 'hover:bg-slate-50 dark:hover:bg-dark-850/60';
@@ -384,12 +377,37 @@ function renderTransactions() {
         <td class="py-3 px-4">${escapeHTML(item.category)}</td>
         <td class="py-3 px-4 text-slate-400">${escapeHTML(item.paymentMethod)}</td>
         <td class="py-3 px-4 font-bold text-xs">${escapeHTML(item.date)}</td>
-        <td class="py-3 px-4 font-black ${isInc ? 'text-emerald-500' : 'text-rose-500'}">${amountStr}</td>
+        <td class="py-3 px-4 font-black ${colorClass}">${sign}${money(item.amount)} ج.م</td>
         <td class="py-3 px-4 text-center">
           <button onclick="deleteTransaction('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-500 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>
         </td>
       `;
       tbody.appendChild(tr);
+    }
+
+    // 2. كروت الهواتف التفاعلية (Native Look)
+    if (mobileList) {
+      const card = document.createElement('div');
+      card.className = 'mobile-tx-card';
+      card.innerHTML = `
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-xl flex items-center justify-center text-xs shrink-0 ${isInc ? 'bg-emerald-500/10 text-emerald-500' : (isCharity ? 'bg-orange-500/10 text-orange-500' : 'bg-rose-500/10 text-rose-500')}">
+            <i class="fa-solid ${isInc ? 'fa-arrow-trend-up' : (isCharity ? 'fa-heart' : 'fa-arrow-trend-down')}"></i>
+          </div>
+          <div class="min-w-0">
+            <h4 class="font-bold text-xs truncate text-slate-800 dark:text-slate-100">${escapeHTML(item.notes || item.category)}</h4>
+            <div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+              <span>${escapeHTML(item.date)}</span>
+              ${item.client ? `<span>•</span><span class="text-orange-400 font-bold">${escapeHTML(item.client)}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="text-left shrink-0">
+          <div class="font-black text-sm ${colorClass}">${sign}${money(item.amount)}</div>
+          <span class="text-[9px] text-slate-400">${escapeHTML(item.paymentMethod.split(' ')[0])}</span>
+        </div>
+      `;
+      mobileList.appendChild(card);
     }
   });
 }
@@ -408,6 +426,14 @@ function switchTab(tab) {
   document.getElementById('panelTransactions')?.classList.toggle('hidden', tab !== 'transactions');
   document.getElementById('panelDebts')?.classList.toggle('hidden', tab !== 'debts');
   document.getElementById('panelClients')?.classList.toggle('hidden', tab !== 'clients');
+
+  document.getElementById('tabBtnTransactions')?.classList.toggle('active', tab === 'transactions');
+  document.getElementById('tabBtnDebts')?.classList.toggle('active', tab === 'debts');
+  document.getElementById('tabBtnClients')?.classList.toggle('active', tab === 'clients');
+
+  document.getElementById('mNavTx')?.classList.toggle('active', tab === 'transactions');
+  document.getElementById('mNavDebts')?.classList.toggle('active', tab === 'debts');
+  document.getElementById('mNavClients')?.classList.toggle('active', tab === 'clients');
 }
 
 function toggleMenu() { document.getElementById('dropMenu')?.classList.toggle('hidden'); }
@@ -417,11 +443,11 @@ function showToast(msg, type = 'success') {
   const box = document.getElementById('toastBox');
   const inner = document.getElementById('toastInner');
   if (!box || !inner) return;
-  inner.className = `px-4 py-2.5 rounded-2xl shadow-xl text-xs font-black text-white ${type === 'error' ? 'bg-rose-600' : 'bg-orange-500'}`;
+  inner.className = `px-4 py-2.5 rounded-2xl shadow-2xl text-xs font-black text-white ${type === 'error' ? 'bg-rose-600' : 'bg-orange-500'}`;
   inner.textContent = msg;
   box.classList.remove('opacity-0', '-translate-y-5');
   box.classList.add('opacity-100', 'translate-y-0');
-  setTimeout(() => box.classList.add('opacity-0', '-translate-y-5'), 2500);
+  setTimeout(() => box.classList.add('opacity-0', '-translate-y-5'), 2200);
 }
 
 function getBudget() { return Number(localStorage.getItem(BUDGET_KEY) || 0); }
@@ -430,13 +456,7 @@ function closeBudgetModal() { document.getElementById('budgetModal')?.classList.
 function saveBudget() {
   localStorage.setItem(BUDGET_KEY, Number(document.getElementById('budgetInput').value));
   closeBudgetModal();
-  updateBudget();
   showToast('تم حفظ الميزانية', 'success');
-}
-function updateBudget() {
-  const budget = getBudget();
-  const bTotal = document.getElementById('budgetTotal');
-  if (bTotal) bTotal.textContent = budget ? money(budget) + ' ج.م' : 'غير محددة';
 }
 
 function openBackupModal() { document.getElementById('backupModal')?.classList.remove('hidden'); document.getElementById('backupModal')?.classList.add('flex'); }
@@ -448,7 +468,7 @@ function downloadBackup() {
 function exportToCSV() {
   let csv = '\uFEFFالنوع,المبلغ,العميل,التصنيف,التاريخ,البيان\n';
   getActiveTransactions().forEach(t => {
-    csv += `"${typeName(t.type)}","${t.amount}","${t.client || ''}","${t.category}","${t.date}","${t.notes || ''}"\n`;
+    csv += `"${t.type}","${t.amount}","${t.client || ''}","${t.category}","${t.date}","${t.notes || ''}"\n`;
   });
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); a.download = `احسبلي_${todayString()}.csv`; a.click();
 }
@@ -457,7 +477,7 @@ function confirmClearData() {
 }
 function loadDemoData() {
   transactions = [
-    { id:'d1', type:'income', amount:1500, category:'خدمات سوفت وير وصيانة', client:'أحمد', paymentMethod:'كاش نقدي', notes:'صيانة 3 أجهزة', date:todayString() }
+    { id:'d1', type:'income', amount:1500, category:'خدمات سوفت وير وصيانة', client:'أحمد', paymentMethod:'كاش نقدي', notes:'صيانة جهاز', date:todayString() }
   ].map(normalizeTransaction);
   saveData(); refreshAll(); showToast('تم تحميل بيانات تجريبية', 'success');
 }
@@ -467,7 +487,6 @@ function refreshAll() {
   renderTransactions();
   renderDebts();
   renderClients();
-  updateBudget();
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -476,5 +495,5 @@ window.addEventListener('DOMContentLoaded', () => {
   loadLocalData();
   refreshAll();
   switchTab('transactions');
-  setTimeout(() => { hideAuthLoading(); }, 800);
+  setTimeout(() => { hideAuthLoading(); }, 500);
 });
