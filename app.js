@@ -1,7 +1,7 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V8.8
-   Realtime Live Sync (Firestore onSnapshot)
-   Fast Image Compression + Client Portal + Time Tracking
+   EHSEBLI / HONDA FINANCIAL MANAGER V8.9
+   Instant Realtime Sync (No Delays / No Locks)
+   hasPendingWrites Protection + Ultra-light Compression
    ========================================================= */
 
 const SUPER_ADMIN_EMAILS = [
@@ -55,8 +55,6 @@ let balanceChartInstance = null;
 let lastDeletedId = null;
 
 let searchDebounceTimer = null;
-let syncInProgress = false;
-let syncPending = false;
 let authResolved = false;
 
 let adminActiveTab = 'users';
@@ -64,7 +62,7 @@ let usersSearchQuery = '';
 let editingUserPermissions = null;
 let currentUserPermissionsOverride = null;
 let userDocUnsubscribe = null;
-let transactionsUnsubscribe = null; // لاشتراك المزامنة اللحظية للعمليات
+let transactionsUnsubscribe = null;
 
 let currentLoginMethod = 'google';
 let emailMode = 'signin';
@@ -199,7 +197,7 @@ function normalizeTransaction(t) {
 }
 
 /* =========================================================
-   RECEIPT IMAGE UPLOAD & FAST COMPRESSION
+   RECEIPT IMAGE UPLOAD & ULTRA-FAST COMPRESSION
    ========================================================= */
 function handleReceiptSelected(event) {
   const file = event.target.files?.[0];
@@ -215,9 +213,8 @@ function handleReceiptSelected(event) {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      // تقليل الحجم لـ 600px وجودة 0.5 لسرعة النقل وتفادي امتلاء المستند
-      const MAX_WIDTH = 600;
-      const MAX_HEIGHT = 600;
+      const MAX_WIDTH = 500;
+      const MAX_HEIGHT = 500;
       let width = img.width;
       let height = img.height;
 
@@ -238,9 +235,10 @@ function handleReceiptSelected(event) {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
 
-      currentReceiptData = canvas.toDataURL('image/jpeg', 0.5);
+      // حجم فائق الصغر للحفاظ على سرعة السحابة اللحظية
+      currentReceiptData = canvas.toDataURL('image/jpeg', 0.4);
       setReceiptUI(currentReceiptData);
-      showToast('تم ضغط وإرفاق الصورة بنجاح ✓', 'success');
+      showToast('تم إرفاق الصورة بنجاح ✓', 'success');
     };
     img.src = e.target.result;
   };
@@ -334,7 +332,7 @@ function getAllClientNames() {
 }
 
 /* =========================================================
-   PUBLIC CLIENT PORTAL ROUTING
+   PUBLIC CLIENT PORTAL
    ========================================================= */
 async function checkPublicPortalMode() {
   const params = new URLSearchParams(window.location.search);
@@ -353,8 +351,7 @@ async function checkPublicPortalMode() {
     try {
       const doc = await db.collection('users').doc(uidParam).get();
       if (doc.exists && doc.data().transactions) {
-        const raw = doc.data().transactions || [];
-        clientTransactions = raw.filter(validateTransaction);
+        clientTransactions = (doc.data().transactions || []).filter(validateTransaction);
       }
     } catch(e) {
       console.warn("Could not load from cloud, reading local:", e);
@@ -1316,7 +1313,7 @@ function handleUserSwitch(uid) {
 }
 
 /* =========================================================
-   AUTH STATE CHANGE (WITH REALTIME LISTENER)
+   AUTH STATE CHANGE (WITH DIRECT REALTIME LISTENER)
    ========================================================= */
 auth.onAuthStateChanged(async user => {
   if (isPortalModeActive) return;
@@ -1359,7 +1356,7 @@ auth.onAuthStateChanged(async user => {
     switchTab('transactions');
 
     subscribeToUserDoc(user.uid);
-    subscribeToCloudTransactions(user.uid); // تفعيل المزامنة اللحظية الحية هنا
+    subscribeToCloudTransactions(user.uid); // اشتراك المزامنة اللحظية الحية
     updatePinUI();
 
     loadCloudData(user.uid).finally(() => {
@@ -1399,7 +1396,7 @@ function logout() {
 function logoutFromLock() { auth.signOut(); }
 
 /* =========================================================
-   REALTIME TRANSACTIONS LISTENER
+   REALTIME TRANSACTIONS LISTENER (INSTANT & NO LOOP)
    ========================================================= */
 function subscribeToCloudTransactions(uid) {
   if (transactionsUnsubscribe) {
@@ -1407,25 +1404,30 @@ function subscribeToCloudTransactions(uid) {
     transactionsUnsubscribe = null;
   }
 
-  // الاستماع اللحظي الفوري لأي إضافة أو تعديل من أي جهاز
-  transactionsUnsubscribe = db.collection('users').doc(uid).onSnapshot(doc => {
-    if (!doc.exists) return;
-    const data = doc.data();
-    if (Array.isArray(data.transactions)) {
-      transactions = mergeTransactions(transactions, data.transactions);
-      if (data.budget !== undefined) {
-        localStorage.setItem(BUDGET_KEY, data.budget);
+  // يستقبل التغييرات الصادرة من الأجهزة الأخرى فـوراً بدون تصادم محلي
+  transactionsUnsubscribe = db.collection('users').doc(uid)
+    .onSnapshot({ includeMetadataChanges: false }, doc => {
+      if (!doc.exists) return;
+      
+      // تجاهل التغيير إذا كان صادر من نفس المتصفح الحالي محلياً
+      if (doc.metadata && doc.metadata.hasPendingWrites) return;
+
+      const data = doc.data();
+      if (Array.isArray(data.transactions)) {
+        transactions = data.transactions.filter(validateTransaction);
+        if (data.budget !== undefined) {
+          localStorage.setItem(BUDGET_KEY, data.budget);
+        }
+        saveLocalData();
+        refreshAll();
       }
-      saveLocalData();
-      refreshAll();
-    }
-  }, err => {
-    console.warn("Realtime transactions sync warning:", err);
-  });
+    }, err => {
+      console.warn("Realtime transactions sync warning:", err);
+    });
 }
 
 /* =========================================================
-   CLOUD SYNC & MERGE
+   DIRECT CLOUD SYNC (NO DELAYS / NO LOCKS)
    ========================================================= */
 function mergeTransactions(local, cloud) {
   const map = new Map();
@@ -1445,23 +1447,16 @@ function mergeTransactions(local, cloud) {
 
 async function syncToCloud() {
   if (!currentUser) return;
-  if (syncInProgress) { syncPending = true; return; }
-  syncInProgress = true;
   try {
     const docRef = db.collection('users').doc(currentUser.uid);
-    const doc = await docRef.get();
-    const cloudTx = doc.exists && Array.isArray(doc.data().transactions) ? doc.data().transactions : [];
-    const merged = mergeTransactions(transactions, cloudTx);
+    // إرسال مباشر وتحديث سريع دون حجز مؤقت
     await docRef.set({
-      transactions: merged,
+      transactions: transactions,
       budget: getBudget(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   } catch (error) {
     console.error("Cloud sync error: ", error);
-  } finally {
-    syncInProgress = false;
-    if (syncPending) { syncPending = false; syncToCloud(); }
   }
 }
 
@@ -1799,7 +1794,7 @@ function renderTransactions() {
 }
 
 /* =========================================================
-   DEBTS RENDER (WITH PARTIAL PAYMENTS & CLIENTS)
+   DEBTS RENDER
    ========================================================= */
 function renderDebts() {
   const container = document.getElementById('debtsContainer');
@@ -2516,7 +2511,7 @@ function downloadBackup() {
   if (!requireAuth()) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '8.8',
+    version: '8.9',
     createdAt: new Date().toISOString(),
     transactions,
     budget: getBudget(),
@@ -2854,7 +2849,6 @@ document.addEventListener('keydown', event => {
 window.addEventListener('DOMContentLoaded', async () => {
   initTheme();
 
-  // فحص ما إذا كان الرابط مفتوحاً كصفحة عميل مستقلة
   const isPortal = await checkPublicPortalMode();
   if (isPortal) return;
 
