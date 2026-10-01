@@ -1,6 +1,5 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V9.6
-   Mobile App Native Look + Adaptive Splash Screen
+   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V9.8
    ========================================================= */
 
 * { 
@@ -28,11 +27,14 @@ body {
 .glow-orange { box-shadow: 0 0 25px -4px rgba(249, 115, 22, .45); }
 .glow-orange-sm { box-shadow: 0 0 12px -2px rgba(249, 115, 22, .35); }
 
-.glow-card { transition: .25s ease; }
+.glow-card { 
+  position: relative;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+}
 .glow-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 30px -10px rgba(249, 115, 22, .25);
-  border-color: rgba(249, 115, 22, .4);
+  border-color: rgba(249, 115, 22, .5) !important;
 }
 .glow-card:active { transform: scale(0.98); }
 
@@ -92,7 +94,6 @@ body {
 }
 .mobile-scroll::-webkit-scrollbar { display: none; }
 
-/* لا نحجب عناصر الصفحة بالكامل حتى لا تعلق الشاشة */
 body.not-authed #appHeader,
 body.not-authed #appMain,
 body.not-authed #appFooter,
@@ -117,6 +118,7 @@ body.portal-mode #cloudStatus { display: none !important; }
   font-size: 11px;
   font-weight: 800;
   transition: .2s;
+  cursor: pointer;
 }
 .menu-item:hover { background: rgba(249, 115, 22, .08); }
 

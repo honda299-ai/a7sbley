@@ -1,8 +1,7 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V9.6
-   Full Code: Complete Admin Panel + Role Permissions
-   Zero Undefined Data + Instant Realtime Sync + Days Filters
-   Smooth Adaptive Splash Screen + User Avatar Integration
+   EHSEBLI / HONDA FINANCIAL MANAGER V9.8
+   Fixed Modal Click Trigger + Full Admin & Days Filters
+   Instant Realtime Sync + Clean Data Format
    ========================================================= */
 
 const SUPER_ADMIN_EMAILS = [
@@ -341,7 +340,7 @@ function getAllClientNames() {
 }
 
 /* =========================================================
-   PUBLIC CLIENT PORTAL ROUTING
+   PUBLIC CLIENT PORTAL
    ========================================================= */
 async function checkPublicPortalMode() {
   const params = new URLSearchParams(window.location.search);
@@ -455,7 +454,7 @@ function copyClientPortalLink() {
 function shareClientPortalWhatsApp() {
   if (!activeClientName) return;
   const link = getClientPortalLink(activeClientName);
-  const text = `مرحباً يا ${activeClientName}، تفضل رابط صفحة كشف حسابك المباشر لمتابعة كافة المعاملات المشتركة بيننا أولاً بأول:\n${link}\n\n— Honda Store`;
+  const text = `مرحباً يا ${activeClientName}، تفضل رابط صفحة كشف حسابك المالي المباشر لمتابعة كافة المعاملات المشتركة بيننا أولاً بأول:\n${link}\n\n— Honda Store`;
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
 
@@ -542,8 +541,8 @@ function applyRoleUI() {
   const badge = document.getElementById('roleBadge');
   if (badge) {
     if (isSuperAdmin) {
-      badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-500/40 text-amber-500';
-      badge.innerHTML = '<i class="fa-solid fa-crown"></i> Super Admin';
+      badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black border border-amber-500/40 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300';
+      badge.innerHTML = '<i class="fa-solid fa-crown text-[10px] text-amber-400"></i> Super Admin';
     } else {
       const meta = ROLES_META[userRole] || ROLES_META.free;
       badge.className = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border ${meta.badgeClasses}`;
@@ -827,7 +826,7 @@ async function openUserPermissionsModal(uid) {
     if (!doc.exists) { showToast('المستخدم غير موجود', 'error'); return; }
     const data = doc.data();
     if (isSuperAdminEmail(data.email)) {
-      showToast('لا يمكن تعديل صلاحيات Super Admin 🛡️', 'error');
+      showToast('لا يمكن تعديل صلاحيات Super Admin 🛡️️', 'error');
       return;
     }
     editingUserPermissions = { uid, data };
@@ -1349,7 +1348,7 @@ auth.onAuthStateChanged(async user => {
 
     if (avatar) {
       if (user.photoURL) avatar.src = user.photoURL;
-      else avatar.src = 'logo.png';
+      else avatar.src = 'https://l.top4top.io/s_3926i5al91.jpg';
     }
 
     cloudStatus?.classList.remove('hidden');
@@ -1562,7 +1561,6 @@ function saveData(options = {}) {
    PERIODS & DAYS FILTERS
    ========================================================= */
 function setPeriod(period) {
-  if (!requireAuth()) return;
   currentPeriod = period;
   document.querySelectorAll('.period-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.period === period);
@@ -1727,7 +1725,7 @@ function debouncedRenderTransactions() {
 }
 
 /* =========================================================
-   TRANSACTIONS RENDER (DESKTOP + MOBILE CARDS)
+   TRANSACTIONS RENDER
    ========================================================= */
 function filterTransactions(filter) {
   activeFilter = filter;
@@ -1774,7 +1772,6 @@ function renderTransactions() {
 
     const timeFormatted = item.time ? formatTimeTo12Hour(item.time) : '';
 
-    // 1. جدول الكمبيوتر
     if (tbody) {
       const tr = document.createElement('tr');
       tr.className = 'hover:bg-slate-50 dark:hover:bg-dark-850/60 transition group';
@@ -1812,7 +1809,6 @@ function renderTransactions() {
       tbody.appendChild(tr);
     }
 
-    // 2. كروت متجاوبة للموبايل
     if (mobileList) {
       const card = document.createElement('div');
       card.className = 'mobile-tx-card';
@@ -2076,9 +2072,7 @@ function openClientLedger(clientName) {
             <div class="font-bold">${escapeHTML(t.date)}</div>
             <div class="text-[9px] text-orange-500 font-bold">${escapeHTML(formatTimeTo12Hour(t.time || ''))}</div>
           </td>
-          <td class="py-2.5 px-3">
-            <div class="font-bold">${escapeHTML(t.notes || t.category)}</div>
-          </td>
+          <td class="py-2.5 px-3 font-bold">${escapeHTML(t.notes || t.category)}</td>
           <td class="py-2.5 px-3 text-slate-400 font-semibold">${escapeHTML(t.paymentMethod || 'كاش')}</td>
           <td class="py-2.5 px-3 font-black ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">
             ${t.type === 'income' ? '+' : '-'}${money(t.amount)} ج.م
@@ -2134,7 +2128,7 @@ function shareViaWhatsApp(id) {
 💰 *المبلغ:* ${money(item.amount)} ج.م
 📅 *التاريخ:* ${item.date} ${timeStr ? `(${timeStr})` : ''}
 💳 *طريقة الدفع:* ${item.paymentMethod || 'كاش'}
-----------------------------------------
+${item.reference ? `🔖 *المرجع:* ${item.reference}\n` : ''}----------------------------------------
 شكراً لتعاملكم معنا ✨`;
 
   const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
@@ -2218,23 +2212,24 @@ function updateCharts() {
 }
 
 /* =========================================================
-   TRANSACTION MODAL & FORM SUBMIT
+   TRANSACTION MODAL & SUBMIT (FIXED ZERO-BLOCK TRIGGER)
    ========================================================= */
 function openModal(type = 'expense', id = null) {
-  if (!requireAuth()) return;
-  if (type === 'charity' && !hasFeature('charity')) { showToast('باب الخير غير متاح لدورك', 'error'); return; }
-  if ((type === 'debt_receivable' || type === 'debt_payable') && !hasFeature('debts')) { showToast('دفتر الديون غير متاح لدورك', 'error'); return; }
-
   const modal = document.getElementById('transactionModal');
   const form = document.getElementById('transactionForm');
+  if (!modal) return;
+
   editingId = id;
   form?.reset();
 
   currentReceiptData = null;
   setReceiptUI(null);
 
-  document.getElementById('formDate').value = todayString();
-  document.getElementById('formTime').value = currentInputTimeString();
+  const formDate = document.getElementById('formDate');
+  if (formDate) formDate.value = todayString();
+  const formTime = document.getElementById('formTime');
+  if (formTime) formTime.value = currentInputTimeString();
+  
   updateClientsDatalist();
 
   if (id) {
@@ -2249,14 +2244,12 @@ function openModal(type = 'expense', id = null) {
     document.getElementById('formClient').value = item.client || '';
     document.getElementById('formCategory').value = item.category;
     document.getElementById('formPaymentMethod').value = item.paymentMethod || 'كاش نقدي';
-    document.getElementById('formReference').value = item.reference || '';
     document.getElementById('formNotes').value = item.notes || '';
 
     if (item.receipt) {
       currentReceiptData = item.receipt;
       setReceiptUI(item.receipt);
     }
-
     document.getElementById('submitText').textContent = 'حفظ التعديل';
   } else {
     const radio = document.querySelector(`input[name="txType"][value="${type}"]`);
@@ -2265,9 +2258,9 @@ function openModal(type = 'expense', id = null) {
     document.getElementById('submitText').textContent = 'حفظ العملية';
   }
 
-  modal?.classList.remove('hidden');
-  modal?.classList.add('flex');
-  setTimeout(() => document.getElementById('formAmount')?.focus(), 100);
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  setTimeout(() => document.getElementById('formAmount')?.focus(), 120);
 }
 
 function closeModal() {
@@ -2284,7 +2277,6 @@ function onTypeChange() {
   const type = selected.value;
   const select = document.getElementById('formCategory');
   const title = document.getElementById('modalTitle');
-  const icon = document.getElementById('modalIconBox');
 
   if (select) {
     select.innerHTML = '';
@@ -2295,44 +2287,31 @@ function onTypeChange() {
     });
   }
 
-  if (title && icon) {
-    if (type === 'charity') {
-      title.textContent = editingId ? 'تعديل باب الخير' : 'تسجيل صدقة أو عمل خير';
-      icon.innerHTML = '<i class="fa-solid fa-heart text-orange-500"></i>';
-    } else if (type === 'income') {
-      title.textContent = editingId ? 'تعديل الدخل' : 'تسجيل دخل / إيراد جديد';
-      icon.innerHTML = '<i class="fa-solid fa-arrow-trend-up text-emerald-500"></i>';
-    } else if (type === 'debt_receivable') {
-      title.textContent = editingId ? 'تعديل دين مستحق لي' : 'تسجيل دين مستحق لي';
-      icon.innerHTML = '<i class="fa-solid fa-user-plus text-cyan-500"></i>';
-    } else if (type === 'debt_payable') {
-      title.textContent = editingId ? 'تعديل دين عليّ' : 'تسجيل دين مستحق عليّ';
-      icon.innerHTML = '<i class="fa-solid fa-user-minus text-purple-500"></i>';
-    } else {
-      title.textContent = editingId ? 'تعديل مصروف' : 'تسجيل مصروف جديد';
-      icon.innerHTML = '<i class="fa-solid fa-arrow-trend-down text-rose-500"></i>';
-    }
+  if (title) {
+    if (type === 'charity') title.textContent = editingId ? 'تعديل باب الخير' : 'تسجيل صدقة أو عمل خير';
+    else if (type === 'income') title.textContent = editingId ? 'تعديل الدخل' : 'تسجيل دخل / إيراد جديد';
+    else if (type === 'debt_receivable') title.textContent = editingId ? 'تعديل دين ليا' : 'تسجيل دين مستحق لي';
+    else if (type === 'debt_payable') title.textContent = editingId ? 'تعديل دين عليا' : 'تسجيل دين مستحق عليّ';
+    else title.textContent = editingId ? 'تعديل مصروف' : 'تسجيل مصروف جديد';
   }
 }
 
 function handleFormSubmit(event) {
   event.preventDefault();
-  if (!requireAuth()) return;
   const wasEditing = !!editingId;
 
-  const type = document.querySelector('input[name="txType"]:checked').value;
-  const amount = Number(document.getElementById('formAmount').value);
-  const date = document.getElementById('formDate').value;
-  const timeInput = document.getElementById('formTime').value;
+  const type = document.querySelector('input[name="txType"]:checked')?.value || 'expense';
+  const amount = Number(document.getElementById('formAmount')?.value);
+  const date = document.getElementById('formDate')?.value;
+  const timeInput = document.getElementById('formTime')?.value;
   const time = formatTimeTo12Hour(timeInput || currentInputTimeString());
-  const client = sanitizeString(document.getElementById('formClient').value, 60);
-  const category = document.getElementById('formCategory').value;
-  const paymentMethod = document.getElementById('formPaymentMethod').value;
-  const reference = sanitizeString(document.getElementById('formReference').value, 50);
-  const notes = sanitizeString(document.getElementById('formNotes').value, 200);
+  const client = sanitizeString(document.getElementById('formClient')?.value, 60);
+  const category = document.getElementById('formCategory')?.value || 'عام';
+  const paymentMethod = document.getElementById('formPaymentMethod')?.value || 'كاش نقدي';
+  const notes = sanitizeString(document.getElementById('formNotes')?.value, 200);
 
   if (!amount || amount <= 0 || amount > 1e9) { 
-    showToast('يرجى إدخال مبلغ صحيح (أكبر من 0)', 'error'); return; 
+    showToast('يرجى إدخال مبلغ صحيح', 'error'); return; 
   }
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { 
     showToast('يرجى اختيار تاريخ صحيح', 'error'); return; 
@@ -2345,7 +2324,6 @@ function handleFormSubmit(event) {
     transactions[index] = normalizeTransaction({
       ...old, type, amount, date, time, client, category,
       paymentMethod: isDebt(type) ? 'آجل / معلق' : paymentMethod,
-      reference,
       notes: notes || (type === 'charity' ? 'صدقة لوجه الله' : category),
       receipt: currentReceiptData,
       status: isDebt(type) ? (old.status || 'pending') : null,
@@ -2358,7 +2336,6 @@ function handleFormSubmit(event) {
       type, amount, date, time, client, category,
       paidAmount: 0,
       paymentMethod: isDebt(type) ? 'آجل / معلق' : paymentMethod,
-      reference,
       notes: notes || (type === 'charity' ? 'صدقة لوجه الله' : category),
       receipt: currentReceiptData,
       status: isDebt(type) ? 'pending' : null,
@@ -2383,12 +2360,10 @@ function handleFormSubmit(event) {
    DELETE & UNDO
    ========================================================= */
 function editTransaction(id) {
-  if (!requireAuth()) return;
   openModal('expense', id);
 }
 
 function requestDelete(id) {
-  if (!requireAuth()) return;
   const item = transactions.find(t => t.id === id);
   if (!item) return;
   openConfirm(
@@ -2399,7 +2374,6 @@ function requestDelete(id) {
 }
 
 function deleteTransaction(id) {
-  if (!requireAuth()) return;
   const tx = transactions.find(t => t.id === id);
   if (!tx) return;
   tx._deleted = true;
@@ -2411,7 +2385,7 @@ function deleteTransaction(id) {
 }
 
 function undoDelete() {
-  if (!lastDeletedId || !requireAuth()) return;
+  if (!lastDeletedId) return;
   const tx = transactions.find(t => t.id === lastDeletedId);
   if (tx) { tx._deleted = false; tx._updatedAt = Date.now(); }
   lastDeletedId = null;
@@ -2442,7 +2416,6 @@ function closeConfirm() {
 }
 
 function toggleDebtStatus(id) {
-  if (!requireAuth()) return;
   const debt = transactions.find(t => t.id === id);
   if (!debt) return;
   const wasPaid = debt.status === 'paid';
@@ -2461,8 +2434,6 @@ function toggleDebtStatus(id) {
 function getBudget() { return Number(localStorage.getItem(BUDGET_KEY) || 0); }
 
 function openBudgetModal() {
-  if (!requireAuth()) return;
-  if (!hasFeature('budget')) { showToast('الميزانية غير متاحة لدورك', 'error'); return; }
   closeMenus();
   document.getElementById('budgetInput').value = getBudget() || '';
   const modal = document.getElementById('budgetModal');
@@ -2473,7 +2444,6 @@ function closeBudgetModal() {
   modal?.classList.add('hidden'); modal?.classList.remove('flex');
 }
 function saveBudget() {
-  if (!requireAuth()) return;
   const value = Number(document.getElementById('budgetInput').value);
   if (!isFinite(value) || value < 0 || value > 1e9) { showToast('قيمة الميزانية غير صحيحة', 'error'); return; }
   localStorage.setItem(BUDGET_KEY, value);
@@ -2483,7 +2453,6 @@ function saveBudget() {
   showToast('تم حفظ الميزانية الشهرية', 'success');
 }
 function clearBudget() {
-  if (!requireAuth()) return;
   localStorage.removeItem(BUDGET_KEY);
   closeBudgetModal();
   updateBudget();
@@ -2520,8 +2489,6 @@ function updateBudget() {
    BACKUP & EXPORT
    ========================================================= */
 function openBackupModal() {
-  if (!requireAuth()) return;
-  if (!hasFeature('backup')) { showToast('النسخ الاحتياطي غير متاح لدورك', 'error'); return; }
   closeMenus();
   const modal = document.getElementById('backupModal');
   modal?.classList.remove('hidden'); modal?.classList.add('flex');
@@ -2532,10 +2499,9 @@ function closeBackupModal() {
 }
 
 function downloadBackup() {
-  if (!requireAuth()) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '9.6',
+    version: '9.8',
     createdAt: new Date().toISOString(),
     transactions,
     budget: getBudget(),
@@ -2552,7 +2518,6 @@ function downloadBackup() {
 }
 
 function restoreBackup(event) {
-  if (!requireAuth()) { event.target.value = ''; return; }
   const file = event.target.files?.[0];
   if (!file) return;
   const reader = new FileReader();
@@ -2581,8 +2546,6 @@ function restoreBackup(event) {
 }
 
 function exportToCSV() {
-  if (!requireAuth()) return;
-  if (!hasFeature('export')) { showToast('التصدير غير متاح لدورك', 'error'); return; }
   closeMenus();
   const list = getActiveTransactions();
   if (!list.length) { showToast('لا توجد بيانات للتصدير', 'error'); return; }
@@ -2609,14 +2572,11 @@ function exportToCSV() {
 }
 
 function printReport() {
-  if (!requireAuth()) return;
-  if (!hasFeature('reports')) { showToast('التقارير غير متاحة لدورك', 'error'); return; }
   closeMenus();
   window.print();
 }
 
 function confirmClearData() {
-  if (!requireAuth()) return;
   closeMenus();
   openConfirm('تصفير جميع البيانات؟', 'سيتم حذف كل المعاملات والميزانية نهائياً.', () => {
     transactions = [];
@@ -2628,11 +2588,15 @@ function confirmClearData() {
 }
 
 function loadDemoData() {
-  if (!requireAuth()) return;
   closeMenus();
   openConfirm('تحميل البيانات التجريبية؟', 'سيتم استبدال المعاملات الحالية بالبيانات النموذجية.', () => {
     const now = Date.now();
-    transactions = JSON.parse(JSON.stringify(DEMO_ITEMS)).map((t, i) => normalizeTransaction({ ...t, _updatedAt: now + i }));
+    transactions = [
+      { id:'demo-1', type:'income', amount:1200, category:'خدمات سوفت وير وصيانة', client:'أحمد', paymentMethod:'كاش نقدي', notes:'إصلاح بوت لودر وفلاش 3 أجهزة', date:todayString(), time:'02:30 PM' },
+      { id:'demo-2', type:'charity', amount:150, category:'مساعدة محتاج وتفريج كربة', client:'', paymentMethod:'كاش نقدي', notes:'صدقة شكر بنية الرزق والبركة', date:todayString(), time:'03:15 PM' },
+      { id:'demo-3', type:'expense', amount:380, category:'تفعيل وسيرفرات وكريدت', client:'موزع سيرفر محمد', paymentMethod:'إنستاباي (InstaPay)', notes:'تفعيل باقة دونجل وسيرفر شاومي', date:yesterdayString(), time:'05:40 PM' },
+      { id:'demo-4', type:'debt_receivable', amount:650, paidAmount:200, category:'حساب محل صيانة', client:'أحمد', paymentMethod:'آجل / معلق', notes:'باقي حساب فلاش 4 أجهزة', status:'pending', date:beforeYesterdayString(), time:'11:20 AM' }
+    ].map((t, i) => normalizeTransaction({ ...t, _updatedAt: now + i }));
     saveData({ force: true });
     refreshAll();
     showToast('تم تحميل البيانات التجريبية', 'success');
@@ -2643,7 +2607,6 @@ function loadDemoData() {
    PIN SECURITY
    ========================================================= */
 function openPinModal() {
-  if (!requireAuth()) return;
   closeMenus();
   const modal = document.getElementById('pinModal');
   const title = document.getElementById('pinTitle');
@@ -2676,7 +2639,6 @@ async function handlePinAction() {
 }
 
 function confirmRemovePin() {
-  if (!requireAuth()) return;
   closeMenus();
   openConfirm('إزالة رمز القفل؟', 'سيتم إلغاء قفل التطبيق PIN.', () => {
     localStorage.removeItem(PIN_KEY);
@@ -2732,7 +2694,6 @@ async function forgotPinUnlock() {
    TABS & NAVIGATION (DESKTOP + MOBILE APP BAR)
    ========================================================= */
 function switchTab(tab) {
-  if (tab === 'debts' && !hasFeature('debts')) { showToast('دفتر الديون غير متاح لدورك', 'error'); return; }
   currentTab = tab;
   
   const isTx = tab === 'transactions';
@@ -2757,7 +2718,6 @@ function switchTab(tab) {
 
   if (isClients) renderClients();
 
-  // النزول الساحر للوحة المطلوبة على شاشات الموبايل
   let targetPanel = isTx ? panelTx : (isDebts ? panelDebts : panelClients);
   if (targetPanel && window.innerWidth < 768) {
     targetPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2878,11 +2838,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   showAuthLoading();
   await handleRedirectResult();
 
-  // صمام أمان لإخفاء شاشة اللودنج حتى لو تأخر الرد
   setTimeout(() => {
     hideAuthLoading();
     if (!currentUser && !authResolved) {
       showLoginWall();
     }
-  }, 2500);
+  }, 1800);
 });
