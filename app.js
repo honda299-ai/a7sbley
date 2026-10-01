@@ -1,6 +1,6 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V9.6
-   Full Code: Complete Admin Panel + Role Permissions
+   EHSEBLI / HONDA FINANCIAL MANAGER V9.4
+   Full Features: Complete Admin Panel + Role Permissions
    Zero Undefined Data + Instant Realtime Sync + Days Filters
    Smooth Adaptive Splash Screen + User Avatar Integration
    ========================================================= */
@@ -189,6 +189,9 @@ function validateTransaction(t) {
   return true;
 }
 
+/* =========================================================
+   CLEAN TRANSACTION (ABSOLUTELY ZERO UNDEFINED VALUES)
+   ========================================================= */
 function normalizeTransaction(t) {
   return {
     id: String(t.id || ('tx-' + Date.now())).slice(0, 100),
@@ -455,7 +458,7 @@ function copyClientPortalLink() {
 function shareClientPortalWhatsApp() {
   if (!activeClientName) return;
   const link = getClientPortalLink(activeClientName);
-  const text = `مرحباً يا ${activeClientName}، تفضل رابط صفحة كشف حسابك المباشر لمتابعة كافة المعاملات المشتركة بيننا أولاً بأول:\n${link}\n\n— Honda Store`;
+  const text = `مرحباً يا ${activeClientName}، تفضل رابط صفحة كشف حسابك المالي المباشر لمتابعة كافة المعاملات المشتركة بيننا أولاً بأول:\n${link}\n\n— Honda Store`;
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
 
@@ -1038,7 +1041,7 @@ async function saveRolePermissions() {
 }
 
 /* =========================================================
-   LOGIN & AUTH FLOW
+   LOGIN & AUTH FLOW (Google + Email + Phone OTP)
    ========================================================= */
 function switchLoginMethod(method) {
   currentLoginMethod = method;
@@ -1262,23 +1265,24 @@ async function hashPin(pin) {
 function getPin() { return localStorage.getItem(PIN_KEY); }
 
 function showAuthLoading() {
+  document.body.classList.add('auth-pending');
+  document.body.classList.remove('not-authed');
   const splash = document.getElementById('splashScreen');
   if (splash) {
     splash.style.display = 'flex';
     splash.style.opacity = '1';
-    splash.classList.remove('hidden');
   }
   document.getElementById('loginWall')?.classList.add('hidden');
 }
 
 function hideAuthLoading() {
+  document.body.classList.remove('auth-pending');
   const splash = document.getElementById('splashScreen');
   if (splash) {
     splash.style.opacity = '0';
     setTimeout(() => {
       splash.style.display = 'none';
-      splash.classList.add('hidden');
-    }, 400);
+    }, 500);
   }
   const oldLoading = document.getElementById('authLoading');
   if (oldLoading) oldLoading.style.display = 'none';
@@ -1290,6 +1294,7 @@ function showLoginWall() {
   const wall = document.getElementById('loginWall');
   wall?.classList.remove('hidden');
   wall?.classList.add('flex');
+  document.getElementById('userProfile')?.classList.add('hidden');
 }
 
 function hideLoginWall() {
@@ -1559,7 +1564,7 @@ function saveData(options = {}) {
 }
 
 /* =========================================================
-   PERIODS & DAYS FILTERS
+   PERIODS & DAYS FILTERS (النهاردة - امبارح - أول أمس...)
    ========================================================= */
 function setPeriod(period) {
   if (!requireAuth()) return;
@@ -1727,7 +1732,7 @@ function debouncedRenderTransactions() {
 }
 
 /* =========================================================
-   TRANSACTIONS RENDER (DESKTOP + MOBILE CARDS)
+   TRANSACTIONS RENDER (DESKTOP TABLE + MOBILE CARDS)
    ========================================================= */
 function filterTransactions(filter) {
   activeFilter = filter;
@@ -2076,9 +2081,7 @@ function openClientLedger(clientName) {
             <div class="font-bold">${escapeHTML(t.date)}</div>
             <div class="text-[9px] text-orange-500 font-bold">${escapeHTML(formatTimeTo12Hour(t.time || ''))}</div>
           </td>
-          <td class="py-2.5 px-3">
-            <div class="font-bold">${escapeHTML(t.notes || t.category)}</div>
-          </td>
+          <td class="py-2.5 px-3 font-bold">${escapeHTML(t.notes || t.category)}</td>
           <td class="py-2.5 px-3 text-slate-400 font-semibold">${escapeHTML(t.paymentMethod || 'كاش')}</td>
           <td class="py-2.5 px-3 font-black ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">
             ${t.type === 'income' ? '+' : '-'}${money(t.amount)} ج.م
@@ -2134,7 +2137,7 @@ function shareViaWhatsApp(id) {
 💰 *المبلغ:* ${money(item.amount)} ج.م
 📅 *التاريخ:* ${item.date} ${timeStr ? `(${timeStr})` : ''}
 💳 *طريقة الدفع:* ${item.paymentMethod || 'كاش'}
-----------------------------------------
+${item.reference ? `🔖 *المرجع:* ${item.reference}\n` : ''}----------------------------------------
 شكراً لتعاملكم معنا ✨`;
 
   const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
@@ -2283,7 +2286,9 @@ function onTypeChange() {
   if (!selected) return;
   const type = selected.value;
   const select = document.getElementById('formCategory');
+  const baraka = document.getElementById('barakaBox');
   const title = document.getElementById('modalTitle');
+  const notes = document.getElementById('notesLabel');
   const icon = document.getElementById('modalIconBox');
 
   if (select) {
@@ -2295,21 +2300,28 @@ function onTypeChange() {
     });
   }
 
+  baraka?.classList.toggle('hidden', type !== 'charity');
+
   if (title && icon) {
     if (type === 'charity') {
       title.textContent = editingId ? 'تعديل باب الخير' : 'تسجيل صدقة أو عمل خير';
+      if (notes) notes.textContent = 'النية / الملاحظات';
       icon.innerHTML = '<i class="fa-solid fa-heart text-orange-500"></i>';
     } else if (type === 'income') {
       title.textContent = editingId ? 'تعديل الدخل' : 'تسجيل دخل / إيراد جديد';
+      if (notes) notes.textContent = 'بيان الخدمة بالتفصيل';
       icon.innerHTML = '<i class="fa-solid fa-arrow-trend-up text-emerald-500"></i>';
     } else if (type === 'debt_receivable') {
       title.textContent = editingId ? 'تعديل دين مستحق لي' : 'تسجيل دين مستحق لي';
+      if (notes) notes.textContent = 'بيان الدين والخدمة *';
       icon.innerHTML = '<i class="fa-solid fa-user-plus text-cyan-500"></i>';
     } else if (type === 'debt_payable') {
       title.textContent = editingId ? 'تعديل دين عليّ' : 'تسجيل دين مستحق عليّ';
+      if (notes) notes.textContent = 'بيان الدين والالتزام *';
       icon.innerHTML = '<i class="fa-solid fa-user-minus text-purple-500"></i>';
     } else {
       title.textContent = editingId ? 'تعديل مصروف' : 'تسجيل مصروف جديد';
+      if (notes) notes.textContent = 'بيان المصروف';
       icon.innerHTML = '<i class="fa-solid fa-arrow-trend-down text-rose-500"></i>';
     }
   }
@@ -2491,31 +2503,6 @@ function clearBudget() {
   showToast('تم حذف الميزانية الشهرية', 'info');
 }
 
-function updateBudget() {
-  const budget = getBudget();
-  const monthItems = getActiveTransactions().filter(t => isInPeriod(t.date, 'month'));
-  let used = 0;
-  monthItems.forEach(t => {
-    if (t.type === 'expense' || t.type === 'charity') used += Number(t.amount || 0);
-  });
-
-  const bUsed = document.getElementById('budgetUsed');
-  if (bUsed) bUsed.textContent = money(used);
-
-  const bTotal = document.getElementById('budgetTotal');
-  const bBar = document.getElementById('budgetBar');
-
-  if (!budget) {
-    if (bTotal) bTotal.textContent = 'غير محددة';
-    if (bBar) bBar.style.width = '0%';
-    return;
-  }
-
-  if (bTotal) bTotal.textContent = money(budget) + ' ج.م';
-  const percent = Math.min(100, (used / budget) * 100);
-  if (bBar) bBar.style.width = percent + '%';
-}
-
 /* =========================================================
    BACKUP & EXPORT
    ========================================================= */
@@ -2535,7 +2522,7 @@ function downloadBackup() {
   if (!requireAuth()) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '9.6',
+    version: '9.4',
     createdAt: new Date().toISOString(),
     transactions,
     budget: getBudget(),
@@ -2739,40 +2726,22 @@ function switchTab(tab) {
   const isDebts = tab === 'debts';
   const isClients = tab === 'clients';
 
-  const panelTx = document.getElementById('panelTransactions');
-  const panelDebts = document.getElementById('panelDebts');
-  const panelClients = document.getElementById('panelClients');
+  document.getElementById('panelTransactions')?.classList.toggle('hidden', !isTx);
+  document.getElementById('panelDebts')?.classList.toggle('hidden', !isDebts);
+  document.getElementById('panelClients')?.classList.toggle('hidden', !isClients);
 
-  panelTx?.classList.toggle('hidden', !isTx);
-  panelDebts?.classList.toggle('hidden', !isDebts);
-  panelClients?.classList.toggle('hidden', !isClients);
-
+  // تحديث شريط الكمبيوتر
   document.getElementById('tabBtnTransactions')?.classList.toggle('active', isTx);
   document.getElementById('tabBtnDebts')?.classList.toggle('active', isDebts);
   document.getElementById('tabBtnClients')?.classList.toggle('active', isClients);
 
+  // تحديث شريط الموبايل السفلي
   document.getElementById('mNavTx')?.classList.toggle('active', isTx);
   document.getElementById('mNavDebts')?.classList.toggle('active', isDebts);
   document.getElementById('mNavClients')?.classList.toggle('active', isClients);
 
   if (isClients) renderClients();
-
-  // النزول الساحر للوحة المطلوبة على شاشات الموبايل
-  let targetPanel = isTx ? panelTx : (isDebts ? panelDebts : panelClients);
-  if (targetPanel && window.innerWidth < 768) {
-    targetPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-}
-
-function toggleMobileMoreMenu(event) {
-  if (event) event.stopPropagation();
-  const menu = document.getElementById('dropMenu');
-  if (!menu) return;
-  menu.classList.toggle('hidden');
-  
-  if (window.innerWidth < 768) {
-    menu.classList.add('fixed', 'bottom-20', 'right-4', 'left-4', 'w-auto');
-  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 let toastTimer = null;
@@ -2803,26 +2772,14 @@ function showToast(message, type = 'success', allowUndo = false) {
   }, allowUndo ? 6000 : 3500);
 }
 
-function toggleMenu() { 
-  const menu = document.getElementById('dropMenu');
-  if (!menu) return;
-  menu.classList.remove('fixed', 'bottom-20', 'right-4', 'left-4', 'w-auto');
-  menu.classList.toggle('hidden'); 
-}
-
-function closeMenus() { 
-  const menu = document.getElementById('dropMenu');
-  if (!menu) return;
-  menu.classList.add('hidden'); 
-  menu.classList.remove('fixed', 'bottom-20', 'right-4', 'left-4', 'w-auto');
-}
+function toggleMenu() { document.getElementById('dropMenu')?.classList.toggle('hidden'); }
+function closeMenus() { document.getElementById('dropMenu')?.classList.add('hidden'); }
 
 window.addEventListener('click', event => {
   const btn = document.getElementById('menuBtn');
-  const mNavBtn = document.getElementById('mNavMore');
   const menu = document.getElementById('dropMenu');
-  if (menu && !menu.contains(event.target) && !btn?.contains(event.target) && !mNavBtn?.contains(event.target)) {
-    closeMenus();
+  if (btn && menu && !btn.contains(event.target) && !menu.contains(event.target)) {
+    menu.classList.add('hidden');
   }
 });
 
@@ -2878,11 +2835,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   showAuthLoading();
   await handleRedirectResult();
 
-  // صمام أمان لإخفاء شاشة اللودنج حتى لو تأخر الرد
   setTimeout(() => {
-    hideAuthLoading();
-    if (!currentUser && !authResolved) {
+    if (!authResolved) {
+      hideAuthLoading();
       showLoginWall();
     }
-  }, 2500);
+  }, 4000);
 });
