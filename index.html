@@ -54,6 +54,13 @@
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans min-h-screen flex flex-col transition-colors duration-300 auth-pending">
 
+  <!-- PWA SPLASH SCREEN -->
+  <div id="pwaSplash" class="pwa-splash">
+    <div class="pwa-splash-logo"><i class="fa-solid fa-coins"></i></div>
+    <div class="pwa-splash-title">احسبلي</div>
+    <div class="pwa-splash-loader"><span></span><span></span><span></span></div>
+  </div>
+
   <!-- ================= HEADER ================= -->
   <header id="appHeader" class="sticky top-0 z-40 border-b border-slate-200 dark:border-dark-800 glass-light dark:glass-dark shadow-sm no-print">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -85,7 +92,7 @@
             </button>
           </div>
 
-          <button onclick="togglePrivacyMode()" id="privacyBtn" title="إخفاء / إظهار المبالغ"
+          <button onclick="togglePrivacyMode()" id="privacyBtn" title="خصوصية"
             class="hidden sm:flex p-2.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 hover:border-orange-500 text-slate-700 dark:text-slate-200 transition shadow-sm items-center gap-2 text-xs font-bold">
             <i id="privacyIcon" class="fa-solid fa-eye text-orange-500"></i>
             <span class="hidden md:inline">خصوصية</span>
@@ -108,10 +115,17 @@
               class="p-2.5 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-slate-600 dark:text-slate-300 hover:text-orange-500 transition">
               <i class="fa-solid fa-ellipsis-vertical"></i>
             </button>
-            <div id="dropMenu" class="hidden absolute left-0 mt-2 w-56 rounded-2xl shadow-2xl bg-white dark:bg-dark-850 border border-slate-200 dark:border-dark-750 p-1.5 z-50">
+            <div id="dropMenu" class="hidden absolute left-0 mt-2 w-60 rounded-2xl shadow-2xl bg-white dark:bg-dark-850 border border-slate-200 dark:border-dark-750 p-1.5 z-50">
               <button id="installAppBtn" onclick="installApp()" class="menu-item text-blue-500 hidden">
                 <i class="fa-solid fa-mobile-screen-button"></i> تثبيت التطبيق على الجوال
               </button>
+              <button id="notificationToggleBtn" onclick="togglePushNotifications()" class="menu-item text-amber-500">
+                <i class="fa-solid fa-bell-slash"></i> <span>تفعيل الإشعارات</span>
+              </button>
+              <button onclick="sendTestNotification()" class="menu-item text-blue-400">
+                <i class="fa-solid fa-flask"></i> إرسال إشعار تجريبي
+              </button>
+              <div class="my-1 border-t border-slate-100 dark:border-dark-800"></div>
               <button onclick="exportToCSV()" data-feature="export" class="menu-item text-emerald-500"><i class="fa-solid fa-file-excel"></i> تصدير شيت إكسيل (CSV)</button>
               <button onclick="loadDemoData()" class="menu-item text-blue-500"><i class="fa-solid fa-rotate"></i> تعبئة بيانات تجريبية</button>
               <button onclick="openBackupModal()" data-feature="backup" class="menu-item text-teal-500"><i class="fa-solid fa-database"></i> النسخ الاحتياطي والاستعادة</button>
@@ -543,7 +557,7 @@
     </div>
   </footer>
 
-  <!-- ================= MOBILE BOTTOM NAV ================= -->
+  <!-- MOBILE BOTTOM NAV -->
   <nav id="mobileBottomNav" class="mobile-bottom-nav no-print">
     <button onclick="switchTab('transactions')" class="mob-nav-btn active" data-tab="transactions">
       <i class="fa-solid fa-list-check"></i>

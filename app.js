@@ -1,12 +1,9 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V9.1
-   PWA Edition - Installable Mobile App
-   Clean Firestore Data + Instant Realtime Sync
+   EHSEBLI / HONDA FINANCIAL MANAGER V9.2
+   PWA Edition + Shortcuts + Push Notifications
    ========================================================= */
 
-const SUPER_ADMIN_EMAILS = [
-  'hondastore299@gmail.com'
-];
+const SUPER_ADMIN_EMAILS = ['hondastore299@gmail.com'];
 
 /* ---------- Firebase Config ---------- */
 const firebaseConfig = {
@@ -49,25 +46,22 @@ let partialPaymentDebtId = null;
 let currentReceiptData = null;
 let activeClientName = null;
 let isPortalModeActive = false;
-
 let categoryChartInstance = null;
 let balanceChartInstance = null;
 let lastDeletedId = null;
-
 let searchDebounceTimer = null;
 let authResolved = false;
-
 let adminActiveTab = 'users';
 let usersSearchQuery = '';
 let editingUserPermissions = null;
 let currentUserPermissionsOverride = null;
 let userDocUnsubscribe = null;
 let transactionsUnsubscribe = null;
-
 let currentLoginMethod = 'google';
 let emailMode = 'signin';
 let confirmationResult = null;
 let recaptchaVerifier = null;
+let deferredInstallPrompt = null;
 
 /* ---------- Roles Meta ---------- */
 const ROLES_META = {
@@ -79,12 +73,12 @@ const ROLES_META = {
 };
 
 const FEATURE_LIST = [
-  { key: 'charity', label: 'باب الخير',      icon: 'fa-hand-holding-heart', type: 'bool' },
-  { key: 'debts',   label: 'دفتر الديون',    icon: 'fa-handshake',           type: 'bool' },
-  { key: 'budget',  label: 'الميزانية',      icon: 'fa-wallet',              type: 'bool' },
-  { key: 'export',  label: 'تصدير CSV',      icon: 'fa-file-excel',          type: 'bool' },
-  { key: 'backup',  label: 'نسخ احتياطي',    icon: 'fa-database',            type: 'bool' },
-  { key: 'reports', label: 'تقارير PDF',     icon: 'fa-file-pdf',            type: 'bool' }
+  { key: 'charity', label: 'باب الخير',      icon: 'fa-hand-holding-heart' },
+  { key: 'debts',   label: 'دفتر الديون',    icon: 'fa-handshake' },
+  { key: 'budget',  label: 'الميزانية',      icon: 'fa-wallet' },
+  { key: 'export',  label: 'تصدير CSV',      icon: 'fa-file-excel' },
+  { key: 'backup',  label: 'نسخ احتياطي',    icon: 'fa-database' },
+  { key: 'reports', label: 'تقارير PDF',     icon: 'fa-file-pdf' }
 ];
 
 const DEFAULT_PERMISSIONS = {
@@ -97,19 +91,15 @@ const DEFAULT_PERMISSIONS = {
 
 let rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
 
-/* =========================================================
-   DATE, TIME & IMAGE HELPERS
-   ========================================================= */
+/* ---------- Helpers ---------- */
 function todayString() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-
 function currentInputTimeString() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
-
 function formatTimeTo12Hour(timeStr) {
   if (!timeStr) return '';
   if (/am|pm/i.test(timeStr)) return timeStr;
@@ -121,7 +111,6 @@ function formatTimeTo12Hour(timeStr) {
   h = h % 12 || 12;
   return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
 }
-
 function format12To24(time12) {
   if (!time12) return currentInputTimeString();
   const match = time12.match(/(\d+):(\d+)\s*(AM|PM)/i);
@@ -133,39 +122,26 @@ function format12To24(time12) {
   if (ampm === 'AM' && h === 12) h = 0;
   return `${String(h).padStart(2, '0')}:${m}`;
 }
-
 function offsetDate(days) {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-
-function money(value) { 
-  return Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }); 
+function money(v) { return Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+function escapeHTML(v) {
+  return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
-
-function escapeHTML(value) {
-  return String(value ?? '')
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-}
-
 function sanitizeString(str, maxLength = 500) {
   return String(str || '').replace(/[\u0000-\u001F\u007F]/g, '').slice(0, maxLength).trim();
 }
-
 function isDebt(type) { return String(type || '').startsWith('debt_'); }
-
 function typeName(type) {
   return ({ income:'دخل', expense:'مصروف', charity:'باب الخير', debt_receivable:'دين ليا', debt_payable:'دين عليا' })[type] || type;
 }
-
 function getActiveTransactions() { return transactions.filter(t => !t._deleted); }
-
 function isSuperAdminEmail(email) {
   return SUPER_ADMIN_EMAILS.map(e => e.toLowerCase().trim()).includes(String(email || '').toLowerCase().trim());
 }
-
 function validateTransaction(t) {
   if (!t || typeof t !== 'object') return false;
   if (!t.id || typeof t.id !== 'string') return false;
@@ -175,10 +151,6 @@ function validateTransaction(t) {
   if (!t.date || !/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return false;
   return true;
 }
-
-/* =========================================================
-   CLEAN TRANSACTION (NO UNDEFINED VALUES)
-   ========================================================= */
 function normalizeTransaction(t) {
   return {
     id: String(t.id).slice(0, 100),
@@ -200,17 +172,13 @@ function normalizeTransaction(t) {
 }
 
 /* =========================================================
-   PWA: INSTALL PROMPT & SERVICE WORKER
+   PWA: INSTALL PROMPT
    ========================================================= */
-let deferredInstallPrompt = null;
-
 function installApp() {
   if (deferredInstallPrompt) {
     deferredInstallPrompt.prompt();
     deferredInstallPrompt.userChoice.then((choice) => {
-      if (choice.outcome === 'accepted') {
-        showToast('جاري تثبيت التطبيق...', 'success');
-      }
+      if (choice.outcome === 'accepted') showToast('جاري تثبيت التطبيق...', 'success');
       deferredInstallPrompt = null;
       const btn = document.getElementById('installAppBtn');
       if (btn) btn.classList.add('hidden');
@@ -218,11 +186,8 @@ function installApp() {
     return;
   }
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  if (isIOS) {
-    showToast('اضغط زر المشاركة ⬆️ ثم "إضافة إلى الشاشة الرئيسية"', 'info');
-  } else {
-    showToast('التطبيق مثبّت بالفعل أو غير مدعوم في هذا المتصفح', 'info');
-  }
+  if (isIOS) showToast('اضغط زر المشاركة ⬆️ ثم "إضافة إلى الشاشة الرئيسية"', 'info');
+  else showToast('التطبيق مثبّت بالفعل أو غير مدعوم في هذا المتصفح', 'info');
 }
 
 function registerServiceWorker() {
@@ -248,50 +213,276 @@ function initInstallPrompt() {
   });
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true;
-  if (isStandalone) {
-    document.body.classList.add('pwa-standalone');
+  if (isStandalone) document.body.classList.add('pwa-standalone');
+}
+
+/* =========================================================
+   PWA: SHORTCUTS
+   ========================================================= */
+function handleAppShortcut() {
+  const params = new URLSearchParams(window.location.search);
+  const shortcut = params.get('shortcut');
+  if (!shortcut) return false;
+
+  const cleanUrl = window.location.pathname + window.location.hash;
+  window.history.replaceState({}, document.title, cleanUrl);
+
+  if (authResolved && currentUser) setTimeout(() => executeShortcut(shortcut), 400);
+  else sessionStorage.setItem('pending_shortcut', shortcut);
+  return true;
+}
+
+function executeShortcut(shortcut) {
+  switch (shortcut) {
+    case 'expense': openModal('expense'); break;
+    case 'income':  openModal('income');  break;
+    case 'charity': openModal('charity'); break;
+    case 'debts':   switchTab('debts');   break;
+    case 'clients': switchTab('clients'); break;
+  }
+}
+
+function checkPendingShortcut() {
+  const pending = sessionStorage.getItem('pending_shortcut');
+  if (pending && currentUser) {
+    sessionStorage.removeItem('pending_shortcut');
+    setTimeout(() => executeShortcut(pending), 600);
   }
 }
 
 /* =========================================================
-   RECEIPT IMAGE UPLOAD & COMPRESSION
+   PWA: SHARE TARGET
+   ========================================================= */
+function handleShareTarget() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('share')) return false;
+
+  const sharedTitle = params.get('title') || '';
+  const sharedText = params.get('text') || '';
+  const sharedUrl = params.get('url') || '';
+  const payload = { sharedTitle, sharedText, sharedUrl };
+
+  const runAction = () => {
+    if (!currentUser) {
+      sessionStorage.setItem('pending_share', JSON.stringify(payload));
+      return;
+    }
+    openModal('expense');
+    setTimeout(() => {
+      const notesField = document.getElementById('formNotes');
+      const combined = [sharedTitle, sharedText, sharedUrl].filter(Boolean).join(' - ');
+      if (notesField && combined) notesField.value = combined.slice(0, 200);
+    }, 300);
+  };
+
+  if (authResolved && currentUser) setTimeout(runAction, 500);
+  else sessionStorage.setItem('pending_share', JSON.stringify(payload));
+
+  const cleanUrl = window.location.pathname;
+  window.history.replaceState({}, document.title, cleanUrl);
+  return true;
+}
+
+function checkPendingShare() {
+  const pending = sessionStorage.getItem('pending_share');
+  if (pending && currentUser) {
+    try {
+      const data = JSON.parse(pending);
+      sessionStorage.removeItem('pending_share');
+      openModal('expense');
+      setTimeout(() => {
+        const notesField = document.getElementById('formNotes');
+        const combined = [data.sharedTitle, data.sharedText, data.sharedUrl].filter(Boolean).join(' - ');
+        if (notesField && combined) notesField.value = combined.slice(0, 200);
+      }, 400);
+    } catch (e) {}
+  }
+}
+
+/* =========================================================
+   PWA: FILE RESTORE
+   ========================================================= */
+function handleFileRestore() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('file')) return false;
+  showToast('اسحب ملف النسخة الاحتياطية في التطبيق للاستعادة', 'info');
+  openBackupModal();
+  const cleanUrl = window.location.pathname;
+  window.history.replaceState({}, document.title, cleanUrl);
+  return true;
+}
+
+/* =========================================================
+   PWA: PUSH NOTIFICATIONS
+   ========================================================= */
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') {
+    showToast('التنبيهات مرفوضة - افتح إعدادات المتصفح', 'error');
+    return false;
+  }
+  const permission = await Notification.requestPermission();
+  return permission === 'granted';
+}
+
+async function subscribeToPushNotifications() {
+  if (!currentUser) { showToast('سجّل الدخول أولاً', 'error'); return; }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    showToast('الإشعارات غير مدعومة في هذا المتصفح', 'error');
+    return;
+  }
+  const granted = await requestNotificationPermission();
+  if (!granted) return;
+  showToast('تم تفعيل الإشعارات بنجاح 🔔', 'success');
+  updateNotificationUI(true);
+  localStorage.setItem('ehsebli_notif_enabled', 'true');
+}
+
+async function unsubscribeFromPushNotifications() {
+  if (!currentUser) return;
+  localStorage.setItem('ehsebli_notif_enabled', 'false');
+  showToast('تم إيقاف الإشعارات', 'info');
+  updateNotificationUI(false);
+}
+
+async function togglePushNotifications() {
+  if (!currentUser) return;
+  const enabled = localStorage.getItem('ehsebli_notif_enabled') === 'true';
+  if (enabled) await unsubscribeFromPushNotifications();
+  else await subscribeToPushNotifications();
+}
+
+function updateNotificationUI(enabled) {
+  const btn = document.getElementById('notificationToggleBtn');
+  if (!btn) return;
+  const icon = btn.querySelector('i');
+  const label = btn.querySelector('span');
+  if (enabled) {
+    if (icon) icon.className = 'fa-solid fa-bell text-emerald-500';
+    if (label) label.textContent = 'إيقاف الإشعارات';
+  } else {
+    if (icon) icon.className = 'fa-solid fa-bell-slash text-slate-400';
+    if (label) label.textContent = 'تفعيل الإشعارات';
+  }
+}
+
+function showLocalNotification(title, body, url) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (navigator.serviceWorker?.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'SHOW_LOCAL_NOTIFICATION', title, body, url
+    });
+  } else {
+    new Notification(title, { body, icon: './icon.svg', badge: './icon.svg' });
+  }
+}
+
+async function sendTestNotification() {
+  if (!('Notification' in window)) { showToast('الإشعارات غير مدعومة', 'error'); return; }
+  if (Notification.permission !== 'granted') {
+    const granted = await requestNotificationPermission();
+    if (!granted) return;
+  }
+  showLocalNotification(
+    'احسبلي — اختبار الإشعارات 🔔',
+    'لو وصلتك الرسالة دي، يعني الإشعارات شغالة تمام!',
+    './'
+  );
+}
+
+/* =========================================================
+   PWA: NETWORK STATUS
+   ========================================================= */
+function initNetworkStatus() {
+  window.addEventListener('online', () => {
+    showToast('عاد الاتصال بالإنترنت ✓', 'success');
+    document.body.classList.remove('offline');
+  });
+  window.addEventListener('offline', () => {
+    showToast('انقطع الاتصال — العمل في الوضع المحلي', 'info');
+    document.body.classList.add('offline');
+  });
+  if (!navigator.onLine) document.body.classList.add('offline');
+}
+
+/* =========================================================
+   PWA: UPDATE BANNER
+   ========================================================= */
+function showUpdateBanner() {
+  if (document.getElementById('updateBanner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'updateBanner';
+  banner.className = 'update-banner';
+  banner.innerHTML = `
+    <span><i class="fa-solid fa-rocket"></i> إصدار جديد متوفر!</span>
+    <button onclick="applyUpdate()">تحديث الآن</button>
+  `;
+  document.body.appendChild(banner);
+}
+
+function applyUpdate() {
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+  }
+  setTimeout(() => window.location.reload(), 300);
+}
+
+/* =========================================================
+   PWA: INSTALL BANNER (بعد 3 زيارات)
+   ========================================================= */
+function checkInstallPrompt() {
+  const visits = Number(localStorage.getItem('ehsebli_visits') || 0) + 1;
+  localStorage.setItem('ehsebli_visits', visits);
+  const dismissed = localStorage.getItem('ehsebli_install_dismissed') === 'true';
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+  if (visits >= 3 && !dismissed && !isStandalone && deferredInstallPrompt) showInstallBanner();
+}
+
+function showInstallBanner() {
+  if (document.getElementById('installBanner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'installBanner';
+  banner.className = 'install-prompt';
+  banner.innerHTML = `
+    <div class="install-prompt-icon"><i class="fa-solid fa-mobile-screen-button"></i></div>
+    <div class="install-prompt-content">
+      <div class="install-prompt-title">ثبّت التطبيق على جوالك</div>
+      <div class="install-prompt-desc">وصول سريع بدون متصفح + عمل أوفلاين</div>
+    </div>
+    <div class="install-prompt-actions">
+      <button class="install-prompt-dismiss" onclick="dismissInstallBanner()">لاحقاً</button>
+      <button class="install-prompt-accept" onclick="installApp()">تثبيت</button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+}
+
+function dismissInstallBanner() {
+  localStorage.setItem('ehsebli_install_dismissed', 'true');
+  const banner = document.getElementById('installBanner');
+  if (banner) banner.remove();
+}
+
+/* =========================================================
+   RECEIPT IMAGE
    ========================================================= */
 function handleReceiptSelected(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-
-  if (!file.type.startsWith('image/')) {
-    showToast('يرجى اختيار ملف صورة صالح', 'error');
-    return;
-  }
+  if (!file.type.startsWith('image/')) { showToast('يرجى اختيار ملف صورة صالح', 'error'); return; }
 
   const reader = new FileReader();
   reader.onload = (e) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const MAX_WIDTH = 500;
-      const MAX_HEIGHT = 500;
-      let width = img.width;
-      let height = img.height;
-
-      if (width > height) {
-        if (width > MAX_WIDTH) {
-          height *= MAX_WIDTH / width;
-          width = MAX_WIDTH;
-        }
-      } else {
-        if (height > MAX_HEIGHT) {
-          width *= MAX_HEIGHT / height;
-          height = MAX_HEIGHT;
-        }
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-
+      const MAX_W = 500, MAX_H = 500;
+      let width = img.width, height = img.height;
+      if (width > height) { if (width > MAX_W) { height *= MAX_W / width; width = MAX_W; } }
+      else { if (height > MAX_H) { width *= MAX_H / height; height = MAX_H; } }
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
       currentReceiptData = canvas.toDataURL('image/jpeg', 0.4);
       setReceiptUI(currentReceiptData);
       showToast('تم إرفاق الصورة بنجاح ✓', 'success');
@@ -306,7 +497,6 @@ function setReceiptUI(base64) {
   const img = document.getElementById('receiptPreviewImg');
   const text = document.getElementById('receiptUploadText');
   const removeBtn = document.getElementById('removeReceiptBtn');
-
   if (base64) {
     img.src = base64;
     box.classList.remove('hidden');
@@ -316,52 +506,43 @@ function setReceiptUI(base64) {
     img.src = '';
     box.classList.add('hidden');
     removeBtn.classList.add('hidden');
-    text.textContent = 'تصوير بالكاميرا أو اختيار صورة';
+    text.textContent = 'تصوير أو اختيار صورة';
     document.getElementById('formReceiptFile').value = '';
   }
 }
 
-function clearReceiptImage() {
-  currentReceiptData = null;
-  setReceiptUI(null);
-}
+function clearReceiptImage() { currentReceiptData = null; setReceiptUI(null); }
 
 function viewReceiptImage(src) {
   if (!src) return;
   document.getElementById('viewerImageFull').src = src;
   document.getElementById('downloadReceiptLink').href = src;
   const modal = document.getElementById('receiptViewerModal');
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
+  modal.classList.remove('hidden'); modal.classList.add('flex');
 }
 
 function closeReceiptViewer() {
   const modal = document.getElementById('receiptViewerModal');
-  modal.classList.add('hidden');
-  modal.classList.remove('flex');
+  modal.classList.add('hidden'); modal.classList.remove('flex');
 }
 
 /* =========================================================
-   PRIVACY (GHOST) MODE
+   PRIVACY MODE
    ========================================================= */
 function initPrivacyMode() {
   isPrivacyMode = localStorage.getItem(PRIVACY_KEY) === 'true';
   applyPrivacyModeUI();
 }
-
 function togglePrivacyMode() {
   isPrivacyMode = !isPrivacyMode;
   localStorage.setItem(PRIVACY_KEY, isPrivacyMode);
   applyPrivacyModeUI();
   showToast(isPrivacyMode ? 'تم تفعيل وضع الخصوصية وإخفاء الأرقام 🔒' : 'تم إظهار الأرقام 👁️', 'info');
 }
-
 function applyPrivacyModeUI() {
   document.body.classList.toggle('privacy-active', isPrivacyMode);
   const icon = document.getElementById('privacyIcon');
-  if (icon) {
-    icon.className = isPrivacyMode ? 'fa-solid fa-eye-slash text-rose-500' : 'fa-solid fa-eye text-orange-500';
-  }
+  if (icon) icon.className = isPrivacyMode ? 'fa-solid fa-eye-slash text-rose-500' : 'fa-solid fa-eye text-orange-500';
 }
 
 /* =========================================================
@@ -371,14 +552,12 @@ function updateClientsDatalist() {
   const dl = document.getElementById('clientsDatalist');
   if (!dl) return;
   dl.innerHTML = '';
-  const clients = getAllClientNames();
-  clients.forEach(c => {
+  getAllClientNames().forEach(c => {
     const opt = document.createElement('option');
     opt.value = c;
     dl.appendChild(opt);
   });
 }
-
 function getAllClientNames() {
   const set = new Set();
   getActiveTransactions().forEach(t => {
@@ -388,13 +567,12 @@ function getAllClientNames() {
 }
 
 /* =========================================================
-   PUBLIC CLIENT PORTAL
+   PUBLIC PORTAL
    ========================================================= */
 async function checkPublicPortalMode() {
   const params = new URLSearchParams(window.location.search);
   const clientParam = params.get('client');
   const uidParam = params.get('uid');
-
   if (!clientParam) return false;
 
   isPortalModeActive = true;
@@ -402,23 +580,18 @@ async function checkPublicPortalMode() {
   hideAuthLoading();
 
   let clientTransactions = [];
-
   if (uidParam) {
     try {
       const doc = await db.collection('users').doc(uidParam).get();
       if (doc.exists && doc.data().transactions) {
         clientTransactions = (doc.data().transactions || []).filter(validateTransaction);
       }
-    } catch(e) {
-      console.warn("Could not load from cloud, reading local:", e);
-    }
+    } catch(e) { console.warn("Cloud load failed:", e); }
   }
-
   if (!clientTransactions.length) {
     loadLocalData();
     clientTransactions = transactions;
   }
-
   renderPublicPortal(clientParam, clientTransactions);
   return true;
 }
@@ -437,18 +610,15 @@ function renderPublicPortal(clientName, sourceTransactions) {
   const tbody = document.getElementById('portalTransactionsTbody');
   const empty = document.getElementById('portalEmptyState');
   tbody.innerHTML = '';
-
   document.getElementById('portalTxCount').textContent = `${txs.length} معاملة مسجلة`;
 
-  if (!txs.length) {
-    empty.classList.remove('hidden');
-  } else {
+  if (!txs.length) empty.classList.remove('hidden');
+  else {
     empty.classList.add('hidden');
     txs.forEach(t => {
       const amt = Number(t.amount) || 0;
       const paid = Number(t.paidAmount) || 0;
       const rem = Math.max(0, amt - paid);
-
       if (t.type === 'income') income += amt;
       else if (t.type === 'debt_receivable' && t.status !== 'paid') debtRec += rem;
       else if (t.type === 'debt_payable' && t.status !== 'paid') debtPay += rem;
@@ -493,9 +663,7 @@ function copyClientPortalLink() {
   const link = getClientPortalLink(activeClientName);
   navigator.clipboard.writeText(link).then(() => {
     showToast('تم نسخ رابط صفحة العميل بنجاح ✓', 'success');
-  }).catch(() => {
-    prompt('انسخ هذا الرابط وأرسله للعميل:', link);
-  });
+  }).catch(() => prompt('انسخ هذا الرابط وأرسله للعميل:', link));
 }
 
 function shareClientPortalWhatsApp() {
@@ -506,7 +674,7 @@ function shareClientPortalWhatsApp() {
 }
 
 /* =========================================================
-   PERMISSION HELPERS
+   PERMISSIONS
    ========================================================= */
 function hasFeature(feature) {
   if (isSuperAdmin || userRole === 'admin') return true;
@@ -517,7 +685,6 @@ function hasFeature(feature) {
   if (!perms) return false;
   return perms[feature] === true;
 }
-
 function getMaxTransactions() {
   if (isSuperAdmin || userRole === 'admin') return -1;
   if (currentUserPermissionsOverride && typeof currentUserPermissionsOverride.maxTransactions === 'number') {
@@ -527,22 +694,18 @@ function getMaxTransactions() {
   if (!perms) return -1;
   return Number(perms.maxTransactions ?? -1);
 }
-
 function canAddMoreTransactions() {
   const max = getMaxTransactions();
   if (max === -1) return true;
   return getActiveTransactions().length < max;
 }
-
 async function loadRolePermissions() {
   try {
     const doc = await db.collection('config').doc('roles').get();
     if (doc.exists && doc.data().permissions) {
       const cloud = doc.data().permissions;
       const merged = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
-      Object.keys(merged).forEach(r => {
-        if (cloud[r]) merged[r] = { ...merged[r], ...cloud[r] };
-      });
+      Object.keys(merged).forEach(r => { if (cloud[r]) merged[r] = { ...merged[r], ...cloud[r] }; });
       rolePermissions = merged;
     }
     localStorage.setItem(PERMS_CACHE_KEY, JSON.stringify(rolePermissions));
@@ -554,12 +717,8 @@ async function loadRolePermissions() {
   }
   applyRoleUI();
 }
-
 async function saveRolePermissionsToCloud() {
-  if (!currentUser || userRole !== 'admin') {
-    showToast('غير مصرح', 'error');
-    return false;
-  }
+  if (!currentUser || userRole !== 'admin') { showToast('غير مصرح', 'error'); return false; }
   try {
     await db.collection('config').doc('roles').set({
       permissions: rolePermissions,
@@ -568,18 +727,13 @@ async function saveRolePermissionsToCloud() {
     }, { merge: true });
     localStorage.setItem(PERMS_CACHE_KEY, JSON.stringify(rolePermissions));
     return true;
-  } catch (error) {
-    showToast('فشل الحفظ في السحابة', 'error');
-    return false;
-  }
+  } catch (error) { showToast('فشل الحفظ في السحابة', 'error'); return false; }
 }
 
 function applyRoleUI() {
   document.querySelectorAll('[data-feature]').forEach(el => {
-    const display = hasFeature(el.dataset.feature) ? '' : 'none';
-    el.style.display = display;
+    el.style.display = hasFeature(el.dataset.feature) ? '' : 'none';
   });
-
   const adminBtn = document.getElementById('adminPanelBtn');
   const adminDivider = document.getElementById('adminDivider');
   const showAdmin = (userRole === 'admin');
@@ -598,8 +752,6 @@ function applyRoleUI() {
     }
   }
   updatePinUI();
-
-  // Sync mobile bottom nav visibility
   document.querySelectorAll('.mob-nav-btn[data-feature]').forEach(btn => {
     btn.style.display = hasFeature(btn.dataset.feature) ? '' : 'none';
   });
@@ -607,13 +759,11 @@ function applyRoleUI() {
 
 function updatePinUI() {
   const removeBtn = document.getElementById('removePinBtn');
-  if (removeBtn) {
-    removeBtn.style.display = getPin() ? '' : 'none';
-  }
+  if (removeBtn) removeBtn.style.display = getPin() ? '' : 'none';
 }
 
 /* =========================================================
-   USER ROLE LOAD
+   USER ROLE
    ========================================================= */
 async function loadUserRole(uid) {
   try {
@@ -625,10 +775,8 @@ async function loadUserRole(uid) {
       userRole = 'admin';
       currentUserPermissionsOverride = null;
       await db.collection('users').doc(uid).set({
-        role: 'admin',
-        email: currentUser.email || null,
-        displayName: currentUser.displayName || '',
-        isSuperAdmin: true,
+        role: 'admin', email: currentUser.email || null,
+        displayName: currentUser.displayName || '', isSuperAdmin: true,
         loginMethod: getLoginMethod(),
         lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
@@ -636,15 +784,10 @@ async function loadUserRole(uid) {
     }
 
     const doc = await db.collection('users').doc(uid).get();
-
     if (doc.exists && doc.data().role && ROLES_META[doc.data().role]) {
       userRole = doc.data().role;
       currentUserPermissionsOverride = doc.data().permissionsOverride || null;
-
-      if (userRole === 'admin' && !isSuperAdmin) {
-        userRole = 'free';
-      }
-
+      if (userRole === 'admin' && !isSuperAdmin) userRole = 'free';
       await db.collection('users').doc(uid).set({
         email: currentUser.email || null,
         phoneNumber: userPhone || null,
@@ -655,10 +798,8 @@ async function loadUserRole(uid) {
     } else {
       userRole = 'free';
       currentUserPermissionsOverride = null;
-
       await db.collection('users').doc(uid).set({
-        role: 'free',
-        email: currentUser.email || null,
+        role: 'free', email: currentUser.email || null,
         phoneNumber: userPhone || null,
         displayName: currentUser.displayName || '',
         loginMethod: getLoginMethod(),
@@ -668,12 +809,8 @@ async function loadUserRole(uid) {
     }
   } catch (error) {
     const userEmail = (currentUser?.email || '').toLowerCase().trim();
-    if (isSuperAdminEmail(userEmail)) {
-      userRole = 'admin';
-      isSuperAdmin = true;
-    } else {
-      userRole = 'free';
-    }
+    if (isSuperAdminEmail(userEmail)) { userRole = 'admin'; isSuperAdmin = true; }
+    else userRole = 'free';
     currentUserPermissionsOverride = null;
   }
 }
@@ -698,28 +835,22 @@ function switchAdminTab(tab) {
   document.getElementById('adminTabPerms').classList.toggle('active', !isUsers);
   document.getElementById('adminPanelUsers').classList.toggle('hidden', !isUsers);
   document.getElementById('adminPanelPerms').classList.toggle('hidden', isUsers);
-
   if (isUsers) renderUsersList();
   else renderPermissionsEditor();
 }
 
 async function openAdminPanel() {
-  if (userRole !== 'admin') {
-    showToast('هذه الصفحة للمدير فقط', 'error');
-    return;
-  }
+  if (userRole !== 'admin') { showToast('هذه الصفحة للمدير فقط', 'error'); return; }
   closeMenus();
   const modal = document.getElementById('adminModal');
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
+  modal.classList.remove('hidden'); modal.classList.add('flex');
   await loadRolePermissions();
   switchAdminTab('users');
 }
 
 function closeAdminPanel() {
   const modal = document.getElementById('adminModal');
-  modal.classList.add('hidden');
-  modal.classList.remove('flex');
+  modal.classList.add('hidden'); modal.classList.remove('flex');
 }
 
 function filterUsersList() {
@@ -731,17 +862,14 @@ async function renderUsersList() {
   const container = document.getElementById('usersList');
   const searchCount = document.getElementById('usersSearchCount');
   container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> جاري التحميل...</div>';
-
   try {
     const snap = await db.collection('users').get();
     container.innerHTML = '';
-
     if (snap.empty) {
       container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400">لا يوجد مستخدمين</div>';
       if (searchCount) searchCount.textContent = '';
       return;
     }
-
     let users = [];
     snap.forEach(doc => {
       const data = doc.data();
@@ -752,37 +880,19 @@ async function renderUsersList() {
       const isMe = doc.id === currentUser.uid;
       const roleKey = data.role || 'free';
       const hasOverride = data.permissionsOverride && Object.keys(data.permissionsOverride).length > 0;
-
       let priority = 3;
       if (isSuper) priority = 0;
       else if (roleKey === 'admin') priority = 1;
       else if (isMe) priority = 2;
-
       users.push({ doc, data, isSuper, isMe, roleKey, priority, emailLower, nameLower, phoneLower, hasOverride });
     });
-
     const q = usersSearchQuery;
-    if (q) {
-      users = users.filter(u => 
-        u.emailLower.includes(q) || 
-        u.nameLower.includes(q) ||
-        u.phoneLower.includes(q)
-      );
-    }
-
+    if (q) users = users.filter(u => u.emailLower.includes(q) || u.nameLower.includes(q) || u.phoneLower.includes(q));
     users.sort((a, b) => a.priority - b.priority);
-
-    if (searchCount) {
-      searchCount.textContent = q ? `${users.length} نتيجة` : `${users.length} مستخدم`;
-    }
+    if (searchCount) searchCount.textContent = q ? `${users.length} نتيجة` : `${users.length} مستخدم`;
 
     if (!users.length) {
-      container.innerHTML = `
-        <div class="text-center py-8 text-xs text-slate-400">
-          <i class="fa-solid fa-magnifying-glass text-3xl mb-3 opacity-30"></i>
-          <p class="font-bold">لا توجد نتائج مطابقة</p>
-        </div>
-      `;
+      container.innerHTML = `<div class="text-center py-8 text-xs text-slate-400"><i class="fa-solid fa-magnifying-glass text-3xl mb-3 opacity-30"></i><p class="font-bold">لا توجد نتائج مطابقة</p></div>`;
       return;
     }
 
@@ -790,21 +900,17 @@ async function renderUsersList() {
       const meta = ROLES_META[roleKey] || ROLES_META.free;
       const card = document.createElement('div');
       card.className = 'p-3 rounded-xl border flex items-center justify-between gap-2 ' + (
-        isSuper
-          ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/40'
-          : 'border-slate-200 dark:border-dark-750 bg-slate-50/50 dark:bg-dark-850/50'
+        isSuper ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/40'
+                : 'border-slate-200 dark:border-dark-750 bg-slate-50/50 dark:bg-dark-850/50'
       );
-
       let lastLoginStr = 'لم يسجل بعد';
       try {
         const lastLogin = data.lastLoginAt && data.lastLoginAt.toDate ? data.lastLoginAt.toDate() : null;
         if (lastLogin) lastLoginStr = `آخر دخول: ${lastLogin.toLocaleDateString('ar-EG')}`;
       } catch(e) {}
-
       const optionsHtml = Object.keys(ROLES_META).map(r =>
         `<option value="${r}" ${roleKey === r ? 'selected' : ''}>${ROLES_META[r].name}</option>`
       ).join('');
-
       const disabled = isMe || isSuper;
       const identifier = data.email ? escapeHTML(data.email) : (data.phoneNumber ? '📱 ' + escapeHTML(data.phoneNumber) : 'بدون معرّف');
 
@@ -821,13 +927,11 @@ async function renderUsersList() {
           <div class="text-[9px] text-slate-500 mt-0.5">${lastLoginStr}</div>
         </div>
         <div class="flex items-center gap-1 shrink-0">
-          <select onchange="changeUserRole('${doc.id}', this.value)"
-                  ${disabled ? 'disabled' : ''}
+          <select onchange="changeUserRole('${doc.id}', this.value)" ${disabled ? 'disabled' : ''}
                   class="text-[10px] font-black rounded-lg px-2 py-1.5 border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}">
             ${optionsHtml}
           </select>
-          <button onclick="openUserPermissionsModal('${doc.id}')"
-                  title="صلاحيات مخصصة"
+          <button onclick="openUserPermissionsModal('${doc.id}')" title="صلاحيات مخصصة"
                   class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition flex items-center justify-center">
             <i class="fa-solid fa-sliders text-xs"></i>
           </button>
@@ -844,18 +948,14 @@ async function changeUserRole(uid, newRole) {
   if (userRole !== 'admin') { showToast('غير مصرح لك', 'error'); return; }
   if (!ROLES_META[newRole]) return;
   if (uid === currentUser.uid) { showToast('لا يمكنك تغيير دورك الخاص', 'error'); renderUsersList(); return; }
-
   try {
     const targetDoc = await db.collection('users').doc(uid).get();
     const targetData = targetDoc.data() || {};
     const targetEmail = (targetData.email || '').toLowerCase().trim();
-
     if (isSuperAdminEmail(targetEmail)) {
       showToast('لا يمكن تعديل صلاحيات Super Admin 🛡️', 'error');
-      renderUsersList();
-      return;
+      renderUsersList(); return;
     }
-
     await db.collection('users').doc(uid).update({
       role: newRole,
       roleUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -869,7 +969,7 @@ async function changeUserRole(uid, newRole) {
 }
 
 /* =========================================================
-   USER PERMISSIONS OVERRIDE MODAL
+   USER PERMISSIONS OVERRIDE
    ========================================================= */
 async function openUserPermissionsModal(uid) {
   if (userRole !== 'admin') { showToast('غير مصرح', 'error'); return; }
@@ -877,25 +977,17 @@ async function openUserPermissionsModal(uid) {
     const doc = await db.collection('users').doc(uid).get();
     if (!doc.exists) { showToast('المستخدم غير موجود', 'error'); return; }
     const data = doc.data();
-    if (isSuperAdminEmail(data.email)) {
-      showToast('لا يمكن تعديل صلاحيات Super Admin 🛡️', 'error');
-      return;
-    }
+    if (isSuperAdminEmail(data.email)) { showToast('لا يمكن تعديل صلاحيات Super Admin 🛡️', 'error'); return; }
     editingUserPermissions = { uid, data };
     document.getElementById('userPermTitle').textContent = `صلاحيات: ${data.displayName || 'بدون اسم'}`;
     document.getElementById('userPermEmail').textContent = data.email || data.phoneNumber || '';
-
     const roleSelect = document.getElementById('userPermRole');
     const currentRole = data.role || 'free';
     Array.from(roleSelect.options).forEach(opt => { opt.selected = opt.value === currentRole; });
-
     renderUserPermOverrides(data.permissionsOverride || {});
     const modal = document.getElementById('userPermissionsModal');
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-  } catch (error) {
-    showToast('فشل تحميل بيانات المستخدم', 'error');
-  }
+    modal.classList.remove('hidden'); modal.classList.add('flex');
+  } catch (error) { showToast('فشل تحميل بيانات المستخدم', 'error'); }
 }
 
 function renderUserPermOverrides(override) {
@@ -906,32 +998,24 @@ function renderUserPermOverrides(override) {
     let state = 'inherit';
     if (val === true) state = 'allow';
     else if (val === false) state = 'deny';
-
     const row = document.createElement('div');
     row.className = 'perm-row';
     row.innerHTML = `
-      <div class="perm-row-label">
-        <i class="fa-solid ${feature.icon}"></i>
-        <span>${feature.label}</span>
-      </div>
+      <div class="perm-row-label"><i class="fa-solid ${feature.icon}"></i><span>${feature.label}</span></div>
       <select class="perm-override-select" data-feature-override="${feature.key}">
         <option value="inherit" ${state === 'inherit' ? 'selected' : ''}>🔵 حسب الدور</option>
-        <option value="allow" ${state === 'allow' ? 'selected' : ''}>🟢 مفعّل دايماً</option>
-        <option value="deny" ${state === 'deny' ? 'selected' : ''}>🔴 معطّل دايماً</option>
+        <option value="allow" ${state === 'allow' ? 'selected' : ''}>🟢 مفعّل</option>
+        <option value="deny" ${state === 'deny' ? 'selected' : ''}>🔴 معطّل</option>
       </select>
     `;
     container.appendChild(row);
   });
-
   const maxVal = override.maxTransactions;
   const maxDisplay = typeof maxVal === 'number' ? maxVal : '';
   const maxRow = document.createElement('div');
   maxRow.className = 'perm-row';
   maxRow.innerHTML = `
-    <div class="perm-row-label">
-      <i class="fa-solid fa-list-ol"></i>
-      <span>حد العمليات</span>
-    </div>
+    <div class="perm-row-label"><i class="fa-solid fa-list-ol"></i><span>حد العمليات</span></div>
     <input type="number" min="-1" step="1" class="perm-max-input" id="userPermMaxTx" value="${maxDisplay}" placeholder="حسب الدور">
   `;
   container.appendChild(maxRow);
@@ -948,8 +1032,7 @@ function resetUserPermissionsOverride() {
 
 function closeUserPermissionsModal() {
   const modal = document.getElementById('userPermissionsModal');
-  modal.classList.add('hidden');
-  modal.classList.remove('flex');
+  modal.classList.add('hidden'); modal.classList.remove('flex');
   editingUserPermissions = null;
 }
 
@@ -958,20 +1041,17 @@ async function saveUserPermissionsOverride() {
   const uid = editingUserPermissions.uid;
   const newRole = document.getElementById('userPermRole').value;
   const override = {};
-
   FEATURE_LIST.forEach(feature => {
     const el = document.querySelector(`[data-feature-override="${feature.key}"]`);
     if (!el) return;
     if (el.value === 'allow') override[feature.key] = true;
     else if (el.value === 'deny') override[feature.key] = false;
   });
-
   const maxEl = document.getElementById('userPermMaxTx');
   if (maxEl && maxEl.value.trim() !== '') {
     const n = parseInt(maxEl.value, 10);
     if (isFinite(n)) override.maxTransactions = Math.max(-1, Math.min(1000000, n));
   }
-
   const hasOverride = Object.keys(override).length > 0;
   try {
     await db.collection('users').doc(uid).update({
@@ -983,22 +1063,15 @@ async function saveUserPermissionsOverride() {
     showToast('تم حفظ الصلاحيات بنجاح ✓', 'success');
     closeUserPermissionsModal();
     renderUsersList();
-  } catch (error) {
-    showToast('فشل حفظ الصلاحيات', 'error');
-  }
+  } catch (error) { showToast('فشل حفظ الصلاحيات', 'error'); }
 }
 
 function subscribeToUserDoc(uid) {
-  if (userDocUnsubscribe) {
-    try { userDocUnsubscribe(); } catch(e) {}
-    userDocUnsubscribe = null;
-  }
+  if (userDocUnsubscribe) { try { userDocUnsubscribe(); } catch(e) {} userDocUnsubscribe = null; }
   userDocUnsubscribe = db.collection('users').doc(uid).onSnapshot(doc => {
     if (!doc.exists) return;
     const data = doc.data();
-    if (!isSuperAdmin && data.role && ROLES_META[data.role]) {
-      userRole = data.role;
-    }
+    if (!isSuperAdmin && data.role && ROLES_META[data.role]) userRole = data.role;
     currentUserPermissionsOverride = data.permissionsOverride || null;
     applyRoleUI();
     refreshAll();
@@ -1014,38 +1087,26 @@ function renderPermissionsEditor() {
     const perms = rolePermissions[roleKey] || {};
     const card = document.createElement('div');
     card.className = 'role-card';
-
     const maxVal = Number(perms.maxTransactions ?? -1);
     const maxDisplay = maxVal === -1 ? '' : maxVal;
     let rowsHtml = `
       <div class="perm-row">
-        <div class="perm-row-label">
-          <i class="fa-solid fa-list-ol"></i>
-          <span>حد العمليات (فاضي = بلا حد)</span>
-        </div>
+        <div class="perm-row-label"><i class="fa-solid fa-list-ol"></i><span>حد العمليات</span></div>
         <input type="number" min="-1" step="1" class="perm-max-input" value="${maxDisplay}" placeholder="∞" data-role="${roleKey}" data-key="maxTransactions" ${isAdminRole ? 'disabled' : ''}>
       </div>
     `;
-
     FEATURE_LIST.forEach(feature => {
       const isOn = perms[feature.key] === true;
       rowsHtml += `
         <div class="perm-row">
-          <div class="perm-row-label">
-            <i class="fa-solid ${feature.icon}"></i>
-            <span>${feature.label}</span>
-          </div>
+          <div class="perm-row-label"><i class="fa-solid ${feature.icon}"></i><span>${feature.label}</span></div>
           <button type="button" class="perm-toggle ${isOn ? 'on' : ''}" data-role="${roleKey}" data-key="${feature.key}" onclick="togglePerm(this)" ${isAdminRole ? 'disabled style="opacity:.5; cursor:not-allowed;"' : ''}></button>
         </div>
       `;
     });
-
     card.innerHTML = `
       <div class="role-card-header">
-        <div class="role-card-title">
-          <i class="fa-solid ${meta.icon}" style="color: #f97316;"></i>
-          <span>${meta.name}</span>
-        </div>
+        <div class="role-card-title"><i class="fa-solid ${meta.icon}" style="color: #f97316;"></i><span>${meta.name}</span></div>
         ${isAdminRole ? '<span class="role-card-locked"><i class="fa-solid fa-lock"></i> مقفول</span>' : ''}
       </div>
       <div class="perm-grid">${rowsHtml}</div>
@@ -1059,7 +1120,6 @@ function togglePerm(btn) {
   const roleKey = btn.dataset.role;
   const key = btn.dataset.key;
   if (roleKey === 'admin') return;
-
   if (!rolePermissions[roleKey]) rolePermissions[roleKey] = { ...DEFAULT_PERMISSIONS[roleKey] };
   const current = rolePermissions[roleKey][key] === true;
   rolePermissions[roleKey][key] = !current;
@@ -1076,7 +1136,6 @@ async function saveRolePermissions() {
     if (!rolePermissions[roleKey]) rolePermissions[roleKey] = { ...DEFAULT_PERMISSIONS[roleKey] };
     rolePermissions[roleKey].maxTransactions = val;
   });
-
   rolePermissions.admin = { ...DEFAULT_PERMISSIONS.admin };
   const ok = await saveRolePermissionsToCloud();
   if (ok) {
@@ -1087,7 +1146,7 @@ async function saveRolePermissions() {
 }
 
 /* =========================================================
-   LOGIN & AUTH FLOW
+   LOGIN & AUTH
    ========================================================= */
 function switchLoginMethod(method) {
   currentLoginMethod = method;
@@ -1108,7 +1167,6 @@ function setEmailMode(mode) {
   document.getElementById('signupOnlyFields').classList.toggle('hidden', mode !== 'signup');
   document.getElementById('confirmPasswordWrapper').classList.toggle('hidden', mode !== 'signup');
   document.getElementById('forgotPasswordBtn').classList.toggle('hidden', mode === 'signup');
-  
   const submitText = document.getElementById('emailSubmitText');
   const submitIcon = document.getElementById('emailSubmitIcon');
   submitText.textContent = mode === 'signup' ? 'إنشاء الحساب' : 'تسجيل الدخول';
@@ -1125,22 +1183,10 @@ function togglePasswordVisibility(inputId) {
   eye.className = isPass ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
 }
 
-function showEmailError(msg) {
-  const el = document.getElementById('emailError');
-  if (el) { el.textContent = msg; el.classList.remove('hidden'); }
-}
-function hideEmailError() {
-  const el = document.getElementById('emailError');
-  if (el) el.classList.add('hidden');
-}
-function showPhoneError(msg) {
-  const el = document.getElementById('phoneError');
-  if (el) { el.textContent = msg; el.classList.remove('hidden'); }
-}
-function hidePhoneError() {
-  const el = document.getElementById('phoneError');
-  if (el) el.classList.add('hidden');
-}
+function showEmailError(msg) { const el = document.getElementById('emailError'); if (el) { el.textContent = msg; el.classList.remove('hidden'); } }
+function hideEmailError() { const el = document.getElementById('emailError'); if (el) el.classList.add('hidden'); }
+function showPhoneError(msg) { const el = document.getElementById('phoneError'); if (el) { el.textContent = msg; el.classList.remove('hidden'); } }
+function hidePhoneError() { const el = document.getElementById('phoneError'); if (el) el.classList.add('hidden'); }
 
 async function submitEmailAuth() {
   hideEmailError();
@@ -1148,37 +1194,25 @@ async function submitEmailAuth() {
   const password = document.getElementById('passwordInput').value || '';
   const displayName = (document.getElementById('emailDisplayNameInput').value || '').trim();
   const confirmPassword = document.getElementById('confirmPasswordInput').value || '';
-
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    showEmailError('❌ يرجى إدخال إيميل صحيح'); return;
-  }
-  if (!password || password.length < 6) {
-    showEmailError('❌ كلمة السر لازم تكون 6 أحرف على الأقل'); return;
-  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showEmailError('❌ يرجى إدخال إيميل صحيح'); return; }
+  if (!password || password.length < 6) { showEmailError('❌ كلمة السر لازم تكون 6 أحرف على الأقل'); return; }
   if (emailMode === 'signup') {
     if (!displayName || displayName.length < 2) { showEmailError('❌ يرجى إدخال اسمك الكامل'); return; }
     if (password !== confirmPassword) { showEmailError('❌ كلمتي السر مش متطابقتين'); return; }
   }
-
   const btn = document.getElementById('emailSubmitBtn');
   btn.disabled = true;
-
   try {
     if (emailMode === 'signup') {
       const cred = await auth.createUserWithEmailAndPassword(email, password);
-      if (cred.user && displayName) {
-        try { await cred.user.updateProfile({ displayName }); } catch(e) {}
-      }
+      if (cred.user && displayName) { try { await cred.user.updateProfile({ displayName }); } catch(e) {} }
       showToast(`أهلاً بك يا ${displayName || 'صديقنا'} 🎉`, 'success');
     } else {
       await auth.signInWithEmailAndPassword(email, password);
       showToast(`أهلاً بعودتك 👋`, 'success');
     }
-  } catch (error) {
-    showEmailError('❌ ' + (error.message || error.code));
-  } finally {
-    btn.disabled = false;
-  }
+  } catch (error) { showEmailError('❌ ' + (error.message || error.code)); }
+  finally { btn.disabled = false; }
 }
 
 async function sendPasswordReset() {
@@ -1188,26 +1222,18 @@ async function sendPasswordReset() {
   try {
     await auth.sendPasswordResetEmail(email);
     showToast('تم إرسال رابط استعادة كلمة السر للإيميل', 'success');
-  } catch (error) {
-    showEmailError('❌ ' + (error.message || error.code));
-  }
+  } catch (error) { showEmailError('❌ ' + (error.message || error.code)); }
 }
 
 function initRecaptcha() {
   if (recaptchaVerifier) return recaptchaVerifier;
   try {
     recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptchaContainer', {
-      size: 'invisible',
-      callback: () => {},
-      'expired-callback': () => {
-        try { recaptchaVerifier.clear(); } catch(e) {}
-        recaptchaVerifier = null;
-      }
+      size: 'invisible', callback: () => {},
+      'expired-callback': () => { try { recaptchaVerifier.clear(); } catch(e) {} recaptchaVerifier = null; }
     });
     return recaptchaVerifier;
-  } catch (error) {
-    return null;
-  }
+  } catch (error) { return null; }
 }
 
 async function sendPhoneOTP() {
@@ -1216,11 +1242,9 @@ async function sendPhoneOTP() {
   let number = (document.getElementById('phoneNumberInput').value || '').replace(/[^\d]/g, '');
   if (!number || number.length < 7) { showPhoneError('❌ رقم موبايل غير صحيح'); return; }
   if (code === '+20' && number.startsWith('0')) number = number.slice(1);
-
   const fullNumber = code + number;
   const btn = document.getElementById('sendOtpBtn');
   btn.disabled = true;
-
   try {
     const appVerifier = initRecaptcha();
     confirmationResult = await auth.signInWithPhoneNumber(fullNumber, appVerifier);
@@ -1230,9 +1254,7 @@ async function sendPhoneOTP() {
   } catch (error) {
     showPhoneError('❌ ' + (error.message || error.code));
     if (recaptchaVerifier) { try { recaptchaVerifier.clear(); } catch(e) {} recaptchaVerifier = null; }
-  } finally {
-    btn.disabled = false;
-  }
+  } finally { btn.disabled = false; }
 }
 
 async function verifyPhoneOTP() {
@@ -1240,17 +1262,13 @@ async function verifyPhoneOTP() {
   const code = (document.getElementById('otpInput').value || '').trim();
   if (!code || !/^\d{4,6}$/.test(code)) { showPhoneError('❌ الكود مكوّن من 6 أرقام'); return; }
   if (!confirmationResult) { changePhoneNumber(); return; }
-
   const btn = document.getElementById('verifyOtpBtn');
   btn.disabled = true;
   try {
     const result = await confirmationResult.confirm(code);
     showToast(`أهلاً بك يا ${result.user.phoneNumber} 👋`, 'success');
-  } catch (error) {
-    showPhoneError('❌ كود غير صحيح أو منتهي');
-  } finally {
-    btn.disabled = false;
-  }
+  } catch (error) { showPhoneError('❌ كود غير صحيح أو منتهي'); }
+  finally { btn.disabled = false; }
 }
 
 function changePhoneNumber() {
@@ -1266,20 +1284,15 @@ async function loginWithGoogle() {
     const result = await auth.signInWithPopup(provider);
     showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success');
   } catch (error) {
-    if (error.code === 'auth/popup-blocked') {
-      await auth.signInWithRedirect(provider);
-    } else {
-      showToast('تعذر تسجيل الدخول: ' + error.message, 'error');
-    }
+    if (error.code === 'auth/popup-blocked') await auth.signInWithRedirect(provider);
+    else showToast('تعذر تسجيل الدخول: ' + error.message, 'error');
   }
 }
 
 async function handleRedirectResult() {
   try {
     const result = await auth.getRedirectResult();
-    if (result && result.user) {
-      showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success');
-    }
+    if (result && result.user) showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success');
   } catch (error) {}
 }
 
@@ -1296,10 +1309,10 @@ const CATEGORIES = {
 
 const DEMO_ITEMS = [
   { id:'demo-1', type:'income', amount:1200, category:'خدمات سوفت وير وصيانة', client:'أحمد', paymentMethod:'كاش نقدي', notes:'إصلاح بوت لودر وفلاش 3 أجهزة', reference:'INV-1001', date:offsetDate(-1), time:'02:30 PM' },
-  { id:'demo-2', type:'charity', amount:150, category:'مساعدة محتاج وتفريج كربة', client:'', paymentMethod:'كاش نقدي', notes:'صدقة شكر بنية الرزق والبركة', reference:'', date:offsetDate(-1), time:'03:15 PM' },
-  { id:'demo-3', type:'expense', amount:380, category:'تفعيل وسيرفرات وكريدت', client:'موزع سيرفر محمد', paymentMethod:'إنستاباي (InstaPay)', notes:'تفعيل باقة دونجل وسيرفر شاومي', reference:'EXP-3001', date:offsetDate(-2), time:'05:40 PM' },
-  { id:'demo-4', type:'income', amount:950, category:'شغل ريموت أونلاين', client:'محل المنصورة', paymentMethod:'إنستاباي (InstaPay)', notes:'خدمة ريموت لمحل المنصورة', reference:'INV-1002', date:offsetDate(-2), time:'08:10 PM' },
-  { id:'demo-5', type:'expense', amount:90, category:'أكل ومشروبات', client:'', paymentMethod:'فودافون كاش / محفظة', notes:'غداء ومشروبات الشغل', reference:'', date:offsetDate(-3), time:'01:00 PM' },
+  { id:'demo-2', type:'charity', amount:150, category:'مساعدة محتاج وتفريج كربة', client:'', paymentMethod:'كاش نقدي', notes:'صدقة شكر', reference:'', date:offsetDate(-1), time:'03:15 PM' },
+  { id:'demo-3', type:'expense', amount:380, category:'تفعيل وسيرفرات وكريدت', client:'موزع سيرفر محمد', paymentMethod:'إنستاباي (InstaPay)', notes:'تفعيل باقة دونجل', reference:'EXP-3001', date:offsetDate(-2), time:'05:40 PM' },
+  { id:'demo-4', type:'income', amount:950, category:'شغل ريموت أونلاين', client:'محل المنصورة', paymentMethod:'إنستاباي (InstaPay)', notes:'خدمة ريموت', reference:'INV-1002', date:offsetDate(-2), time:'08:10 PM' },
+  { id:'demo-5', type:'expense', amount:90, category:'أكل ومشروبات', client:'', paymentMethod:'فودافون كاش / محفظة', notes:'غداء', reference:'', date:offsetDate(-3), time:'01:00 PM' },
   { id:'demo-6', type:'debt_receivable', amount:650, paidAmount:200, category:'حساب محل صيانة', client:'أحمد', paymentMethod:'آجل / معلق', notes:'باقي حساب فلاش 4 أجهزة', reference:'', status:'pending', date:offsetDate(-4), time:'11:20 AM' },
   { id:'demo-7', type:'debt_payable', amount:400, paidAmount:0, category:'دين لمورد / موزّع سيرفر', client:'موزع سيرفر محمد', paymentMethod:'آجل / معلق', notes:'كريدت سيرفر', reference:'', status:'pending', date:offsetDate(-5), time:'04:15 PM' }
 ];
@@ -1308,10 +1321,7 @@ const DEMO_ITEMS = [
    AUTH GUARDS & PIN
    ========================================================= */
 function requireAuth() {
-  if (!currentUser) {
-    showToast('يجب تسجيل الدخول أولاً', 'error');
-    return false;
-  }
+  if (!currentUser) { showToast('يجب تسجيل الدخول أولاً', 'error'); return false; }
   return true;
 }
 
@@ -1375,11 +1385,10 @@ function handleUserSwitch(uid) {
 }
 
 /* =========================================================
-   AUTH STATE CHANGE
+   AUTH STATE
    ========================================================= */
 auth.onAuthStateChanged(async user => {
   if (isPortalModeActive) return;
-
   hideAuthLoading();
   authResolved = true;
 
@@ -1392,14 +1401,12 @@ auth.onAuthStateChanged(async user => {
   if (user) {
     currentUser = user;
     handleUserSwitch(user.uid);
-
     hideLoginWall();
     userProfile.classList.remove('hidden');
     userProfile.classList.add('flex');
 
-    if (user.photoURL) {
-      avatar.src = user.photoURL;
-    } else {
+    if (user.photoURL) avatar.src = user.photoURL;
+    else {
       const initial = (user.displayName || user.email || user.phoneNumber || 'U').charAt(0).toUpperCase();
       avatar.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%23f97316'/><text x='50%' y='55%' text-anchor='middle' dominant-baseline='middle' font-size='20' font-family='Cairo' fill='white' font-weight='bold'>${escapeHTML(initial)}</text></svg>`;
     }
@@ -1420,6 +1427,11 @@ auth.onAuthStateChanged(async user => {
     subscribeToUserDoc(user.uid);
     subscribeToCloudTransactions(user.uid);
     updatePinUI();
+    updateNotificationUI(localStorage.getItem('ehsebli_notif_enabled') === 'true');
+
+    // Process pending shortcuts/shares
+    checkPendingShortcut();
+    checkPendingShare();
 
     loadCloudData(user.uid).finally(() => {
       if (getPin()) showPinLock();
@@ -1431,16 +1443,8 @@ auth.onAuthStateChanged(async user => {
     isSuperAdmin = false;
     currentUserPermissionsOverride = null;
     rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
-    
-    if (userDocUnsubscribe) {
-      try { userDocUnsubscribe(); } catch(e) {}
-      userDocUnsubscribe = null;
-    }
-    if (transactionsUnsubscribe) {
-      try { transactionsUnsubscribe(); } catch(e) {}
-      transactionsUnsubscribe = null;
-    }
-    
+    if (userDocUnsubscribe) { try { userDocUnsubscribe(); } catch(e) {} userDocUnsubscribe = null; }
+    if (transactionsUnsubscribe) { try { transactionsUnsubscribe(); } catch(e) {} transactionsUnsubscribe = null; }
     hidePinLock();
     showLoginWall();
     footerSync.innerHTML = `<i class="fa-solid fa-database text-amber-500"></i> سجّل الدخول للمزامنة`;
@@ -1451,48 +1455,35 @@ auth.onAuthStateChanged(async user => {
 
 function logout() {
   if (!currentUser) return;
-  openConfirm('تسجيل الخروج؟', 'سيتم إنهاء الجلسة. بياناتك محفوظة في السحابة بأمان.', () => {
-    auth.signOut();
-  });
+  openConfirm('تسجيل الخروج؟', 'سيتم إنهاء الجلسة. بياناتك محفوظة في السحابة بأمان.', () => auth.signOut());
 }
 function logoutFromLock() { auth.signOut(); }
 
 /* =========================================================
-   REALTIME TRANSACTIONS LISTENER
+   REALTIME LISTENER
    ========================================================= */
 function subscribeToCloudTransactions(uid) {
-  if (transactionsUnsubscribe) {
-    try { transactionsUnsubscribe(); } catch(e) {}
-    transactionsUnsubscribe = null;
-  }
-
+  if (transactionsUnsubscribe) { try { transactionsUnsubscribe(); } catch(e) {} transactionsUnsubscribe = null; }
   transactionsUnsubscribe = db.collection('users').doc(uid)
     .onSnapshot({ includeMetadataChanges: false }, doc => {
       if (!doc.exists) return;
       if (doc.metadata && doc.metadata.hasPendingWrites) return;
-
       const data = doc.data();
       if (Array.isArray(data.transactions)) {
         transactions = data.transactions.map(normalizeTransaction);
-        if (data.budget !== undefined) {
-          localStorage.setItem(BUDGET_KEY, data.budget);
-        }
+        if (data.budget !== undefined) localStorage.setItem(BUDGET_KEY, data.budget);
         saveLocalData();
         refreshAll();
       }
-    }, err => {
-      console.warn("Realtime transactions sync warning:", err);
-    });
+    }, err => console.warn("Realtime sync warning:", err));
 }
 
 /* =========================================================
-   DIRECT CLOUD SYNC
+   CLOUD SYNC
    ========================================================= */
 function mergeTransactions(local, cloud) {
   const map = new Map();
-  cloud.forEach(t => { 
-    if (t && t.id && validateTransaction(t)) map.set(t.id, normalizeTransaction(t)); 
-  });
+  cloud.forEach(t => { if (t && t.id && validateTransaction(t)) map.set(t.id, normalizeTransaction(t)); });
   local.forEach(t => {
     if (!t || !t.id || !validateTransaction(t)) return;
     const existing = map.get(t.id);
@@ -1511,14 +1502,13 @@ async function syncToCloud() {
     const cleanTransactions = JSON.parse(
       JSON.stringify(transactions.map(normalizeTransaction), (k, v) => (v === undefined ? null : v))
     );
-
     await docRef.set({
       transactions: cleanTransactions,
       budget: getBudget() || 0,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   } catch (error) {
-    console.error("Cloud sync error: ", error);
+    console.error("Cloud sync error:", error);
     showToast('فشل المزامنة: ' + (error.code || error.message), 'error');
   }
 }
@@ -1534,9 +1524,7 @@ async function forceSyncToCloud() {
       budget: getBudget() || 0,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
-  } catch (error) {
-    console.error("Force sync error: ", error);
-  }
+  } catch (error) { console.error("Force sync error:", error); }
 }
 
 async function loadCloudData(uid) {
@@ -1546,9 +1534,7 @@ async function loadCloudData(uid) {
       const data = doc.data();
       const cloudTx = Array.isArray(data.transactions) ? data.transactions : [];
       transactions = mergeTransactions(transactions, cloudTx);
-      if (data.budget !== undefined) {
-        localStorage.setItem(BUDGET_KEY, data.budget);
-      }
+      if (data.budget !== undefined) localStorage.setItem(BUDGET_KEY, data.budget);
       saveLocalData();
       refreshAll();
       await syncToCloud();
@@ -1578,7 +1564,6 @@ function applyTheme(theme) {
     if (isDark) { icon.className = 'fa-solid fa-sun text-amber-500'; text.textContent = 'الوضع النهاري'; }
     else { icon.className = 'fa-solid fa-moon text-slate-700'; text.textContent = 'الوضع الليلي'; }
   }
-  // Update theme-color meta for PWA
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', isDark ? '#0f1117' : '#ffffff');
 }
@@ -1600,9 +1585,7 @@ function loadLocalData() {
     transactions = Array.isArray(arr) ? arr.filter(validateTransaction).map(normalizeTransaction) : [];
   } catch (error) { transactions = []; }
 }
-function saveLocalData() { 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions)); 
-}
+function saveLocalData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions)); }
 function saveData(options = {}) {
   if (!requireAuth()) return;
   saveLocalData();
@@ -1610,15 +1593,12 @@ function saveData(options = {}) {
 }
 
 /* =========================================================
-   PERIODS & CUSTOM DATES
+   PERIODS
    ========================================================= */
 function setPeriod(period) {
   if (!requireAuth()) return;
   currentPeriod = period;
-  document.querySelectorAll('.period-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.period === period);
-  });
-  
+  document.querySelectorAll('.period-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.period === period));
   const customBox = document.getElementById('customDateBox');
   if (period === 'custom') {
     customBox.classList.remove('hidden');
@@ -1633,7 +1613,6 @@ function setPeriod(period) {
     customBox.classList.add('hidden');
     customBox.classList.remove('flex');
   }
-
   const labels = { all:'كل البيانات', today:'اليوم', week:'هذا الأسبوع', month:'هذا الشهر', year:'هذه السنة' };
   document.getElementById('periodLabel').textContent = labels[period] || 'كل البيانات';
   refreshAll();
@@ -1672,34 +1651,20 @@ function isInPeriod(dateString, period = currentPeriod) {
 function getPeriodTransactions() { return getActiveTransactions().filter(t => isInPeriod(t.date)); }
 
 /* =========================================================
-   METRICS & WALLET BREAKDOWN
+   METRICS
    ========================================================= */
 function calculateMetrics(list = getPeriodTransactions()) {
   let income = 0, expense = 0, charity = 0, debtRec = 0, debtPay = 0;
   const wallets = {};
-
   list.forEach(t => {
     const amount = Number(t.amount) || 0;
     const method = t.paymentMethod || 'كاش نقدي';
-
-    if (t.type === 'income') {
-      income += amount;
-      wallets[method] = (wallets[method] || 0) + amount;
-    } else if (t.type === 'expense') {
-      expense += amount;
-      wallets[method] = (wallets[method] || 0) - amount;
-    } else if (t.type === 'charity') {
-      charity += amount;
-      wallets[method] = (wallets[method] || 0) - amount;
-    } else if (t.type === 'debt_receivable' && t.status !== 'paid') {
-      const remaining = amount - (Number(t.paidAmount) || 0);
-      debtRec += Math.max(0, remaining);
-    } else if (t.type === 'debt_payable' && t.status !== 'paid') {
-      const remaining = amount - (Number(t.paidAmount) || 0);
-      debtPay += Math.max(0, remaining);
-    }
+    if (t.type === 'income') { income += amount; wallets[method] = (wallets[method] || 0) + amount; }
+    else if (t.type === 'expense') { expense += amount; wallets[method] = (wallets[method] || 0) - amount; }
+    else if (t.type === 'charity') { charity += amount; wallets[method] = (wallets[method] || 0) - amount; }
+    else if (t.type === 'debt_receivable' && t.status !== 'paid') debtRec += Math.max(0, amount - (Number(t.paidAmount) || 0));
+    else if (t.type === 'debt_payable' && t.status !== 'paid') debtPay += Math.max(0, amount - (Number(t.paidAmount) || 0));
   });
-
   return { income, expense, charity, available: income - expense - charity, debtRec, debtPay, wallets };
 }
 
@@ -1708,26 +1673,20 @@ function updateMetrics() {
   document.getElementById('statIncome').textContent = money(metrics.income);
   document.getElementById('statExpense').textContent = money(metrics.expense);
   document.getElementById('statCharity').textContent = money(metrics.charity);
-
   const net = document.getElementById('statNet');
   net.textContent = money(metrics.available);
-  net.className = 'money-val text-xl sm:text-3xl font-black ' + (metrics.available >= 0 ? 'text-emerald-500' : 'text-rose-500');
-
+  net.className = 'money-val text-lg sm:text-3xl font-black ' + (metrics.available >= 0 ? 'text-emerald-500' : 'text-rose-500');
   document.getElementById('statNetTag').textContent = metrics.available >= 0
     ? 'الرصيد المتاح بعد المصاريف والخير' : 'تنبيه: المصروفات تجاوزت الإيرادات';
-
   document.getElementById('statDebtReceivable').textContent = money(metrics.debtRec) + ' ج.م';
   document.getElementById('statDebtPayable').textContent = money(metrics.debtPay) + ' ج.م';
-
   const ratio = metrics.income > 0 ? ((metrics.charity / metrics.income) * 100).toFixed(1) : '0';
   document.getElementById('statCharityRatio').textContent = ratio + '%';
-
   const daily = getPeriodTransactions().filter(t => !isDebt(t.type));
   const debts = getActiveTransactions().filter(t => isDebt(t.type) && t.status !== 'paid');
   document.getElementById('badgeTxCount').textContent = daily.length;
   document.getElementById('badgeDebtCount').textContent = debts.length;
   document.getElementById('badgeClientCount').textContent = getAllClientNames().length;
-
   renderWalletsBreakdown(metrics.wallets);
 }
 
@@ -1735,21 +1694,17 @@ function renderWalletsBreakdown(wallets) {
   const container = document.getElementById('walletsContainer');
   if (!container) return;
   container.innerHTML = '';
-
   const defaultMethods = ['كاش نقدي', 'إنستاباي (InstaPay)', 'فودافون كاش / محفظة', 'فيزا / بطاقة بنكية'];
   const allMethods = Array.from(new Set([...defaultMethods, ...Object.keys(wallets)]));
-
   allMethods.forEach(method => {
     const bal = wallets[method] || 0;
     const card = document.createElement('div');
     card.className = 'p-2.5 rounded-xl border border-slate-100 dark:border-dark-750 bg-slate-50 dark:bg-dark-850/60 flex flex-col justify-between';
-    
     let icon = 'fa-wallet';
     if (method.includes('كاش')) icon = 'fa-money-bill-1-wave';
     else if (method.includes('إنستاباي')) icon = 'fa-bolt';
     else if (method.includes('محفظة')) icon = 'fa-mobile-screen-button';
     else if (method.includes('فيزا')) icon = 'fa-credit-card';
-
     card.innerHTML = `
       <div class="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold truncate">
         <i class="fa-solid ${icon} text-orange-500"></i>
@@ -1773,9 +1728,7 @@ function debouncedRenderTransactions() {
    ========================================================= */
 function filterTransactions(filter) {
   activeFilter = filter;
-  document.querySelectorAll('.filter-pill').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.filter === filter);
-  });
+  document.querySelectorAll('.filter-pill').forEach(btn => btn.classList.toggle('active', btn.dataset.filter === filter));
   renderTransactions();
 }
 
@@ -1783,7 +1736,6 @@ function renderTransactions() {
   const tbody = document.getElementById('transactionsTbody');
   const empty = document.getElementById('emptyTransactionsState');
   const search = (document.getElementById('searchInput').value || '').trim().toLowerCase();
-
   tbody.innerHTML = '';
 
   let list = getPeriodTransactions().filter(t => {
@@ -1793,16 +1745,13 @@ function renderTransactions() {
     const text = [t.category, t.notes, t.client, t.paymentMethod, t.reference, t.time, typeName(t.type)].join(' ').toLowerCase();
     return text.includes(search);
   });
-
   list.sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
-
   if (!list.length) { empty.classList.remove('hidden'); return; }
   empty.classList.add('hidden');
 
   list.forEach(item => {
     const tr = document.createElement('tr');
     tr.className = 'hover:bg-slate-50 dark:hover:bg-dark-850/60 transition group';
-
     let badge = '', amount = '';
     if (item.type === 'income') {
       badge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"><i class="fa-solid fa-arrow-trend-up"></i> دخل</span>`;
@@ -1814,9 +1763,7 @@ function renderTransactions() {
       badge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-500/10 text-rose-500 border border-rose-500/20"><i class="fa-solid fa-arrow-trend-down"></i> مصروف</span>`;
       amount = `<span class="money-val font-black text-rose-500">-${money(item.amount)} ج.م</span>`;
     }
-
     const timeFormatted = item.time ? formatTimeTo12Hour(item.time) : '';
-
     tr.innerHTML = `
       <td class="py-3 px-4">
         <div class="flex items-center gap-2.5">
@@ -1824,35 +1771,25 @@ function renderTransactions() {
           <div>
             <div class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
               <span>${escapeHTML(item.notes || 'بدون بيان')}</span>
-              ${item.receipt ? `
-                <button onclick="viewReceiptImage('${item.receipt}')" title="عرض الفاتورة / الإيصال" class="text-orange-500 hover:text-orange-400">
-                  <i class="fa-solid fa-paperclip text-xs"></i>
-                </button>
-              ` : ''}
+              ${item.receipt ? `<button onclick="viewReceiptImage('${item.receipt}')" title="عرض الفاتورة" class="text-orange-500 hover:text-orange-400"><i class="fa-solid fa-paperclip text-xs"></i></button>` : ''}
             </div>
             ${item.reference ? `<div class="text-[9px] text-slate-400 mt-0.5">مرجع: ${escapeHTML(item.reference)}</div>` : ''}
           </div>
         </div>
       </td>
       <td class="py-3 px-4">
-        ${item.client ? `
-          <button onclick="openClientLedger('${escapeHTML(item.client)}')" class="inline-flex items-center gap-1 text-xs font-black text-orange-500 hover:underline">
-            <i class="fa-solid fa-user-circle"></i> ${escapeHTML(item.client)}
-          </button>
-        ` : '<span class="text-slate-400 text-[10px]">-</span>'}
+        ${item.client ? `<button onclick="openClientLedger('${escapeHTML(item.client)}')" class="inline-flex items-center gap-1 text-xs font-black text-orange-500 hover:underline"><i class="fa-solid fa-user-circle"></i> ${escapeHTML(item.client)}</button>` : '<span class="text-slate-400 text-[10px]">-</span>'}
       </td>
       <td class="py-3 px-4"><span class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-slate-300 font-bold text-[10px]">${escapeHTML(item.category)}</span></td>
       <td class="py-3 px-4 text-slate-500 dark:text-slate-400 font-semibold">${escapeHTML(item.paymentMethod || 'كاش نقدي')}</td>
       <td class="py-3 px-4">
         <div class="font-bold text-slate-600 dark:text-slate-300 text-xs">${escapeHTML(item.date)}</div>
-        <div class="text-[10px] text-orange-500 font-bold flex items-center gap-1 mt-0.5">
-          <i class="fa-regular fa-clock"></i> ${escapeHTML(timeFormatted)}
-        </div>
+        <div class="text-[10px] text-orange-500 font-bold flex items-center gap-1 mt-0.5"><i class="fa-regular fa-clock"></i> ${escapeHTML(timeFormatted)}</div>
       </td>
       <td class="py-3 px-4">${amount}</td>
       <td class="py-3 px-4 text-center">
         <div class="flex items-center justify-center gap-1">
-          <button onclick="shareViaWhatsApp('${item.id}')" title="مشاركة عبر واتساب" class="p-2 rounded-xl text-emerald-500 hover:bg-emerald-500/10 transition"><i class="fa-brands fa-whatsapp text-sm"></i></button>
+          <button onclick="shareViaWhatsApp('${item.id}')" title="مشاركة" class="p-2 rounded-xl text-emerald-500 hover:bg-emerald-500/10 transition"><i class="fa-brands fa-whatsapp text-sm"></i></button>
           <button onclick="editTransaction('${item.id}')" title="تعديل" class="p-2 rounded-xl text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition"><i class="fa-solid fa-pen text-xs"></i></button>
           <button onclick="requestDelete('${item.id}')" title="حذف" class="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition"><i class="fa-solid fa-trash-can text-xs"></i></button>
         </div>
@@ -1869,14 +1806,11 @@ function renderDebts() {
   const container = document.getElementById('debtsContainer');
   const empty = document.getElementById('emptyDebtsState');
   container.innerHTML = '';
-
-  const debts = getActiveTransactions()
-    .filter(t => isDebt(t.type))
+  const debts = getActiveTransactions().filter(t => isDebt(t.type))
     .sort((a, b) => {
       if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
       return new Date(b.date) - new Date(a.date);
     });
-
   if (!debts.length) { empty.classList.remove('hidden'); return; }
   empty.classList.add('hidden');
 
@@ -1887,14 +1821,12 @@ function renderDebts() {
     const paidAmt = Number(d.paidAmount) || 0;
     const remainingAmt = Math.max(0, totalAmount - paidAmt);
     const progressPercent = Math.min(100, Math.round((paidAmt / totalAmount) * 100)) || 0;
-
     const card = document.createElement('div');
     card.className = 'p-4 rounded-2xl border ' + (
       paid ? 'bg-slate-50 dark:bg-dark-850/40 border-slate-200 dark:border-dark-800 opacity-60'
       : isReceivable ? 'bg-emerald-500/5 border-emerald-500/30'
       : 'bg-rose-500/5 border-rose-500/30'
     );
-
     card.innerHTML = `
       <div class="flex items-start justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0">
@@ -1904,11 +1836,7 @@ function renderDebts() {
           <div class="min-w-0">
             <h4 class="text-sm font-black truncate flex items-center gap-1.5">
               <span>${escapeHTML(d.notes || 'دين بدون بيان')}</span>
-              ${d.receipt ? `
-                <button onclick="viewReceiptImage('${d.receipt}')" title="عرض الفاتورة المرفقة" class="text-orange-500 hover:text-orange-400">
-                  <i class="fa-solid fa-paperclip text-xs"></i>
-                </button>
-              ` : ''}
+              ${d.receipt ? `<button onclick="viewReceiptImage('${d.receipt}')" class="text-orange-500"><i class="fa-solid fa-paperclip text-xs"></i></button>` : ''}
             </h4>
             <p class="text-[10px] text-slate-400 font-semibold mt-0.5">
               ${d.client ? `<span class="text-orange-500 font-black cursor-pointer" onclick="openClientLedger('${escapeHTML(d.client)}')"><i class="fa-solid fa-user"></i> ${escapeHTML(d.client)} • </span>` : ''}
@@ -1921,7 +1849,6 @@ function renderDebts() {
           ${paidAmt > 0 && !paid ? `<div class="text-[9px] text-slate-400">سُدد ${money(paidAmt)} من ${money(totalAmount)}</div>` : ''}
         </div>
       </div>
-
       ${!paid && paidAmt > 0 ? `
         <div class="mt-3">
           <div class="h-1.5 rounded-full bg-slate-200 dark:bg-dark-750 overflow-hidden">
@@ -1933,19 +1860,14 @@ function renderDebts() {
           </div>
         </div>
       ` : ''}
-
       <div class="mt-4 pt-3 border-t border-slate-200/60 dark:border-dark-800 flex flex-wrap items-center justify-between gap-2">
         <span class="text-[10px] font-black ${paid ? 'text-slate-400' : isReceivable ? 'text-emerald-500' : 'text-rose-500'}">
           <i class="fa-solid ${paid ? 'fa-circle-check' : 'fa-clock'}"></i>
           ${paid ? 'تم السداد بالكامل ✓' : isReceivable ? 'مستحق لي - معلق' : 'مستحق عليّ - معلق'}
         </span>
         <div class="flex items-center gap-1.5">
-          ${!paid ? `
-            <button onclick="openDebtPaymentModal('${d.id}')" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white text-[10px] font-black transition">
-              <i class="fa-solid fa-hand-holding-dollar"></i> دفعة جزئية
-            </button>
-          ` : ''}
-          <button onclick="toggleDebtStatus('${d.id}')" class="px-2.5 py-1.5 rounded-xl ${paid ? 'bg-slate-200 dark:bg-dark-750 text-slate-700 dark:text-slate-300' : 'bg-orange-500 text-white'} text-[10px] font-black">${paid ? 'إعادة كمعلق' : 'تم السداد كلياً ✓'}</button>
+          ${!paid ? `<button onclick="openDebtPaymentModal('${d.id}')" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white text-[10px] font-black transition"><i class="fa-solid fa-hand-holding-dollar"></i> دفعة جزئية</button>` : ''}
+          <button onclick="toggleDebtStatus('${d.id}')" class="px-2.5 py-1.5 rounded-xl ${paid ? 'bg-slate-200 dark:bg-dark-750 text-slate-700 dark:text-slate-300' : 'bg-orange-500 text-white'} text-[10px] font-black">${paid ? 'إعادة كمعلق' : 'تم السداد ✓'}</button>
           <button onclick="editTransaction('${d.id}')" class="p-2 rounded-xl text-slate-400 hover:text-orange-500"><i class="fa-solid fa-pen text-xs"></i></button>
           <button onclick="requestDelete('${d.id}')" class="p-2 rounded-xl text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash-can text-xs"></i></button>
         </div>
@@ -1962,14 +1884,11 @@ function openDebtPaymentModal(id) {
   const total = Number(debt.amount) || 0;
   const paid = Number(debt.paidAmount) || 0;
   const rem = Math.max(0, total - paid);
-
   document.getElementById('debtPayModalSubtitle').textContent = `الدين: ${debt.notes} (المتبقي: ${money(rem)} ج.م)`;
   document.getElementById('partialPayAmount').value = '';
   document.getElementById('partialPayAmount').max = rem;
-
   const modal = document.getElementById('debtPaymentModal');
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
+  modal.classList.remove('hidden'); modal.classList.add('flex');
 }
 
 function closeDebtPaymentModal() {
@@ -1982,55 +1901,36 @@ function submitPartialDebtPayment() {
   if (!partialPaymentDebtId) return;
   const debt = transactions.find(t => t.id === partialPaymentDebtId);
   if (!debt) return;
-
   const amt = Number(document.getElementById('partialPayAmount').value);
-  if (!amt || amt <= 0) {
-    showToast('أدخل مبلغ دفعة صحيح', 'error');
-    return;
-  }
-
+  if (!amt || amt <= 0) { showToast('أدخل مبلغ دفعة صحيح', 'error'); return; }
   const currentPaid = Number(debt.paidAmount) || 0;
   const total = Number(debt.amount) || 0;
   const newPaid = currentPaid + amt;
-
   debt.paidAmount = newPaid;
-  if (newPaid >= total) {
-    debt.status = 'paid';
-    showToast('تم اكتمال سداد كامل الدين بنجاح 🎉', 'success');
-  } else {
-    showToast(`تم تسجيل دفعة بقيمة ${money(amt)} ج.م ✓`, 'success');
-  }
+  if (newPaid >= total) { debt.status = 'paid'; showToast('تم اكتمال سداد كامل الدين 🎉', 'success'); }
+  else showToast(`تم تسجيل دفعة بقيمة ${money(amt)} ج.م ✓`, 'success');
   debt._updatedAt = Date.now();
-
   saveData();
   refreshAll();
   closeDebtPaymentModal();
 }
 
 /* =========================================================
-   CLIENTS LEDGER & PORTAL SHARING
+   CLIENTS LEDGER
    ========================================================= */
 function renderClients() {
   const container = document.getElementById('clientsContainer');
   const empty = document.getElementById('emptyClientsState');
   const q = (document.getElementById('clientSearchInput')?.value || '').trim().toLowerCase();
   container.innerHTML = '';
-
   let clientNames = getAllClientNames();
   if (q) clientNames = clientNames.filter(name => name.toLowerCase().includes(q));
-
-  if (!clientNames.length) {
-    empty.classList.remove('hidden');
-    return;
-  }
+  if (!clientNames.length) { empty.classList.remove('hidden'); return; }
   empty.classList.add('hidden');
 
   clientNames.forEach(name => {
     const txs = getActiveTransactions().filter(t => t.client && t.client.trim().toLowerCase() === name.toLowerCase());
-    let totalIncome = 0;
-    let totalDebtReceivable = 0;
-    let totalDebtPayable = 0;
-
+    let totalIncome = 0, totalDebtReceivable = 0, totalDebtPayable = 0;
     txs.forEach(t => {
       const amt = Number(t.amount) || 0;
       const paid = Number(t.paidAmount) || 0;
@@ -2038,20 +1938,15 @@ function renderClients() {
       else if (t.type === 'debt_receivable' && t.status !== 'paid') totalDebtReceivable += Math.max(0, amt - paid);
       else if (t.type === 'debt_payable' && t.status !== 'paid') totalDebtPayable += Math.max(0, amt - paid);
     });
-
     const card = document.createElement('div');
     card.className = 'glow-card bg-slate-50 dark:bg-dark-850 p-4 rounded-2xl border border-slate-200 dark:border-dark-750 cursor-pointer flex flex-col justify-between';
     card.onclick = () => openClientLedger(name);
-
     const initial = name.charAt(0).toUpperCase();
-
     card.innerHTML = `
       <div>
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center font-black text-sm">
-              ${escapeHTML(initial)}
-            </div>
+            <div class="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center font-black text-sm">${escapeHTML(initial)}</div>
             <div>
               <h4 class="font-black text-sm text-slate-800 dark:text-slate-100">${escapeHTML(name)}</h4>
               <p class="text-[10px] text-slate-400 font-bold">${txs.length} معاملة مسجلة</p>
@@ -2059,7 +1954,6 @@ function renderClients() {
           </div>
           <span class="text-orange-500 text-xs"><i class="fa-solid fa-chevron-left"></i></span>
         </div>
-
         <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-200/60 dark:border-dark-800">
           <div class="text-[10px]">
             <span class="text-slate-400 block font-bold">باقي عليه (لك):</span>
@@ -2084,28 +1978,22 @@ function openClientLedger(clientName) {
   activeClientName = clientName;
   document.getElementById('clientModalName').textContent = `كشف حساب: ${clientName}`;
   document.getElementById('clientModalInitial').textContent = clientName.charAt(0).toUpperCase();
-
   const txs = getActiveTransactions().filter(t => t.client && t.client.trim().toLowerCase() === clientName.toLowerCase())
     .sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
-
   let income = 0, debtRec = 0, debtPay = 0;
   const tbody = document.getElementById('clientTransactionsTbody');
   const empty = document.getElementById('emptyClientTxState');
   tbody.innerHTML = '';
-
-  if (!txs.length) {
-    empty.classList.remove('hidden');
-  } else {
+  if (!txs.length) empty.classList.remove('hidden');
+  else {
     empty.classList.add('hidden');
     txs.forEach(t => {
       const amt = Number(t.amount) || 0;
       const paid = Number(t.paidAmount) || 0;
       const rem = Math.max(0, amt - paid);
-
       if (t.type === 'income') income += amt;
       else if (t.type === 'debt_receivable' && t.status !== 'paid') debtRec += rem;
       else if (t.type === 'debt_payable' && t.status !== 'paid') debtPay += rem;
-
       const tr = document.createElement('tr');
       tr.className = 'hover:bg-slate-50 dark:hover:bg-dark-850/60';
       tr.innerHTML = `
@@ -2128,14 +2016,11 @@ function openClientLedger(clientName) {
       tbody.appendChild(tr);
     });
   }
-
   document.getElementById('clientTotalIncome').textContent = money(income) + ' ج.م';
   document.getElementById('clientTotalReceivable').textContent = money(debtRec) + ' ج.م';
   document.getElementById('clientTotalPayable').textContent = money(debtPay) + ' ج.م';
-
   const modal = document.getElementById('clientLedgerModal');
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
+  modal.classList.remove('hidden'); modal.classList.add('flex');
 }
 
 function closeClientLedger() {
@@ -2148,21 +2033,17 @@ function openModalForSpecificClient() {
   const name = activeClientName;
   closeClientLedger();
   openModal('income');
-  setTimeout(() => {
-    document.getElementById('formClient').value = name;
-  }, 100);
+  setTimeout(() => { document.getElementById('formClient').value = name; }, 100);
 }
 
 /* =========================================================
-   WHATSAPP SHARE RECEIPT
+   WHATSAPP SHARE
    ========================================================= */
 function shareViaWhatsApp(id) {
   const item = transactions.find(t => t.id === id);
   if (!item) return;
-
   const timeStr = item.time ? formatTimeTo12Hour(item.time) : '';
-  const text = 
-`🧾 *إشعار عملية مالية | Honda Financial Manager*
+  const text = `🧾 *إشعار عملية مالية | Honda Financial Manager*
 ----------------------------------------
 👤 *العميل:* ${item.client || 'عميل محترم'}
 📌 *البيان:* ${item.notes || item.category}
@@ -2171,9 +2052,7 @@ function shareViaWhatsApp(id) {
 💳 *طريقة الدفع:* ${item.paymentMethod || 'كاش'}
 ${item.reference ? `🔖 *المرجع:* ${item.reference}\n` : ''}----------------------------------------
 شكراً لتعاملكم معنا ✨`;
-
-  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank');
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
 
 /* =========================================================
@@ -2184,7 +2063,6 @@ function updateCharts() {
   const isDark = document.documentElement.classList.contains('dark');
   const textColor = isDark ? '#94a3b8' : '#475569';
   const gridColor = isDark ? 'rgba(51,65,85,.25)' : 'rgba(226,232,240,.8)';
-
   const map = {};
   list.forEach(t => {
     if (t.type === 'expense' || t.type === 'charity') {
@@ -2192,13 +2070,10 @@ function updateCharts() {
       map[category] = (map[category] || 0) + Number(t.amount || 0);
     }
   });
-
   const categories = Object.keys(map);
   const amounts = Object.values(map);
   const noData = document.getElementById('noDataCategory');
-
   if (categoryChartInstance) categoryChartInstance.destroy();
-
   if (!categories.length) {
     noData.classList.remove('hidden'); noData.classList.add('flex');
   } else {
@@ -2207,12 +2082,7 @@ function updateCharts() {
       type: 'doughnut',
       data: {
         labels: categories,
-        datasets: [{
-          data: amounts,
-          backgroundColor: ['#ea580c','#f97316','#fb923c','#f59e0b','#10b981','#06b6d4','#8b5cf6','#64748b','#ef4444'],
-          borderWidth: 2,
-          borderColor: isDark ? '#0f1117' : '#ffffff'
-        }]
+        datasets: [{ data: amounts, backgroundColor: ['#ea580c','#f97316','#fb923c','#f59e0b','#10b981','#06b6d4','#8b5cf6','#64748b','#ef4444'], borderWidth: 2, borderColor: isDark ? '#0f1117' : '#ffffff' }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -2221,19 +2091,13 @@ function updateCharts() {
       }
     });
   }
-
   const metrics = calculateMetrics(list);
   if (balanceChartInstance) balanceChartInstance.destroy();
-
   balanceChartInstance = new Chart(document.getElementById('balanceBarChart').getContext('2d'), {
     type: 'bar',
     data: {
       labels: ['الإيرادات', 'المصاريف', 'باب الخير'],
-      datasets: [{
-        data: [metrics.income, metrics.expense, metrics.charity],
-        backgroundColor: ['rgba(16,185,129,.85)','rgba(244,63,94,.85)','rgba(249,115,22,.9)'],
-        borderRadius: 10, borderSkipped: false
-      }]
+      datasets: [{ data: [metrics.income, metrics.expense, metrics.charity], backgroundColor: ['rgba(16,185,129,.85)','rgba(244,63,94,.85)','rgba(249,115,22,.9)'], borderRadius: 10, borderSkipped: false }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
@@ -2247,25 +2111,21 @@ function updateCharts() {
 }
 
 /* =========================================================
-   TRANSACTION MODAL & FORM SUBMIT
+   TRANSACTION MODAL
    ========================================================= */
 function openModal(type = 'expense', id = null) {
   if (!requireAuth()) return;
   if (type === 'charity' && !hasFeature('charity')) { showToast('باب الخير غير متاح لدورك', 'error'); return; }
   if ((type === 'debt_receivable' || type === 'debt_payable') && !hasFeature('debts')) { showToast('دفتر الديون غير متاح لدورك', 'error'); return; }
-
   const modal = document.getElementById('transactionModal');
   const form = document.getElementById('transactionForm');
   editingId = id;
   form.reset();
-
   currentReceiptData = null;
   setReceiptUI(null);
-
   document.getElementById('formDate').value = todayString();
   document.getElementById('formTime').value = currentInputTimeString();
   updateClientsDatalist();
-
   if (id) {
     const item = transactions.find(t => t.id === id);
     if (!item) return;
@@ -2280,12 +2140,7 @@ function openModal(type = 'expense', id = null) {
     document.getElementById('formPaymentMethod').value = item.paymentMethod || 'كاش نقدي';
     document.getElementById('formReference').value = item.reference || '';
     document.getElementById('formNotes').value = item.notes || '';
-
-    if (item.receipt) {
-      currentReceiptData = item.receipt;
-      setReceiptUI(item.receipt);
-    }
-
+    if (item.receipt) { currentReceiptData = item.receipt; setReceiptUI(item.receipt); }
     document.getElementById('submitText').textContent = 'حفظ التعديل';
   } else {
     const radio = document.querySelector(`input[name="txType"][value="${type}"]`);
@@ -2293,16 +2148,13 @@ function openModal(type = 'expense', id = null) {
     onTypeChange();
     document.getElementById('submitText').textContent = 'حفظ العملية';
   }
-
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
+  modal.classList.remove('hidden'); modal.classList.add('flex');
   setTimeout(() => document.getElementById('formAmount').focus(), 100);
 }
 
 function closeModal() {
   const modal = document.getElementById('transactionModal');
-  modal.classList.add('hidden');
-  modal.classList.remove('flex');
+  modal.classList.add('hidden'); modal.classList.remove('flex');
   editingId = null;
   currentReceiptData = null;
 }
@@ -2316,44 +2168,24 @@ function onTypeChange() {
   const title = document.getElementById('modalTitle');
   const notes = document.getElementById('notesLabel');
   const icon = document.getElementById('modalIconBox');
-
   select.innerHTML = '';
   (CATEGORIES[type] || ['عام']).forEach(c => {
     const option = document.createElement('option');
     option.value = c; option.textContent = c;
     select.appendChild(option);
   });
-
   baraka.classList.toggle('hidden', type !== 'charity');
-
-  if (type === 'charity') {
-    title.textContent = editingId ? 'تعديل باب الخير' : 'تسجيل صدقة أو عمل خير';
-    notes.textContent = 'النية / الملاحظات';
-    icon.innerHTML = '<i class="fa-solid fa-heart text-orange-500"></i>';
-  } else if (type === 'income') {
-    title.textContent = editingId ? 'تعديل الدخل' : 'تسجيل دخل / إيراد جديد';
-    notes.textContent = 'بيان الخدمة بالتفصيل';
-    icon.innerHTML = '<i class="fa-solid fa-arrow-trend-up text-emerald-500"></i>';
-  } else if (type === 'debt_receivable') {
-    title.textContent = editingId ? 'تعديل دين مستحق لي' : 'تسجيل دين مستحق لي';
-    notes.textContent = 'بيان الدين والخدمة *';
-    icon.innerHTML = '<i class="fa-solid fa-user-plus text-cyan-500"></i>';
-  } else if (type === 'debt_payable') {
-    title.textContent = editingId ? 'تعديل دين عليّ' : 'تسجيل دين مستحق عليّ';
-    notes.textContent = 'بيان الدين والالتزام *';
-    icon.innerHTML = '<i class="fa-solid fa-user-minus text-purple-500"></i>';
-  } else {
-    title.textContent = editingId ? 'تعديل مصروف' : 'تسجيل مصروف جديد';
-    notes.textContent = 'بيان المصروف';
-    icon.innerHTML = '<i class="fa-solid fa-arrow-trend-down text-rose-500"></i>';
-  }
+  if (type === 'charity') { title.textContent = editingId ? 'تعديل باب الخير' : 'تسجيل صدقة أو عمل خير'; notes.textContent = 'النية / الملاحظات'; icon.innerHTML = '<i class="fa-solid fa-heart text-orange-500"></i>'; }
+  else if (type === 'income') { title.textContent = editingId ? 'تعديل الدخل' : 'تسجيل دخل / إيراد جديد'; notes.textContent = 'بيان الخدمة بالتفصيل'; icon.innerHTML = '<i class="fa-solid fa-arrow-trend-up text-emerald-500"></i>'; }
+  else if (type === 'debt_receivable') { title.textContent = editingId ? 'تعديل دين مستحق لي' : 'تسجيل دين مستحق لي'; notes.textContent = 'بيان الدين والخدمة *'; icon.innerHTML = '<i class="fa-solid fa-user-plus text-cyan-500"></i>'; }
+  else if (type === 'debt_payable') { title.textContent = editingId ? 'تعديل دين عليّ' : 'تسجيل دين مستحق عليّ'; notes.textContent = 'بيان الدين والالتزام *'; icon.innerHTML = '<i class="fa-solid fa-user-minus text-purple-500"></i>'; }
+  else { title.textContent = editingId ? 'تعديل مصروف' : 'تسجيل مصروف جديد'; notes.textContent = 'بيان المصروف'; icon.innerHTML = '<i class="fa-solid fa-arrow-trend-down text-rose-500"></i>'; }
 }
 
 function handleFormSubmit(event) {
   event.preventDefault();
   if (!requireAuth()) return;
   const wasEditing = !!editingId;
-
   const type = document.querySelector('input[name="txType"]:checked').value;
   const amount = Number(document.getElementById('formAmount').value);
   const date = document.getElementById('formDate').value;
@@ -2365,20 +2197,10 @@ function handleFormSubmit(event) {
   const reference = sanitizeString(document.getElementById('formReference').value, 50);
   const notes = sanitizeString(document.getElementById('formNotes').value, 200);
 
-  if (!amount || amount <= 0 || amount > 1e9) { 
-    showToast('يرجى إدخال مبلغ صحيح (أكبر من 0)', 'error'); return; 
-  }
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { 
-    showToast('يرجى اختيار تاريخ صحيح', 'error'); return; 
-  }
-  if (isDebt(type) && !notes && !client) { 
-    showToast('اكتب اسم العميل أو البيان لحفظ الدين', 'error'); return; 
-  }
-
-  if (!wasEditing && !canAddMoreTransactions()) {
-    showToast(`وصلت للحد الأقصى (${getMaxTransactions()} عملية)`, 'error');
-    return;
-  }
+  if (!amount || amount <= 0 || amount > 1e9) { showToast('يرجى إدخال مبلغ صحيح', 'error'); return; }
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { showToast('يرجى اختيار تاريخ صحيح', 'error'); return; }
+  if (isDebt(type) && !notes && !client) { showToast('اكتب اسم العميل أو البيان لحفظ الدين', 'error'); return; }
+  if (!wasEditing && !canAddMoreTransactions()) { showToast(`وصلت للحد الأقصى (${getMaxTransactions()} عملية)`, 'error'); return; }
 
   if (wasEditing) {
     const index = transactions.findIndex(t => t.id === editingId);
@@ -2386,8 +2208,7 @@ function handleFormSubmit(event) {
     const old = transactions[index];
     transactions[index] = normalizeTransaction({
       ...old, type, amount, date, time, client, category,
-      paymentMethod: isDebt(type) ? 'آجل / معلق' : paymentMethod,
-      reference,
+      paymentMethod: isDebt(type) ? 'آجل / معلق' : paymentMethod, reference,
       notes: notes || (type === 'charity' ? 'صدقة لوجه الله' : category),
       receipt: currentReceiptData,
       status: isDebt(type) ? (old.status || 'pending') : null,
@@ -2397,24 +2218,18 @@ function handleFormSubmit(event) {
   } else {
     transactions.unshift(normalizeTransaction({
       id: 'tx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-      type, amount, date, time, client, category,
-      paidAmount: 0,
-      paymentMethod: isDebt(type) ? 'آجل / معلق' : paymentMethod,
-      reference,
+      type, amount, date, time, client, category, paidAmount: 0,
+      paymentMethod: isDebt(type) ? 'آجل / معلق' : paymentMethod, reference,
       notes: notes || (type === 'charity' ? 'صدقة لوجه الله' : category),
       receipt: currentReceiptData,
       status: isDebt(type) ? 'pending' : null,
       _updatedAt: Date.now()
     }));
-
     if (type === 'charity') {
       if (typeof confetti === 'function') confetti({ particleCount: 100, spread: 80, origin: { y: .6 } });
       showToast('تقبل الله منك وأخلف عليك بالبركة 🤲', 'success');
-    } else {
-      showToast('تم تسجيل العملية بنجاح', 'success');
-    }
+    } else showToast('تم تسجيل العملية بنجاح', 'success');
   }
-
   saveData();
   refreshAll();
   closeModal();
@@ -2433,11 +2248,7 @@ function requestDelete(id) {
   if (!requireAuth()) return;
   const item = transactions.find(t => t.id === id);
   if (!item) return;
-  openConfirm(
-    'حذف العملية؟',
-    `سيتم حذف: <strong>${escapeHTML(item.notes || item.category)}</strong> بمبلغ <strong>${money(item.amount)} ج.م</strong>.`,
-    () => deleteTransaction(id)
-  );
+  openConfirm('حذف العملية؟', `سيتم حذف: <strong>${escapeHTML(item.notes || item.category)}</strong> بمبلغ <strong>${money(item.amount)} ج.م</strong>.`, () => deleteTransaction(id));
 }
 
 function deleteTransaction(id) {
@@ -2536,12 +2347,8 @@ function updateBudget() {
   const budget = getBudget();
   const monthItems = getActiveTransactions().filter(t => isInPeriod(t.date, 'month'));
   let used = 0;
-  monthItems.forEach(t => {
-    if (t.type === 'expense' || t.type === 'charity') used += Number(t.amount || 0);
-  });
-
+  monthItems.forEach(t => { if (t.type === 'expense' || t.type === 'charity') used += Number(t.amount || 0); });
   document.getElementById('budgetUsed').textContent = money(used);
-
   if (!budget) {
     document.getElementById('budgetTotal').textContent = 'غير محددة';
     document.getElementById('budgetRemaining').textContent = 'حدد ميزانية شهرية';
@@ -2549,7 +2356,6 @@ function updateBudget() {
     document.getElementById('budgetBar').style.width = '0%';
     return;
   }
-
   document.getElementById('budgetTotal').textContent = money(budget) + ' ج.م';
   const percent = Math.min(100, (used / budget) * 100);
   const remaining = budget - used;
@@ -2557,8 +2363,7 @@ function updateBudget() {
   document.getElementById('budgetBar').style.width = percent + '%';
   document.getElementById('budgetRemaining').textContent = remaining >= 0
     ? `متبقي ${money(remaining)} ج.م` : `متجاوز بـ ${money(Math.abs(remaining))} ج.م`;
-  document.getElementById('budgetRemaining').className =
-    'text-[10px] font-bold ' + (remaining >= 0 ? 'text-emerald-500' : 'text-rose-500');
+  document.getElementById('budgetRemaining').className = 'text-[10px] font-bold ' + (remaining >= 0 ? 'text-emerald-500' : 'text-rose-500');
 }
 
 /* =========================================================
@@ -2580,7 +2385,7 @@ function downloadBackup() {
   if (!requireAuth()) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '9.1',
+    version: '9.2',
     createdAt: new Date().toISOString(),
     transactions,
     budget: getBudget(),
@@ -2607,7 +2412,6 @@ function restoreBackup(event) {
       let restored = Array.isArray(backup) ? backup : backup.transactions;
       restored = restored.filter(validateTransaction);
       if (!restored.length) throw new Error('No valid transactions');
-
       openConfirm('استعادة النسخة؟', `سيتم استبدال العمليات بـ <strong>${restored.length}</strong> عملية.`, () => {
         const now = Date.now();
         transactions = restored.map((item, i) => normalizeTransaction({ ...item, _updatedAt: now + i }));
@@ -2617,9 +2421,7 @@ function restoreBackup(event) {
         closeBackupModal();
         showToast('تم استعادة النسخة الاحتياطية بنجاح', 'success');
       });
-    } catch (error) {
-      showToast('ملف النسخة الاحتياطية غير صالح', 'error');
-    }
+    } catch (error) { showToast('ملف النسخة الاحتياطية غير صالح', 'error'); }
     event.target.value = '';
   };
   reader.readAsText(file);
@@ -2631,18 +2433,13 @@ function exportToCSV() {
   closeMenus();
   const list = getActiveTransactions();
   if (!list.length) { showToast('لا توجد بيانات للتصدير', 'error'); return; }
-
   let csv = '\uFEFF';
   csv += 'المعرف,النوع,المبلغ,العميل,التصنيف,طريقة الدفع,التاريخ,الوقت,المرجع,البيان,الحالة\n';
   list.forEach(t => {
-    const row = [
-      t.id, typeName(t.type), t.amount, t.client || '', t.category,
-      t.paymentMethod || '', t.date, t.time || '', t.reference || '', t.notes || '',
-      t.status === 'paid' ? 'مسدد' : t.status === 'pending' ? 'معلق' : 'منجز'
-    ];
+    const row = [t.id, typeName(t.type), t.amount, t.client || '', t.category, t.paymentMethod || '', t.date, t.time || '', t.reference || '', t.notes || '',
+      t.status === 'paid' ? 'مسدد' : t.status === 'pending' ? 'معلق' : 'منجز'];
     csv += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\n';
   });
-
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2660,19 +2457,11 @@ function printReport() {
   const metrics = calculateMetrics();
   const periodName = document.getElementById('periodLabel').textContent;
   const report = document.getElementById('printReport');
-
   report.innerHTML = `
     <div style="font-family:Cairo,Tajawal,sans-serif;direction:rtl;">
       <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #f97316;padding-bottom:18px;">
-        <div>
-          <h1 style="font-size:30px;margin:0;font-weight:900;">احسبلي</h1>
-          <div style="font-size:12px;color:#666;">Honda Financial Manager</div>
-        </div>
-        <div style="text-align:left;font-size:12px;color:#555;">
-          <div>تقرير مالي</div>
-          <div>${escapeHTML(periodName)}</div>
-          <div>${todayString()}</div>
-        </div>
+        <div><h1 style="font-size:30px;margin:0;font-weight:900;">احسبلي</h1><div style="font-size:12px;color:#666;">Honda Financial Manager</div></div>
+        <div style="text-align:left;font-size:12px;color:#555;"><div>تقرير مالي</div><div>${escapeHTML(periodName)}</div><div>${todayString()}</div></div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:25px;">
         ${reportBox('الإيرادات', metrics.income, '#059669')}
@@ -2683,29 +2472,25 @@ function printReport() {
       <div style="margin-top:30px;">
         <h2 style="font-size:18px;">تفاصيل العمليات</h2>
         <table style="width:100%;border-collapse:collapse;font-size:11px;">
-          <thead>
-            <tr style="background:#f97316;color:white;">
-              <th style="padding:9px;border:1px solid #ddd;">التاريخ والوقت</th>
-              <th style="padding:9px;border:1px solid #ddd;">العميل</th>
-              <th style="padding:9px;border:1px solid #ddd;">النوع</th>
-              <th style="padding:9px;border:1px solid #ddd;">البيان</th>
-              <th style="padding:9px;border:1px solid #ddd;">التصنيف</th>
-              <th style="padding:9px;border:1px solid #ddd;">المبلغ</th>
-            </tr>
-          </thead>
+          <thead><tr style="background:#f97316;color:white;">
+            <th style="padding:9px;border:1px solid #ddd;">التاريخ والوقت</th>
+            <th style="padding:9px;border:1px solid #ddd;">العميل</th>
+            <th style="padding:9px;border:1px solid #ddd;">النوع</th>
+            <th style="padding:9px;border:1px solid #ddd;">البيان</th>
+            <th style="padding:9px;border:1px solid #ddd;">التصنيف</th>
+            <th style="padding:9px;border:1px solid #ddd;">المبلغ</th>
+          </tr></thead>
           <tbody>
-            ${getPeriodTransactions()
-              .sort((a,b) => new Date(b.date) - new Date(a.date))
-              .map(t => `
-                <tr>
-                  <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.date)}${escapeHTML(t.time || '')}</td>
-                  <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.client || '-')}</td>
-                  <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(typeName(t.type))}</td>
-                  <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.notes || '')}</td>
-                  <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.category || '')}</td>
-                  <td style="padding:8px;border:1px solid #ddd;">${money(t.amount)} ج.م</td>
-                </tr>
-              `).join('')}
+            ${getPeriodTransactions().sort((a,b) => new Date(b.date) - new Date(a.date)).map(t => `
+              <tr>
+                <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.date)}${escapeHTML(t.time || '')}</td>
+                <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.client || '-')}</td>
+                <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(typeName(t.type))}</td>
+                <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.notes || '')}</td>
+                <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.category || '')}</td>
+                <td style="padding:8px;border:1px solid #ddd;">${money(t.amount)} ج.م</td>
+              </tr>
+            `).join('')}
           </tbody>
         </table>
       </div>
@@ -2729,12 +2514,10 @@ function openPinModal() {
   if (!requireAuth()) return;
   closeMenus();
   const modal = document.getElementById('pinModal');
-  const title = document.getElementById('pinTitle');
-  const action = document.getElementById('pinActionBtn');
   document.getElementById('pinInput').value = '';
   document.getElementById('pinError').classList.add('hidden');
-  title.textContent = !getPin() ? 'إنشاء PIN' : 'تغيير PIN';
-  action.textContent = !getPin() ? 'تفعيل القفل' : 'تغيير الرمز';
+  document.getElementById('pinTitle').textContent = !getPin() ? 'إنشاء PIN' : 'تغيير PIN';
+  document.getElementById('pinActionBtn').textContent = !getPin() ? 'تفعيل القفل' : 'تغيير الرمز';
   modal.classList.remove('hidden'); modal.classList.add('flex');
   setTimeout(() => document.getElementById('pinInput').focus(), 100);
 }
@@ -2802,43 +2585,31 @@ async function forgotPinUnlock() {
       hidePinLock();
       showToast('تم التحقق — أزيل القفل', 'success');
     }
-  } catch (error) {
-    showToast('فشل التحقق من الهوية', 'error');
-  }
+  } catch (error) { showToast('فشل التحقق من الهوية', 'error'); }
 }
 
 /* =========================================================
-   TABS & TOASTS
+   TABS & TOAST
    ========================================================= */
 function switchTab(tab) {
   if (tab === 'debts' && !hasFeature('debts')) { showToast('دفتر الديون غير متاح لدورك', 'error'); return; }
   currentTab = tab;
-  
   const isTx = tab === 'transactions';
   const isDebts = tab === 'debts';
   const isClients = tab === 'clients';
-
   document.getElementById('panelTransactions').classList.toggle('hidden', !isTx);
   document.getElementById('panelDebts').classList.toggle('hidden', !isDebts);
   document.getElementById('panelClients').classList.toggle('hidden', !isClients);
-
   document.getElementById('tabBtnTransactions').classList.toggle('active', isTx);
   document.getElementById('tabBtnDebts').classList.toggle('active', isDebts);
   document.getElementById('tabBtnClients').classList.toggle('active', isClients);
-
-  // Sync mobile bottom navigation
-  document.querySelectorAll('.mob-nav-btn[data-tab]').forEach((btn) => {
+  document.querySelectorAll('.mob-nav-btn[data-tab]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
-
-  // Scroll to top of the panel area for better UX on mobile
   if (window.innerWidth < 768) {
     const tabs = document.getElementById('tabBtnTransactions');
-    if (tabs && tabs.scrollIntoView) {
-      tabs.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    if (tabs && tabs.scrollIntoView) tabs.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-
   if (isClients) renderClients();
 }
 
@@ -2850,7 +2621,6 @@ function showToast(message, type = 'success', allowUndo = false) {
   let classes = 'bg-dark-900 text-white border-orange-500/40';
   if (type === 'error') { icon = 'fa-solid fa-circle-exclamation'; classes = 'bg-rose-950 text-white border-rose-500/50'; }
   else if (type === 'info') { icon = 'fa-solid fa-circle-info'; classes = 'bg-dark-850 text-slate-100 border-slate-700'; }
-
   inner.className = `flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl text-xs font-black border ${classes}`;
   inner.innerHTML = `
     <i class="${icon} ${type === 'error' ? 'text-rose-400' : type === 'info' ? 'text-blue-400' : 'text-orange-500'}"></i>
@@ -2860,7 +2630,6 @@ function showToast(message, type = 'success', allowUndo = false) {
   document.getElementById('toastMsgSpan').textContent = message;
   box.classList.remove('opacity-0', '-translate-y-5');
   box.classList.add('opacity-100', 'translate-y-0');
-
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
     box.classList.remove('opacity-100', 'translate-y-0');
@@ -2874,9 +2643,7 @@ function closeMenus() { document.getElementById('dropMenu').classList.add('hidde
 window.addEventListener('click', event => {
   const btn = document.getElementById('menuBtn');
   const menu = document.getElementById('dropMenu');
-  if (btn && menu && !btn.contains(event.target) && !menu.contains(event.target)) {
-    menu.classList.add('hidden');
-  }
+  if (btn && menu && !btn.contains(event.target) && !menu.contains(event.target)) menu.classList.add('hidden');
 });
 
 function confirmClearData() {
@@ -2933,6 +2700,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   registerServiceWorker();
   initInstallPrompt();
+  initNetworkStatus();
+
+  // Splash hide
+  const splash = document.getElementById('pwaSplash');
+  if (splash) setTimeout(() => splash.classList.add('hide'), 800);
 
   const isPortal = await checkPublicPortalMode();
   if (isPortal) return;
@@ -2950,6 +2722,29 @@ window.addEventListener('DOMContentLoaded', async () => {
   } catch(e) {}
   applyRoleUI();
   updatePinUI();
+
+  // PWA: Handle shortcut/share/file in URL
+  setTimeout(() => {
+    handleAppShortcut();
+    handleShareTarget();
+    handleFileRestore();
+  }, 100);
+
+  // PWA: Install banner check (after 3 visits)
+  setTimeout(checkInstallPrompt, 2000);
+
+  // PWA: Service Worker update detection
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner();
+        });
+      });
+    });
+  }
 
   showAuthLoading();
   await handleRedirectResult();
