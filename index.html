@@ -10,8 +10,8 @@
   <title>احسبلي | a7sbley</title>
 
   <!-- Favicon & App Icon -->
-  <link rel="icon" type="image/jpg" href="https://l.top4top.io/s_3926i5al91.jpg">
-  <link rel="apple-touch-icon" href="https://l.top4top.io/p_3926i5al91.jpg">
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="apple-touch-icon" href="logo.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,16 +47,17 @@
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans min-h-screen flex flex-col transition-colors duration-300 pb-24 md:pb-8">
 
-  <!-- شاشة التحميل المتجاوبة السلسة -->
+  <!-- ================= SPLASH & LOADING SCREEN ================= -->
   <div id="splashScreen" class="fixed inset-0 z-[500] flex flex-col items-center justify-center transition-all duration-500 bg-white dark:bg-dark-950 text-slate-900 dark:text-white select-none">
     <div class="relative flex flex-col items-center">
       <div class="relative w-28 h-28 sm:w-32 sm:h-32 mb-5">
         <div class="absolute inset-0 bg-orange-500/25 rounded-3xl blur-xl animate-pulse"></div>
-        <img src="https://l.top4top.io/s_3926i5al91.jpg" alt="احسبلي" class="relative z-10 w-full h-full object-contain rounded-3xl drop-shadow-2xl animate-float">
+        <img src="logo.png" alt="احسبلي" class="relative z-10 w-full h-full object-contain drop-shadow-2xl animate-float">
       </div>
       <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">احسبلي</h1>
       <span class="text-[11px] font-bold text-orange-500 tracking-widest mt-1">HONDA FINANCIAL MANAGER</span>
 
+      <!-- شريط التحميل -->
       <div class="w-44 h-1.5 bg-slate-200 dark:bg-dark-800 rounded-full mt-7 overflow-hidden relative">
         <div class="splash-loader-bar h-full bg-gradient-to-r from-orange-600 via-orange-500 to-amber-400 rounded-full"></div>
       </div>
@@ -64,34 +65,33 @@
     </div>
   </div>
 
-  <!-- الهيدر العلوي -->
+  <!-- ================= HEADER ================= -->
   <header id="appHeader" class="sticky top-0 z-40 border-b border-slate-200 dark:border-dark-800 glass-light dark:glass-dark shadow-sm no-print">
     <div class="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between min-h-16 py-2.5 gap-2">
         
-        <!-- اللوجو والعنوان بتدرج متفاعل وتوهج نيون -->
-        <div class="flex items-center gap-2.5 shrink-0 group cursor-pointer" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
-          <div class="relative w-10 h-10 sm:w-11 sm:h-11 rounded-2xl p-0.5 bg-black/60 border border-orange-500/40 flex items-center justify-center overflow-hidden shadow-lg group-hover:border-orange-400 group-hover:shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all duration-300">
-            <img src="https://l.top4top.io/s_3926i5al91.jpg" alt="احسبلي" class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300">
+        <!-- اللوجو -->
+        <div class="flex items-center gap-2.5 shrink-0">
+          <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl p-0.5 bg-black/40 border border-orange-500/30 flex items-center justify-center overflow-hidden shadow-sm">
+            <img src="logo.png" alt="احسبلي" class="w-full h-full object-contain">
           </div>
           <div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <h1 class="text-xl sm:text-2xl font-black tracking-tight text-brand-title">
-                احسبلي
-              </h1>
-              <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black border border-amber-500/40 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]">
-                <i class="fa-solid fa-crown text-[10px] text-amber-400"></i> Super Admin
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <h1 class="text-base sm:text-xl font-black text-slate-900 dark:text-white">احسبلي</h1>
+              <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black border border-slate-500/30 text-slate-400">
+                <i class="fa-solid fa-user"></i> مجاني
               </span>
             </div>
-            <div class="flex items-center gap-1.5 mt-0.5">
-              <span class="text-[10px] font-bold text-slate-400">مقدم من</span>
-              <span class="text-[10px] font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-300">HONDA</span>
+            <div class="flex items-center gap-1">
+              <span class="text-[9px] font-bold text-slate-500 dark:text-slate-400">مقدم من</span>
+              <span class="text-[9px] font-black text-orange-500 tracking-wider">HONDA</span>
             </div>
           </div>
         </div>
 
-        <!-- أزرار الهيدر -->
+        <!-- الأزرار العلوية -->
         <div class="flex items-center gap-1.5 sm:gap-2">
+          
           <button onclick="togglePrivacyMode()" id="privacyBtn" title="إخفاء / إظهار المبالغ"
             class="p-2 sm:px-3 sm:py-2 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 hover:border-orange-500 text-slate-700 dark:text-slate-200 transition shadow-sm flex items-center gap-1.5 text-xs font-bold">
             <i id="privacyIcon" class="fa-solid fa-eye text-orange-500"></i>
@@ -104,18 +104,17 @@
             <span id="themeText" class="hidden lg:inline">الوضع النهاري</span>
           </button>
 
-          <!-- زر إضافة عملية المكتبي -->
-          <button type="button" onclick="openModal('expense')"
-            class="hidden md:flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 active:scale-95 text-white font-black text-xs sm:text-sm shadow-lg glow-orange transition cursor-pointer">
+          <button onclick="openModal('expense')"
+            class="hidden md:flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 active:scale-95 text-white font-black text-xs sm:text-sm shadow-lg glow-orange transition">
             <i class="fa-solid fa-circle-plus"></i>
             <span>إضافة عملية</span>
           </button>
 
-          <!-- قائمة الثلاث نقاط -->
+          <!-- زر الثلاث نقاط -->
           <div class="relative">
             <button onclick="toggleMenu()" id="menuBtn"
               class="p-1.5 sm:p-2 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-slate-600 dark:text-slate-300 hover:text-orange-500 transition flex items-center gap-1.5">
-              <img id="userAvatar" src="https://l.top4top.io/s_3926i5al91.jpg" class="w-6 h-6 rounded-lg object-contain bg-black/40 border border-orange-500/30" alt="الحساب">
+              <img id="userAvatar" src="logo.png" class="w-6 h-6 rounded-lg object-contain bg-black/40 border border-orange-500/30" alt="الحساب">
               <i class="fa-solid fa-ellipsis-vertical text-sm px-1"></i>
             </button>
             
@@ -142,6 +141,7 @@
               <div class="my-1 border-t border-slate-100 dark:border-dark-800"></div>
               <button onclick="confirmClearData()" class="menu-item text-slate-500 hover:text-rose-500"><i class="fa-solid fa-trash-can"></i> تصفير جميع البيانات</button>
               
+              <!-- زر تسجيل الخروج داخل القائمة -->
               <div class="my-1 border-t border-slate-100 dark:border-dark-800"></div>
               <button onclick="logout()" class="menu-item text-rose-500 hover:bg-rose-500/10 font-black">
                 <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
@@ -153,12 +153,12 @@
     </div>
   </header>
 
-  <!-- كشف حساب العميل الإلكتروني المباشر -->
+  <!-- ================= PUBLIC CLIENT PORTAL VIEW ================= -->
   <div id="clientPortalView" class="hidden max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-6">
     <div class="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-dark-900 to-black text-white border border-dark-800 shadow-2xl relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="flex items-center gap-4">
         <div class="w-14 h-14 rounded-2xl bg-black/40 border border-orange-500/40 p-1 flex items-center justify-center shadow-lg">
-          <img src="https://l.top4top.io/s_3926i5al91.jpg" alt="احسبلي" class="w-full h-full object-contain">
+          <img src="logo.png" alt="احسبلي" class="w-full h-full object-contain">
         </div>
         <div>
           <div class="text-[10px] text-orange-400 font-bold uppercase tracking-wider">كشف حساب العميل الإلكتروني</div>
@@ -215,7 +215,7 @@
     </div>
   </div>
 
-  <!-- الواجهة الرئيسية -->
+  <!-- ================= MAIN DASHBOARD ================= -->
   <main id="appMain" class="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6 flex-1 w-full">
 
     <div id="toastBox" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] pointer-events-none opacity-0 -translate-y-5 transition-all duration-300">
@@ -230,7 +230,7 @@
       <span id="syncUserEmail" class="text-[10px] text-slate-400"></span>
     </div>
 
-    <!-- الفترات الزمنية السريعة -->
+    <!-- فلاتر الأيام السريعة -->
     <section class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-2.5 sm:p-3 shadow-sm no-print">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
         <div class="flex items-center gap-2">
@@ -312,7 +312,7 @@
       </div>
     </section>
 
-    <!-- الخزينة والمحافظ -->
+    <!-- أرصدة الخزينة وطرق الدفع -->
     <section class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3.5 no-print shadow-sm">
       <div class="flex items-center justify-between mb-2.5">
         <div class="flex items-center gap-1.5">
@@ -378,31 +378,7 @@
       </div>
     </section>
 
-    <!-- الرسوم البيانية كاملة -->
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-5 no-print">
-      <div class="bg-white dark:bg-dark-900 p-5 rounded-2xl border border-slate-200 dark:border-dark-800 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm font-black flex items-center gap-2"><i class="fa-solid fa-chart-pie text-orange-500"></i> توزيع الخارج</h3>
-          <span class="text-[10px] text-slate-400 font-bold">حسب البند</span>
-        </div>
-        <div class="relative h-64">
-          <canvas id="categoryChart"></canvas>
-          <div id="noDataCategory" class="hidden absolute inset-0 items-center justify-center text-xs text-slate-400 font-bold">لا توجد بيانات</div>
-        </div>
-      </div>
-
-      <div class="bg-white dark:bg-dark-900 p-5 rounded-2xl border border-slate-200 dark:border-dark-800 shadow-sm lg:col-span-2">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h3 class="text-sm font-black flex items-center gap-2"><i class="fa-solid fa-chart-column text-orange-500"></i> ملخص الفترة</h3>
-            <p class="text-[10px] text-slate-400">دخل مقابل مصاريف وخير</p>
-          </div>
-        </div>
-        <div class="relative h-64"><canvas id="balanceBarChart"></canvas></div>
-      </div>
-    </section>
-
-    <!-- شريط التبويبات للكمبيوتر -->
+    <!-- شريط التبويبات الرئيسي للكمبيوتر -->
     <div class="hidden md:flex items-center gap-1 border-b border-slate-200 dark:border-dark-800 no-print">
       <button onclick="switchTab('transactions')" id="tabBtnTransactions" class="tab-btn active">
         <i class="fa-solid fa-list-check"></i> المعاملات <span id="badgeTxCount" class="badge">0</span>
@@ -465,7 +441,7 @@
           <p class="text-[9px] text-slate-400">تابع ما لك وما عليك</p>
         </div>
         <button onclick="openModal('debt_receivable')"
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition cursor-pointer">
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition">
           <i class="fa-solid fa-plus text-[10px]"></i> دين جديد
         </button>
       </div>
@@ -496,7 +472,7 @@
 
   </main>
 
-  <!-- شريط الموبايل السفلي المحسن -->
+  <!-- ================= BOTTOM NAVIGATION BAR (MOBILE APP) ================= -->
   <nav id="bottomAppNav" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-dark-900/95 backdrop-blur-md border-t border-slate-200 dark:border-dark-800 px-3 py-2 flex items-center justify-around no-print shadow-2xl">
     <button onclick="switchTab('transactions')" id="mNavTx" class="app-nav-item active">
       <i class="fa-solid fa-receipt"></i>
@@ -507,8 +483,8 @@
       <span>الديون</span>
     </button>
 
-    <!-- زر البلس العائم في المنتصف (FAB) -->
-    <button type="button" onclick="openModal('expense')" class="w-12 h-12 -mt-6 rounded-full bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 text-white flex items-center justify-center text-lg shadow-xl glow-orange active:scale-90 transition cursor-pointer">
+    <!-- زر إضافة عملية العائم في المنتصف (FAB) -->
+    <button onclick="openModal('expense')" class="w-12 h-12 -mt-6 rounded-full bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 text-white flex items-center justify-center text-lg shadow-xl glow-orange active:scale-90 transition">
       <i class="fa-solid fa-plus"></i>
     </button>
 
@@ -517,13 +493,14 @@
       <span>العملاء</span>
     </button>
     
+    <!-- زر المزيد -->
     <button onclick="toggleMobileMoreMenu(event)" id="mNavMore" class="app-nav-item">
       <i class="fa-solid fa-bars"></i>
       <span>المزيد</span>
     </button>
   </nav>
 
-  <!-- فوتر الموقع -->
+  <!-- FOOTER -->
   <footer id="appFooter" class="bg-white dark:bg-dark-900 border-t border-slate-200 dark:border-dark-800 py-6 mt-auto no-print">
     <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
       <div class="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
@@ -538,12 +515,14 @@
     </div>
   </footer>
 
-  <!-- نافذة تسجيل الدخول -->
+  <!-- ================= MODALS & OVERLAYS ================= -->
+
+  <!-- LOGIN WALL (كامل بكل طرق الدخول) -->
   <div id="loginWall" class="hidden fixed inset-0 z-[300] bg-gradient-to-br from-slate-950 via-dark-950 to-black text-white items-center justify-center p-4 overflow-y-auto">
     <div class="relative w-full max-w-md py-8">
       <div class="text-center">
         <div class="w-20 h-20 rounded-3xl bg-black/40 border border-orange-500/40 p-1 flex items-center justify-center mx-auto shadow-2xl glow-orange animate-float">
-          <img src="https://l.top4top.io/s_3926i5al91.jpg" alt="احسبلي" class="w-full h-full object-contain">
+          <img src="logo.png" alt="احسبلي" class="w-full h-full object-contain">
         </div>
         <h1 class="text-3xl font-black mt-5">احسبلي</h1>
         <div class="text-[11px] font-black text-orange-400 tracking-[.3em] mt-1">HONDA FINANCIAL MANAGER</div>
@@ -672,7 +651,7 @@
             <h3 id="modalTitle" class="text-sm sm:text-base font-black">إضافة عملية</h3>
           </div>
         </div>
-        <button type="button" onclick="closeModal()" class="w-8 h-8 rounded-xl text-slate-400 hover:text-white hover:bg-dark-800 flex items-center justify-center cursor-pointer">
+        <button onclick="closeModal()" class="w-8 h-8 rounded-xl text-slate-400 hover:text-white hover:bg-dark-800 flex items-center justify-center">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
@@ -788,7 +767,7 @@
 
         <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-dark-800">
           <button type="button" onclick="closeModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-white hover:bg-dark-800 transition">إلغاء</button>
-          <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-lg flex items-center gap-1.5 cursor-pointer">
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-lg flex items-center gap-1.5">
             <i class="fa-solid fa-check"></i>
             <span id="submitText">حفظ العملية</span>
           </button>
@@ -1100,7 +1079,7 @@
   <div id="lockScreen" class="hidden fixed inset-0 z-[200] bg-dark-950 text-white items-center justify-center p-5">
     <div class="relative w-full max-w-sm text-center">
       <div class="w-16 h-16 rounded-2xl bg-black/40 border border-orange-500/40 p-1 flex items-center justify-center mx-auto shadow-2xl glow-orange">
-        <img src="https://l.top4top.io/s_3926i5al91.jpg" alt="احسبلي" class="w-full h-full object-contain">
+        <img src="logo.png" alt="احسبلي" class="w-full h-full object-contain">
       </div>
       <h2 class="text-2xl font-black mt-5">احسبلي</h2>
       <p class="text-xs text-slate-400 mt-1">التطبيق مقفول للحفاظ على سرية بياناتك</p>
@@ -1122,7 +1101,6 @@
 
   <div id="printReport" class="print-only"></div>
 
-  <!-- رقم إصدار كسر الكاش لضمان سحب النسخة النظيفة فورا -->
-  <script src="app.js?v=11.0"></script>
+  <script src="app.js?v=9.6"></script>
 </body>
 </html>

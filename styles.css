@@ -1,5 +1,6 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V11.0
+   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V9.6
+   Mobile App Native Look + Adaptive Splash Screen
    ========================================================= */
 
 * { 
@@ -27,27 +28,11 @@ body {
 .glow-orange { box-shadow: 0 0 25px -4px rgba(249, 115, 22, .45); }
 .glow-orange-sm { box-shadow: 0 0 12px -2px rgba(249, 115, 22, .35); }
 
-/* تدرج عنوان احسبلي المضيء المندمج مع النيون */
-.text-brand-title {
-  background: linear-gradient(135deg, #ffffff 0%, #ffedd5 35%, #f97316 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 8px rgba(249, 115, 22, 0.4));
-}
-.dark .text-brand-title {
-  background: linear-gradient(135deg, #ffffff 10%, #fed7aa 55%, #ea580c 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.glow-card { 
-  position: relative;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
-}
+.glow-card { transition: .25s ease; }
 .glow-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 30px -10px rgba(249, 115, 22, .25);
-  border-color: rgba(249, 115, 22, .5) !important;
+  border-color: rgba(249, 115, 22, .4);
 }
 .glow-card:active { transform: scale(0.98); }
 
@@ -75,6 +60,7 @@ body {
 }
 .animate-float { animation: floatY 3s ease-in-out infinite; }
 
+/* شريط لودنج شاشة البداية */
 .splash-loader-bar {
   animation: loaderProgress 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
@@ -106,6 +92,7 @@ body {
 }
 .mobile-scroll::-webkit-scrollbar { display: none; }
 
+/* لا نحجب عناصر الصفحة بالكامل حتى لا تعلق الشاشة */
 body.not-authed #appHeader,
 body.not-authed #appMain,
 body.not-authed #appFooter,
@@ -130,7 +117,6 @@ body.portal-mode #cloudStatus { display: none !important; }
   font-size: 11px;
   font-weight: 800;
   transition: .2s;
-  cursor: pointer;
 }
 .menu-item:hover { background: rgba(249, 115, 22, .08); }
 
@@ -249,6 +235,9 @@ body.portal-mode #cloudStatus { display: none !important; }
 .period-btn:active { transform: scale(0.95); }
 .period-btn.active { background: #f97316; color: white; }
 
+/* =========================================================
+   ADMIN PANEL STYLES
+   ========================================================= */
 .admin-tab {
   padding: 14px 18px;
   font-size: 12px;
@@ -454,6 +443,9 @@ body.portal-mode #cloudStatus { display: none !important; }
   color: #f97316;
 }
 
+/* =========================================================
+   BOTTOM APP NAVIGATION (MOBILE ONLY)
+   ========================================================= */
 .app-nav-item {
   display: flex;
   flex-direction: column;
@@ -469,9 +461,16 @@ body.portal-mode #cloudStatus { display: none !important; }
   transition: .15s;
   width: 55px;
 }
-.app-nav-item.active { color: #f97316; }
-.app-nav-item i { font-size: 15px; }
+.app-nav-item.active {
+  color: #f97316;
+}
+.app-nav-item i {
+  font-size: 15px;
+}
 
+/* =========================================================
+   MOBILE RESPONSIVE TRANSACTION CARDS
+   ========================================================= */
 .mobile-tx-card {
   padding: 11px 10px;
   display: flex;
@@ -479,11 +478,15 @@ body.portal-mode #cloudStatus { display: none !important; }
   gap: 7px;
   transition: .15s;
 }
-.mobile-tx-card:active { background: rgba(249, 115, 22, 0.04); }
+.mobile-tx-card:active {
+  background: rgba(249, 115, 22, 0.04);
+}
 
 body.privacy-active .money-val {
   filter: blur(6px);
   user-select: none;
   transition: filter .2s ease;
 }
-body.privacy-active .money-val:hover { filter: blur(0px); }
+body.privacy-active .money-val:hover {
+  filter: blur(0px);
+}
