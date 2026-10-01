@@ -1,7 +1,8 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER V9.3
-   Full Code: Complete Admin Panel + Role Permissions
+   EHSEBLI / HONDA FINANCIAL MANAGER V9.4
+   Full Features: Complete Admin Panel + Role Permissions
    Zero Undefined Data + Instant Realtime Sync + Days Filters
+   Smooth Adaptive Splash Screen + User Avatar Integration
    ========================================================= */
 
 const SUPER_ADMIN_EMAILS = [
@@ -383,7 +384,6 @@ function renderPublicPortal(clientName, sourceTransactions) {
   portalView?.classList.remove('hidden');
 
   document.getElementById('portalClientName').textContent = clientName;
-  document.getElementById('portalInitial').textContent = clientName.charAt(0).toUpperCase();
 
   const txs = sourceTransactions.filter(t => !t._deleted && t.client && t.client.trim().toLowerCase() === clientName.toLowerCase())
     .sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
@@ -458,7 +458,7 @@ function copyClientPortalLink() {
 function shareClientPortalWhatsApp() {
   if (!activeClientName) return;
   const link = getClientPortalLink(activeClientName);
-  const text = `مرحباً يا ${activeClientName}، تفضل رابط صفحة كشف حسابك المباشر لمتابعة كافة المعاملات المشتركة بيننا أولاً بأول:\n${link}\n\n— Honda Store`;
+  const text = `مرحباً يا ${activeClientName}، تفضل رابط صفحة كشف حسابك المالي المباشر لمتابعة كافة المعاملات المشتركة بيننا أولاً بأول:\n${link}\n\n— Honda Store`;
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
 
@@ -577,7 +577,7 @@ async function loadUserRole(uid) {
       currentUserPermissionsOverride = null;
       await db.collection('users').doc(uid).set({
         role: 'admin',
-        email: currentUser.email,
+        email: currentUser.email || null,
         displayName: currentUser.displayName || '',
         isSuperAdmin: true,
         loginMethod: getLoginMethod(),
@@ -640,7 +640,7 @@ function getLoginMethod() {
 }
 
 /* =========================================================
-   ADMIN PANEL FUNCTIONS (كاملة بالكامل)
+   ADMIN PANEL FUNCTIONS
    ========================================================= */
 function switchAdminTab(tab) {
   adminActiveTab = tab;
@@ -1239,24 +1239,6 @@ async function handleRedirectResult() {
 }
 
 /* =========================================================
-   CATEGORIES & DEMO
-   ========================================================= */
-const CATEGORIES = {
-  expense: ['شغل وأدوات صيانة','تفعيل وسيرفرات وكريدت','أكل ومشروبات','مواصلات وبنزين','فواتير والتزامات','شخصي وعائلة','مشتريات','أخرى'],
-  income: ['خدمات سوفت وير وصيانة','شحن رصيد وتفعيل أدوات','شغل ريموت أونلاين','مبيعات إكسسوار وأجهزة','عمولة / وسيط','أرباح أخرى'],
-  charity: ['صدقة جارية لوجه الله','مساعدة محتاج وتفريج كربة','إطعام طعام','بر والدين وأهل','زكاة مال','أخرى'],
-  debt_receivable: ['حساب محل صيانة','سلف شخصي لصديق','باقي خدمة لعميل','مبيعات آجلة','أخرى'],
-  debt_payable: ['دين لمورد / موزّع سيرفر','سلف مستحق للغير','فاتورة مؤجلة','شراء آجل','أخرى']
-};
-
-const DEMO_ITEMS = [
-  { id:'demo-1', type:'income', amount:1200, category:'خدمات سوفت وير وصيانة', client:'أحمد', paymentMethod:'كاش نقدي', notes:'إصلاح بوت لودر وفلاش 3 أجهزة', reference:'INV-1001', date:todayString(), time:'02:30 PM' },
-  { id:'demo-2', type:'charity', amount:150, category:'مساعدة محتاج وتفريج كربة', client:'', paymentMethod:'كاش نقدي', notes:'صدقة شكر بنية الرزق والبركة', reference:'', date:todayString(), time:'03:15 PM' },
-  { id:'demo-3', type:'expense', amount:380, category:'تفعيل وسيرفرات وكريدت', client:'موزع سيرفر محمد', paymentMethod:'إنستاباي (InstaPay)', notes:'تفعيل باقة دونجل وسيرفر شاومي', reference:'EXP-3001', date:yesterdayString(), time:'05:40 PM' },
-  { id:'demo-4', type:'debt_receivable', amount:650, paidAmount:200, category:'حساب محل صيانة', client:'أحمد', paymentMethod:'آجل / معلق', notes:'باقي حساب فلاش 4 أجهزة', reference:'', status:'pending', date:beforeYesterdayString(), time:'11:20 AM' }
-];
-
-/* =========================================================
    AUTH GUARDS & PIN
    ========================================================= */
 function requireAuth() {
@@ -1279,20 +1261,31 @@ async function hashPin(pin) {
   for (let i = 0; i < salted.length; i++) { h ^= salted.charCodeAt(i); h = Math.imul(h, 16777619); }
   return 'fnv_' + (h >>> 0).toString(16);
 }
+
 function getPin() { return localStorage.getItem(PIN_KEY); }
 
 function showAuthLoading() {
   document.body.classList.add('auth-pending');
   document.body.classList.remove('not-authed');
-  const el = document.getElementById('authLoading');
-  if (el) el.style.display = 'flex';
+  const splash = document.getElementById('splashScreen');
+  if (splash) {
+    splash.style.display = 'flex';
+    splash.style.opacity = '1';
+  }
   document.getElementById('loginWall')?.classList.add('hidden');
 }
 
 function hideAuthLoading() {
   document.body.classList.remove('auth-pending');
-  const el = document.getElementById('authLoading');
-  if (el) el.style.display = 'none';
+  const splash = document.getElementById('splashScreen');
+  if (splash) {
+    splash.style.opacity = '0';
+    setTimeout(() => {
+      splash.style.display = 'none';
+    }, 500);
+  }
+  const oldLoading = document.getElementById('authLoading');
+  if (oldLoading) oldLoading.style.display = 'none';
 }
 
 function showLoginWall() {
@@ -1317,7 +1310,7 @@ function showPinLock() {
   lock?.classList.remove('hidden');
   lock?.classList.add('flex');
   const input = document.getElementById('unlockPinInput');
-  if (input) { input.value = ''; input.focus(); }
+  if (input) { input.value = ''; setTimeout(() => input.focus(), 150); }
   document.getElementById('unlockError')?.classList.add('hidden');
 }
 
@@ -1350,29 +1343,25 @@ auth.onAuthStateChanged(async user => {
   const avatar = document.getElementById('userAvatar');
   const cloudStatus = document.getElementById('cloudStatus');
   const syncEmail = document.getElementById('syncUserEmail');
+  const menuEmail = document.getElementById('menuUserEmail');
   const footerSync = document.getElementById('footerSyncStatus');
-  const userProfile = document.getElementById('userProfile');
 
   if (user) {
     currentUser = user;
     handleUserSwitch(user.uid);
 
     hideLoginWall();
-    userProfile?.classList.remove('hidden');
-    userProfile?.classList.add('flex');
 
     if (avatar) {
       if (user.photoURL) avatar.src = user.photoURL;
-      else {
-        const initial = (user.displayName || user.email || user.phoneNumber || 'U').charAt(0).toUpperCase();
-        avatar.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%23f97316'/><text x='50%' y='55%' text-anchor='middle' dominant-baseline='middle' font-size='20' font-family='Cairo' fill='white' font-weight='bold'>${escapeHTML(initial)}</text></svg>`;
-      }
+      else avatar.src = 'logo.png';
     }
 
     cloudStatus?.classList.remove('hidden');
     cloudStatus?.classList.add('flex');
     const userIdentifier = user.email || user.phoneNumber || 'مستخدم';
     if (syncEmail) syncEmail.textContent = userIdentifier;
+    if (menuEmail) menuEmail.textContent = userIdentifier;
     if (footerSync) footerSync.innerHTML = `<i class="fa-solid fa-cloud-check text-emerald-500"></i> متصل بالسحاب (${escapeHTML(userIdentifier)})`;
 
     await loadUserRole(user.uid);
@@ -1416,6 +1405,7 @@ auth.onAuthStateChanged(async user => {
 
 function logout() {
   if (!currentUser) return;
+  closeMenus();
   openConfirm('تسجيل الخروج؟', 'سيتم إنهاء الجلسة. بياناتك محفوظة في السحابة بأمان.', () => {
     auth.signOut();
   });
@@ -1534,6 +1524,7 @@ function initTheme() {
   const saved = localStorage.getItem(THEME_KEY) || 'dark';
   applyTheme(saved);
 }
+
 function applyTheme(theme) {
   const isDark = theme === 'dark';
   document.documentElement.classList.toggle('dark', isDark);
@@ -1544,6 +1535,7 @@ function applyTheme(theme) {
     else { icon.className = 'fa-solid fa-moon text-slate-700'; text.textContent = 'الوضع الليلي'; }
   }
 }
+
 function toggleTheme() {
   const isDark = document.documentElement.classList.contains('dark');
   const next = isDark ? 'light' : 'dark';
@@ -1684,16 +1676,10 @@ function updateMetrics() {
 
   const net = document.getElementById('statNet');
   net.textContent = money(metrics.available);
-  net.className = 'money-val text-xl sm:text-3xl font-black ' + (metrics.available >= 0 ? 'text-emerald-500' : 'text-rose-500');
-
-  document.getElementById('statNetTag').textContent = metrics.available >= 0
-    ? 'الرصيد المتاح بعد المصاريف والخير' : 'تنبيه: المصروفات تجاوزت الإيرادات';
+  net.className = 'money-val text-lg sm:text-3xl font-black ' + (metrics.available >= 0 ? 'text-emerald-500' : 'text-rose-500');
 
   document.getElementById('statDebtReceivable').textContent = money(metrics.debtRec) + ' ج.م';
   document.getElementById('statDebtPayable').textContent = money(metrics.debtPay) + ' ج.م';
-
-  const ratio = metrics.income > 0 ? ((metrics.charity / metrics.income) * 100).toFixed(1) : '0';
-  document.getElementById('statCharityRatio').textContent = ratio + '%';
 
   const daily = getPeriodTransactions().filter(t => !isDebt(t.type));
   const debts = getActiveTransactions().filter(t => isDebt(t.type) && t.status !== 'paid');
@@ -1781,13 +1767,13 @@ function renderTransactions() {
   list.forEach(item => {
     let badge = '', amount = '', isInc = item.type === 'income', isCharity = item.type === 'charity';
     if (isInc) {
-      badge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"><i class="fa-solid fa-arrow-trend-up"></i> دخل</span>`;
+      badge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-black bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">دخل</span>`;
       amount = `<span class="money-val font-black text-emerald-500">+${money(item.amount)} ج.م</span>`;
     } else if (isCharity) {
-      badge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-orange-500/10 text-orange-500 border border-orange-500/20"><i class="fa-solid fa-heart"></i> خير</span>`;
+      badge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-black bg-orange-500/10 text-orange-500 border border-orange-500/20">خير</span>`;
       amount = `<span class="money-val font-black text-orange-500">-${money(item.amount)} ج.م</span>`;
     } else {
-      badge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-500/10 text-rose-500 border border-rose-500/20"><i class="fa-solid fa-arrow-trend-down"></i> مصروف</span>`;
+      badge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-black bg-rose-500/10 text-rose-500 border border-rose-500/20">مصروف</span>`;
       amount = `<span class="money-val font-black text-rose-500">-${money(item.amount)} ج.م</span>`;
     }
 
@@ -1831,7 +1817,7 @@ function renderTransactions() {
       tbody.appendChild(tr);
     }
 
-    // 2. كروت متجاوبة للموبايل (Mobile Responsive Cards)
+    // 2. كروت متجاوبة للموبايل
     if (mobileList) {
       const card = document.createElement('div');
       card.className = 'mobile-tx-card';
@@ -1924,14 +1910,6 @@ function renderDebts() {
           ${paidAmt > 0 && !paid ? `<div class="text-[9px] text-slate-400">سُدد ${money(paidAmt)} من ${money(totalAmount)}</div>` : ''}
         </div>
       </div>
-
-      ${!paid && paidAmt > 0 ? `
-        <div class="mt-3">
-          <div class="h-1.5 rounded-full bg-slate-200 dark:bg-dark-750 overflow-hidden">
-            <div class="h-full bg-emerald-500 rounded-full" style="width: ${progressPercent}%"></div>
-          </div>
-        </div>
-      ` : ''}
 
       <div class="mt-4 pt-3 border-t border-slate-200/60 dark:border-dark-800 flex flex-wrap items-center justify-between gap-2">
         <span class="text-[10px] font-black ${paid ? 'text-slate-400' : isReceivable ? 'text-emerald-500' : 'text-rose-500'}">
@@ -2103,9 +2081,7 @@ function openClientLedger(clientName) {
             <div class="font-bold">${escapeHTML(t.date)}</div>
             <div class="text-[9px] text-orange-500 font-bold">${escapeHTML(formatTimeTo12Hour(t.time || ''))}</div>
           </td>
-          <td class="py-2.5 px-3">
-            <div class="font-bold">${escapeHTML(t.notes || t.category)}</div>
-          </td>
+          <td class="py-2.5 px-3 font-bold">${escapeHTML(t.notes || t.category)}</td>
           <td class="py-2.5 px-3 text-slate-400 font-semibold">${escapeHTML(t.paymentMethod || 'كاش')}</td>
           <td class="py-2.5 px-3 font-black ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">
             ${t.type === 'income' ? '+' : '-'}${money(t.amount)} ج.م
@@ -2245,7 +2221,7 @@ function updateCharts() {
 }
 
 /* =========================================================
-   TRANSACTION MODAL & SUBMIT
+   TRANSACTION MODAL & FORM SUBMIT
    ========================================================= */
 function openModal(type = 'expense', id = null) {
   if (!requireAuth()) return;
@@ -2374,11 +2350,6 @@ function handleFormSubmit(event) {
     showToast('يرجى اختيار تاريخ صحيح', 'error'); return; 
   }
 
-  if (!wasEditing && !canAddMoreTransactions()) {
-    showToast(`وصلت للحد الأقصى (${getMaxTransactions()} عملية)`, 'error');
-    return;
-  }
-
   if (wasEditing) {
     const index = transactions.findIndex(t => t.id === editingId);
     if (index === -1) return;
@@ -2504,6 +2475,7 @@ function getBudget() { return Number(localStorage.getItem(BUDGET_KEY) || 0); }
 function openBudgetModal() {
   if (!requireAuth()) return;
   if (!hasFeature('budget')) { showToast('الميزانية غير متاحة لدورك', 'error'); return; }
+  closeMenus();
   document.getElementById('budgetInput').value = getBudget() || '';
   const modal = document.getElementById('budgetModal');
   modal?.classList.remove('hidden'); modal?.classList.add('flex');
@@ -2531,36 +2503,6 @@ function clearBudget() {
   showToast('تم حذف الميزانية الشهرية', 'info');
 }
 
-function updateBudget() {
-  const budget = getBudget();
-  const monthItems = getActiveTransactions().filter(t => isInPeriod(t.date, 'month'));
-  let used = 0;
-  monthItems.forEach(t => {
-    if (t.type === 'expense' || t.type === 'charity') used += Number(t.amount || 0);
-  });
-
-  const bUsed = document.getElementById('budgetUsed');
-  if (bUsed) bUsed.textContent = money(used);
-
-  if (!budget) {
-    document.getElementById('budgetTotal').textContent = 'غير محددة';
-    document.getElementById('budgetRemaining').textContent = 'حدد ميزانية شهرية';
-    document.getElementById('budgetPercent').textContent = '0%';
-    document.getElementById('budgetBar').style.width = '0%';
-    return;
-  }
-
-  document.getElementById('budgetTotal').textContent = money(budget) + ' ج.م';
-  const percent = Math.min(100, (used / budget) * 100);
-  const remaining = budget - used;
-  document.getElementById('budgetPercent').textContent = percent.toFixed(1) + '%';
-  document.getElementById('budgetBar').style.width = percent + '%';
-  document.getElementById('budgetRemaining').textContent = remaining >= 0
-    ? `متبقي ${money(remaining)} ج.م` : `متجاوز بـ ${money(Math.abs(remaining))} ج.م`;
-  document.getElementById('budgetRemaining').className =
-    'text-[10px] font-bold ' + (remaining >= 0 ? 'text-emerald-500' : 'text-rose-500');
-}
-
 /* =========================================================
    BACKUP & EXPORT
    ========================================================= */
@@ -2580,7 +2522,7 @@ function downloadBackup() {
   if (!requireAuth()) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '9.3',
+    version: '9.4',
     createdAt: new Date().toISOString(),
     transactions,
     budget: getBudget(),
@@ -2657,69 +2599,31 @@ function printReport() {
   if (!requireAuth()) return;
   if (!hasFeature('reports')) { showToast('التقارير غير متاحة لدورك', 'error'); return; }
   closeMenus();
-  const metrics = calculateMetrics();
-  const periodName = document.getElementById('periodLabel').textContent;
-  const report = document.getElementById('printReport');
-
-  report.innerHTML = `
-    <div style="font-family:Cairo,Tajawal,sans-serif;direction:rtl;">
-      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #f97316;padding-bottom:18px;">
-        <div>
-          <h1 style="font-size:30px;margin:0;font-weight:900;">احسبلي</h1>
-          <div style="font-size:12px;color:#666;">Honda Financial Manager</div>
-        </div>
-        <div style="text-align:left;font-size:12px;color:#555;">
-          <div>تقرير مالي</div>
-          <div>${escapeHTML(periodName)}</div>
-          <div>${todayString()}</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:25px;">
-        ${reportBox('الإيرادات', metrics.income, '#059669')}
-        ${reportBox('المصاريف', metrics.expense, '#e11d48')}
-        ${reportBox('باب الخير', metrics.charity, '#ea580c')}
-        ${reportBox('الرصيد المتاح', metrics.available, metrics.available >= 0 ? '#059669' : '#e11d48')}
-      </div>
-      <div style="margin-top:30px;">
-        <h2 style="font-size:18px;">تفاصيل العمليات</h2>
-        <table style="width:100%;border-collapse:collapse;font-size:11px;">
-          <thead>
-            <tr style="background:#f97316;color:white;">
-              <th style="padding:9px;border:1px solid #ddd;">التاريخ والوقت</th>
-              <th style="padding:9px;border:1px solid #ddd;">العميل</th>
-              <th style="padding:9px;border:1px solid #ddd;">النوع</th>
-              <th style="padding:9px;border:1px solid #ddd;">البيان</th>
-              <th style="padding:9px;border:1px solid #ddd;">التصنيف</th>
-              <th style="padding:9px;border:1px solid #ddd;">المبلغ</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${getPeriodTransactions()
-              .sort((a,b) => new Date(b.date) - new Date(a.date))
-              .map(t => `
-                <tr>
-                  <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.date)}${escapeHTML(t.time || '')}</td>
-                  <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.client || '-')}</td>
-                  <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(typeName(t.type))}</td>
-                  <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.notes || '')}</td>
-                  <td style="padding:8px;border:1px solid #ddd;">${escapeHTML(t.category || '')}</td>
-                  <td style="padding:8px;border:1px solid #ddd;">${money(t.amount)} ج.م</td>
-                </tr>
-              `).join('')}
-          </tbody>
-        </table>
-      </div>
-      <div style="margin-top:35px;text-align:center;color:#777;font-size:10px;">احسبلي — مقدم من هوندا</div>
-    </div>
-  `;
   window.print();
 }
 
-function reportBox(title, value, color) {
-  return `<div style="border:1px solid #ddd;border-radius:14px;padding:15px;">
-    <div style="font-size:11px;color:#777;">${title}</div>
-    <div style="font-size:20px;font-weight:900;color:${color};margin-top:5px;">${money(value)} ج.م</div>
-  </div>`;
+function confirmClearData() {
+  if (!requireAuth()) return;
+  closeMenus();
+  openConfirm('تصفير جميع البيانات؟', 'سيتم حذف كل المعاملات والميزانية نهائياً.', () => {
+    transactions = [];
+    localStorage.removeItem(BUDGET_KEY);
+    saveData({ force: true });
+    refreshAll();
+    showToast('تم تصفير البيانات بالكامل', 'info');
+  });
+}
+
+function loadDemoData() {
+  if (!requireAuth()) return;
+  closeMenus();
+  openConfirm('تحميل البيانات التجريبية؟', 'سيتم استبدال المعاملات الحالية بالبيانات النموذجية.', () => {
+    const now = Date.now();
+    transactions = JSON.parse(JSON.stringify(DEMO_ITEMS)).map((t, i) => normalizeTransaction({ ...t, _updatedAt: now + i }));
+    saveData({ force: true });
+    refreshAll();
+    showToast('تم تحميل البيانات التجريبية', 'success');
+  });
 }
 
 /* =========================================================
@@ -2732,22 +2636,23 @@ function openPinModal() {
   const title = document.getElementById('pinTitle');
   const action = document.getElementById('pinActionBtn');
   document.getElementById('pinInput').value = '';
-  document.getElementById('pinError').classList.add('hidden');
-  title.textContent = !getPin() ? 'إنشاء PIN' : 'تغيير PIN';
-  action.textContent = !getPin() ? 'تفعيل القفل' : 'تغيير الرمز';
+  document.getElementById('pinError')?.classList.add('hidden');
+  if (title) title.textContent = !getPin() ? 'إنشاء PIN' : 'تغيير PIN';
+  if (action) action.textContent = !getPin() ? 'تفعيل القفل' : 'تغيير الرمز';
   modal?.classList.remove('hidden'); modal?.classList.add('flex');
-  setTimeout(() => document.getElementById('pinInput').focus(), 100);
+  setTimeout(() => document.getElementById('pinInput')?.focus(), 100);
 }
+
 function closePinModal() {
   const modal = document.getElementById('pinModal');
   modal?.classList.add('hidden'); modal?.classList.remove('flex');
 }
+
 async function handlePinAction() {
   const pin = document.getElementById('pinInput').value.trim();
   const error = document.getElementById('pinError');
   if (!/^\d{4,6}$/.test(pin)) {
-    error.textContent = 'PIN يجب أن يكون من 4 إلى 6 أرقام';
-    error.classList.remove('hidden');
+    if (error) { error.textContent = 'PIN يجب أن يكون من 4 إلى 6 أرقام'; error.classList.remove('hidden'); }
     return;
   }
   localStorage.setItem(PIN_KEY, await hashPin(pin));
@@ -2756,6 +2661,7 @@ async function handlePinAction() {
   showToast('تم حفظ PIN بنجاح', 'success');
   showPinLock();
 }
+
 function confirmRemovePin() {
   if (!requireAuth()) return;
   closeMenus();
@@ -2765,6 +2671,7 @@ function confirmRemovePin() {
     showToast('تمت إزالة رمز القفل', 'success');
   });
 }
+
 async function unlockApp() {
   const input = document.getElementById('unlockPinInput');
   const entered = input.value.trim();
@@ -2773,11 +2680,12 @@ async function unlockApp() {
   const ok = (await hashPin(entered)) === stored;
   if (ok) { hidePinLock(); input.value = ''; }
   else {
-    document.getElementById('unlockError').classList.remove('hidden');
+    document.getElementById('unlockError')?.classList.remove('hidden');
     input.value = '';
     input.focus();
   }
 }
+
 async function forgotPinUnlock() {
   if (!currentUser) return;
   const user = currentUser;
@@ -2875,30 +2783,6 @@ window.addEventListener('click', event => {
   }
 });
 
-function confirmClearData() {
-  if (!requireAuth()) return;
-  closeMenus();
-  openConfirm('تصفير جميع البيانات؟', 'سيتم حذف كل المعاملات والميزانية نهائياً.', () => {
-    transactions = [];
-    localStorage.removeItem(BUDGET_KEY);
-    saveData({ force: true });
-    refreshAll();
-    showToast('تم تصفير البيانات بالكامل', 'info');
-  });
-}
-
-function loadDemoData() {
-  if (!requireAuth()) return;
-  closeMenus();
-  openConfirm('تحميل البيانات التجريبية؟', 'سيتم استبدال المعاملات الحالية بالبيانات النموذجية.', () => {
-    const now = Date.now();
-    transactions = JSON.parse(JSON.stringify(DEMO_ITEMS)).map((t, i) => normalizeTransaction({ ...t, _updatedAt: now + i }));
-    saveData({ force: true });
-    refreshAll();
-    showToast('تم تحميل البيانات التجريبية', 'success');
-  });
-}
-
 function refreshAll() {
   if (isPortalModeActive) return;
   updateMetrics();
@@ -2944,6 +2828,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const cached = localStorage.getItem(PERMS_CACHE_KEY);
     if (cached) rolePermissions = JSON.parse(cached);
   } catch(e) {}
+  
   applyRoleUI();
   updatePinUI();
 
@@ -2955,5 +2840,5 @@ window.addEventListener('DOMContentLoaded', async () => {
       hideAuthLoading();
       showLoginWall();
     }
-  }, 8000);
+  }, 4000);
 });

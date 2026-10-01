@@ -1,6 +1,6 @@
 /* =========================================================
-   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V9.3
-   Full Admin Styles + Mobile App PWA + Responsive Cards
+   EHSEBLI / HONDA FINANCIAL MANAGER — Styles V9.4
+   Mobile App Native Look + Adaptive Splash Screen
    ========================================================= */
 
 * { 
@@ -59,6 +59,16 @@ body {
   50% { transform: translateY(-8px); }
 }
 .animate-float { animation: floatY 3s ease-in-out infinite; }
+
+/* شريط لودنج شاشة البداية */
+.splash-loader-bar {
+  animation: loaderProgress 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes loaderProgress {
+  0% { width: 0%; transform: translateX(100%); }
+  50% { width: 70%; transform: translateX(0%); }
+  100% { width: 100%; transform: translateX(-100%); }
+}
 
 .print-only { display: none; }
 @media print {
@@ -218,7 +228,7 @@ body.portal-mode #cloudStatus { display: none !important; }
   font-size: 10px;
   font-weight: 800;
   white-space: nowrap;
-  transition: .15s;
+  transition: .2s;
   cursor: pointer;
   border: none;
 }
@@ -230,7 +240,7 @@ body.portal-mode #cloudStatus { display: none !important; }
 .period-btn.active { background: #f97316; color: white; }
 
 /* =========================================================
-   ADMIN PANEL STYLES (كاملة للوحة المدير)
+   ADMIN PANEL STYLES
    ========================================================= */
 .admin-tab {
   padding: 14px 18px;
