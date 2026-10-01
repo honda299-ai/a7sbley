@@ -7,6 +7,10 @@
   <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
   <title>احسبلي | Honda Financial Manager</title>
 
+  <!-- Favicon & Touch Icon -->
+  <link rel="icon" type="image/jpeg" href="https://l.top4top.io/p_3926i5al91.jpg">
+  <link rel="apple-touch-icon" href="https://l.top4top.io/p_3926i5al91.jpg">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -45,8 +49,12 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between min-h-20 py-3 gap-3">
         <div class="flex items-center gap-3 shrink-0">
-          <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 flex items-center justify-center text-white shadow-lg glow-orange-sm">
-            <i class="fa-solid fa-coins text-xl sm:text-2xl"></i>
+          <!-- الشعار الأنيق في الهيدر -->
+          <div class="relative group cursor-pointer">
+            <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl p-[2px] bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 shadow-lg glow-orange-sm transition-transform duration-300 group-hover:scale-105">
+              <img src="https://l.top4top.io/p_3926i5al91.jpg" alt="Logo" class="w-full h-full object-cover rounded-[14px]">
+            </div>
+            <div class="absolute -inset-1 bg-orange-500/20 rounded-2xl blur-sm -z-10 group-hover:bg-orange-500/30 transition"></div>
           </div>
           <div>
             <div class="flex items-center gap-2 flex-wrap">
@@ -519,7 +527,8 @@
 
   <footer id="appFooter" class="bg-white dark:bg-dark-900 border-t border-slate-200 dark:border-dark-800 py-6 mt-auto no-print">
     <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-      <div class="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+      <div class="flex items-center gap-2.5 text-xs font-bold text-slate-500 dark:text-slate-400">
+        <img src="https://l.top4top.io/p_3926i5al91.jpg" alt="Logo" class="w-5 h-5 rounded-lg object-cover">
         <span>احسبلي © 2026</span>
         <span>•</span>
         <span class="text-orange-500 font-black">Presented by Honda</span>
@@ -531,14 +540,17 @@
     </div>
   </footer>
 
-  <!-- AUTH LOADING -->
+  <!-- ================= AUTH LOADING (SPLASH / LOADING SCREEN) ================= -->
   <div id="authLoading" class="fixed inset-0 z-[400] bg-dark-950 items-center justify-center flex">
     <div class="text-center text-white">
-      <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 flex items-center justify-center mx-auto shadow-2xl glow-orange animate-float">
-        <i class="fa-solid fa-coins text-3xl"></i>
+      <div class="relative w-24 h-24 mx-auto animate-float">
+        <div class="w-24 h-24 rounded-3xl p-[3px] bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 shadow-2xl glow-orange flex items-center justify-center overflow-hidden">
+          <img src="https://l.top4top.io/p_3926i5al91.jpg" alt="Ehsebli Logo" class="w-full h-full object-cover rounded-[21px]">
+        </div>
+        <div class="absolute -inset-2 bg-orange-500/25 rounded-3xl blur-xl -z-10 animate-pulse"></div>
       </div>
-      <div class="mt-6 text-base font-black">احسبلي</div>
-      <div class="mt-1 text-[11px] font-bold text-slate-400">جاري التحقق من الحساب...</div>
+      <div class="mt-6 text-xl font-black tracking-wide">احسبلي</div>
+      <div class="mt-1 text-[11px] font-black text-orange-400 tracking-[.25em]">HONDA FINANCIAL MANAGER</div>
       <div class="mt-4 flex items-center justify-center gap-1.5">
         <span class="w-2 h-2 rounded-full bg-orange-500 animate-bounce" style="animation-delay:0ms"></span>
         <span class="w-2 h-2 rounded-full bg-orange-500 animate-bounce" style="animation-delay:150ms"></span>
@@ -547,7 +559,7 @@
     </div>
   </div>
 
-  <!-- LOGIN WALL -->
+  <!-- ================= LOGIN WALL ================= -->
   <div id="loginWall" class="hidden fixed inset-0 z-[300] bg-gradient-to-br from-slate-950 via-dark-950 to-black text-white items-center justify-center p-4 overflow-y-auto">
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
       <div class="absolute -top-40 -right-40 w-96 h-96 bg-orange-500/20 rounded-full blur-3xl"></div>
@@ -557,8 +569,12 @@
 
     <div class="relative w-full max-w-md py-8">
       <div class="text-center">
-        <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 flex items-center justify-center mx-auto shadow-2xl glow-orange animate-float">
-          <i class="fa-solid fa-coins text-3xl"></i>
+        <!-- شعار شاشة الدخول -->
+        <div class="relative w-24 h-24 mx-auto animate-float">
+          <div class="w-24 h-24 rounded-3xl p-[3px] bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-400 shadow-2xl glow-orange flex items-center justify-center overflow-hidden">
+            <img src="https://l.top4top.io/p_3926i5al91.jpg" alt="Logo" class="w-full h-full object-cover rounded-[21px]">
+          </div>
+          <div class="absolute -inset-2 bg-orange-500/20 rounded-3xl blur-lg -z-10"></div>
         </div>
         <h1 class="text-3xl font-black mt-6">احسبلي</h1>
         <div class="text-[11px] font-black text-orange-400 tracking-[.3em] mt-1">HONDA FINANCIAL MANAGER</div>
@@ -715,7 +731,7 @@
     </div>
   </div>
 
-  <!-- نافذة إضافة وتعديل العملية (مع حقل العميل والوقت والصورة) -->
+  <!-- نافذة إضافة وتعديل العملية -->
   <div id="transactionModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
     <div class="fixed inset-0 bg-black/75 backdrop-blur-sm" onclick="closeModal()"></div>
     <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200 dark:border-dark-750 z-10 modal-enter max-h-[92vh] overflow-y-auto">
@@ -789,7 +805,6 @@
           </div>
         </div>
 
-        <!-- حقل اسم العميل (مع اقتراحات الأسماء السابقة) -->
         <div>
           <label class="field-label flex items-center justify-between">
             <span>اسم العميل / الطرف الآخر (اختياري)</span>
@@ -831,7 +846,6 @@
           <input type="text" id="formNotes" maxlength="200" placeholder="مثال: صيانة جهاز، سوفت وير، غداء..." class="form-input">
         </div>
 
-        <!-- حقل تصوير أو رفع صورة الفاتورة / الإيصال -->
         <div>
           <label class="field-label flex items-center justify-between">
             <span>صورة الفاتورة / الإيصال (اختياري)</span>
@@ -1196,17 +1210,23 @@
     </div>
   </div>
 
-  <!-- Lock Screen -->
+  <!-- ================= LOCK SCREEN ================= -->
   <div id="lockScreen" class="hidden fixed inset-0 z-[200] bg-dark-950 text-white items-center justify-center p-5">
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
       <div class="absolute top-0 right-0 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl"></div>
       <div class="absolute bottom-0 left-0 w-80 h-80 bg-orange-600/10 rounded-full blur-3xl"></div>
     </div>
     <div class="relative w-full max-w-sm text-center">
-      <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-orange-600 to-amber-400 flex items-center justify-center mx-auto shadow-2xl glow-orange">
-        <i class="fa-solid fa-lock text-3xl"></i>
+      <!-- شعار شاشة القفل -->
+      <div class="relative w-20 h-20 mx-auto">
+        <div class="w-20 h-20 rounded-3xl p-[2px] bg-gradient-to-tr from-orange-600 to-amber-400 flex items-center justify-center shadow-2xl glow-orange overflow-hidden">
+          <img src="https://l.top4top.io/p_3926i5al91.jpg" alt="Logo" class="w-full h-full object-cover rounded-[22px]">
+        </div>
+        <div class="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-dark-900 border border-orange-500/40 text-orange-500 flex items-center justify-center text-xs shadow-md">
+          <i class="fa-solid fa-lock"></i>
+        </div>
       </div>
-      <h2 class="text-2xl font-black mt-6">احسبلي</h2>
+      <h2 class="text-2xl font-black mt-5">احسبلي</h2>
       <p class="text-xs text-slate-400 mt-1">التطبيق مقفول للحفاظ على سرية بياناتك</p>
       <input id="unlockPinInput" type="password" inputmode="numeric" maxlength="6"
         class="w-full mt-7 text-center tracking-[.5em] text-2xl font-black py-4 rounded-2xl bg-dark-900 border border-dark-750 focus:outline-none focus:ring-2 focus:ring-orange-500"
