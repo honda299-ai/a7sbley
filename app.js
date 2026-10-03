@@ -2659,6 +2659,8 @@ document.addEventListener('keydown', event => {
    INITIAL BOOT
    ========================================================= */
 window.addEventListener('DOMContentLoaded', async () => {
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  window.scrollTo(0, 0);
   initTheme();
   registerServiceWorker();
   initInstallPrompt();

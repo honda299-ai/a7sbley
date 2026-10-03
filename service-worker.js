@@ -1,10 +1,10 @@
 /* =========================================================
-   EHSEBLI / HONDA — Service Worker V9.3
-   Offline Cache + Push Notifications (No Shortcuts)
+   EHSEBLI / HONDA — Service Worker V9.5
+   Network-First Strategy for Instant GitHub Pages Updates
    ========================================================= */
 
-const CACHE_VERSION = 'ehsebli-v9.3';
-const RUNTIME_CACHE = 'ehsebli-runtime';
+const CACHE_VERSION = 'ehsebli-v9.5';
+const RUNTIME_CACHE = 'ehsebli-runtime-v9.5';
 
 const PRECACHE_ASSETS = [
   './', './index.html', './styles.css', './app.js',
@@ -13,26 +13,22 @@ const PRECACHE_ASSETS = [
 
 /* ---------- Install ---------- */
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_VERSION)
-      .then((cache) => cache.addAll(PRECACHE_ASSETS).catch(() => {}))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_VERSION).then((cache) => cache.addAll(PRECACHE_ASSETS).catch(() => {}))
   );
 });
 
-/* ---------- Activate ---------- */
+/* ---------- Activate: Delete all old caches immediately ---------- */
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((k) => k !== CACHE_VERSION && k !== RUNTIME_CACHE)
-            .map((k) => caches.delete(k))
-      )
+      Promise.all(keys.filter((k) => k !== CACHE_VERSION && k !== RUNTIME_CACHE).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
 
-/* ---------- Fetch ---------- */
+/* ---------- Fetch: Network-First so updates on GitHub Pages take effect instantly ---------- */
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -45,31 +41,17 @@ self.addEventListener('fetch', (event) => {
   ];
   if (skipHosts.some((h) => url.hostname.includes(h))) return;
 
-  if (request.headers.get('accept')?.includes('text/html')) {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE_VERSION).then((c) => c.put(request, copy));
-          return res;
-        })
-        .catch(() => caches.match(request).then((r) => r || caches.match('./index.html')))
-    );
-    return;
-  }
-
+  // Network First, fallback to cache
   event.respondWith(
-    caches.match(request).then(
-      (cached) =>
-        cached ||
-        fetch(request).then((res) => {
-          if (res.status === 200 && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(RUNTIME_CACHE).then((c) => c.put(request, copy));
-          }
-          return res;
-        })
-    )
+    fetch(request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(request, responseToCache));
+        }
+        return networkResponse;
+      })
+      .catch(() => caches.match(request).then((cached) => cached || caches.match('./index.html')))
   );
 });
 
@@ -131,14 +113,4 @@ self.addEventListener('notificationclick', (event) => {
 /* ---------- Message Handler ---------- */
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
-  if (event.data?.type === 'SHOW_LOCAL_NOTIFICATION') {
-    const { title, body, url } = event.data;
-    self.registration.showNotification(title || 'احسبلي', {
-      body: body || '',
-      icon: './icon.svg',
-      badge: './icon.svg',
-      vibrate: [200, 100, 200],
-      data: { url: url || './' }
-    });
-  }
 });
