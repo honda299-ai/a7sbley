@@ -20,6 +20,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 
 /* ---------- Constants ---------- */
 const STORAGE_KEY = 'ehsebli_honda_data_v2';
@@ -165,6 +166,7 @@ function normalizeTransaction(t) {
     reference: sanitizeString(t.reference || '', 50),
     notes: sanitizeString(t.notes || '', 200),
     receipt: t.receipt || null,
+    dueDate: t.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(t.dueDate) ? t.dueDate : null,
     status: (t.status === 'paid' || t.status === 'pending') ? t.status : null,
     _deleted: t._deleted === true,
     _updatedAt: Number(t._updatedAt) || Date.now()
@@ -433,25 +435,43 @@ function dismissInstallBanner() {
 /* =========================================================
    RECEIPT IMAGE
    ========================================================= */
-function handleReceiptSelected(event) {
+async function handleReceiptSelected(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   if (!file.type.startsWith('image/')) { showToast('يرجى اختيار ملف صورة صالح', 'error'); return; }
 
+  showToast('جاري معالجة الصورة...', 'info');
   const reader = new FileReader();
   reader.onload = (e) => {
     const img = new Image();
-    img.onload = () => {
+    img.onload = async () => {
       const canvas = document.createElement('canvas');
-      const MAX_W = 500, MAX_H = 500;
+      const MAX_W = 600, MAX_H = 600;
       let width = img.width, height = img.height;
       if (width > height) { if (width > MAX_W) { height *= MAX_W / width; width = MAX_W; } }
       else { if (height > MAX_H) { width *= MAX_H / height; height = MAX_H; } }
       canvas.width = width; canvas.height = height;
       canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      currentReceiptData = canvas.toDataURL('image/jpeg', 0.4);
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+      
+      // Upload to Firebase Storage if online
+      if (currentUser && navigator.onLine) {
+        try {
+          showToast('جاري رفع الفاتورة إلى السحابة ☁️...', 'info');
+          const fileRef = storage.ref(`receipts/${currentUser.uid}/${Date.now()}_receipt.jpg`);
+          await fileRef.putString(compressedDataUrl, 'data_url');
+          currentReceiptData = await fileRef.getDownloadURL();
+          setReceiptUI(currentReceiptData);
+          showToast('تم رفع الفاتورة إلى السحابة ✓', 'success');
+          return;
+        } catch(storageErr) {
+          console.warn("Storage upload failed, fallback to local:", storageErr);
+        }
+      }
+      
+      currentReceiptData = compressedDataUrl;
       setReceiptUI(currentReceiptData);
-      showToast('تم إرفاق الصورة بنجاح ✓', 'success');
+      showToast('تم إرفاق الصورة محلياً ✓', 'success');
     };
     img.src = e.target.result;
   };
@@ -682,6 +702,7 @@ async function loadRolePermissions() {
     } catch(e) {}
   }
   applyRoleUI();
+  updateQuickInsights();
 }
 async function saveRolePermissionsToCloud() {
   if (!currentUser || userRole !== 'admin') { showToast('غير مصرح', 'error'); return false; }
@@ -1806,6 +1827,7 @@ function renderDebts() {
             <p class="text-[10px] text-slate-400 font-semibold mt-0.5">
               ${d.client ? `<span class="text-orange-500 font-black cursor-pointer" onclick="openClientLedger('${escapeHTML(d.client)}')"><i class="fa-solid fa-user"></i> ${escapeHTML(d.client)} • </span>` : ''}
               ${escapeHTML(d.category)} • ${escapeHTML(d.date)} ${d.time ? '• ' + escapeHTML(formatTimeTo12Hour(d.time)) : ''}
+              ${getDueDateBadge(d)}
             </p>
           </div>
         </div>
@@ -2089,6 +2111,8 @@ function openModal(type = 'expense', id = null) {
   currentReceiptData = null;
   setReceiptUI(null);
   document.getElementById('formDate').value = todayString();
+  const dueDateInput = document.getElementById('formDueDate');
+  if (dueDateInput) dueDateInput.value = '';
   document.getElementById('formTime').value = currentInputTimeString();
   updateClientsDatalist();
   if (id) {
@@ -2105,6 +2129,8 @@ function openModal(type = 'expense', id = null) {
     document.getElementById('formPaymentMethod').value = item.paymentMethod || 'كاش نقدي';
     document.getElementById('formReference').value = item.reference || '';
     document.getElementById('formNotes').value = item.notes || '';
+    const dueDateInput = document.getElementById('formDueDate');
+    if (dueDateInput) dueDateInput.value = item.dueDate || '';
     if (item.receipt) { currentReceiptData = item.receipt; setReceiptUI(item.receipt); }
     document.getElementById('submitText').textContent = 'حفظ التعديل';
   } else {
@@ -2140,6 +2166,8 @@ function onTypeChange() {
     select.appendChild(option);
   });
   baraka.classList.toggle('hidden', type !== 'charity');
+  const dueDateWrapper = document.getElementById('debtDueDateWrapper');
+  if (dueDateWrapper) dueDateWrapper.classList.toggle('hidden', !isDebt(type));
   if (type === 'charity') { title.textContent = editingId ? 'تعديل باب الخير' : 'تسجيل صدقة أو عمل خير'; notes.textContent = 'النية / الملاحظات'; icon.innerHTML = '<i class="fa-solid fa-heart text-orange-500"></i>'; }
   else if (type === 'income') { title.textContent = editingId ? 'تعديل الدخل' : 'تسجيل دخل / إيراد جديد'; notes.textContent = 'بيان الخدمة بالتفصيل'; icon.innerHTML = '<i class="fa-solid fa-arrow-trend-up text-emerald-500"></i>'; }
   else if (type === 'debt_receivable') { title.textContent = editingId ? 'تعديل دين مستحق لي' : 'تسجيل دين مستحق لي'; notes.textContent = 'بيان الدين والخدمة *'; icon.innerHTML = '<i class="fa-solid fa-user-plus text-cyan-500"></i>'; }
@@ -2161,6 +2189,7 @@ function handleFormSubmit(event) {
   const paymentMethod = document.getElementById('formPaymentMethod').value;
   const reference = sanitizeString(document.getElementById('formReference').value, 50);
   const notes = sanitizeString(document.getElementById('formNotes').value, 200);
+  const dueDate = isDebt(type) ? (document.getElementById('formDueDate')?.value || null) : null;
 
   if (!amount || amount <= 0 || amount > 1e9) { showToast('يرجى إدخال مبلغ صحيح', 'error'); return; }
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { showToast('يرجى اختيار تاريخ صحيح', 'error'); return; }
@@ -2175,6 +2204,7 @@ function handleFormSubmit(event) {
       ...old, type, amount, date, time, client, category,
       paymentMethod: isDebt(type) ? 'آجل / معلق' : paymentMethod, reference,
       notes: notes || (type === 'charity' ? 'صدقة لوجه الله' : category),
+      dueDate,
       receipt: currentReceiptData,
       status: isDebt(type) ? (old.status || 'pending') : null,
       _updatedAt: Date.now()
@@ -2186,6 +2216,7 @@ function handleFormSubmit(event) {
       type, amount, date, time, client, category, paidAmount: 0,
       paymentMethod: isDebt(type) ? 'آجل / معلق' : paymentMethod, reference,
       notes: notes || (type === 'charity' ? 'صدقة لوجه الله' : category),
+      dueDate,
       receipt: currentReceiptData,
       status: isDebt(type) ? 'pending' : null,
       _updatedAt: Date.now()
@@ -2643,6 +2674,7 @@ function refreshAll() {
   updateClientsDatalist();
   applyPrivacyModeUI();
   applyRoleUI();
+  updateQuickInsights();
 }
 
 document.addEventListener('keydown', event => {
@@ -2684,6 +2716,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   refreshAll();
   switchTab('transactions');
   document.getElementById('formDate').value = todayString();
+  const dueDateInput = document.getElementById('formDueDate');
+  if (dueDateInput) dueDateInput.value = '';
   document.getElementById('formTime').value = currentInputTimeString();
 
   try {
@@ -2725,3 +2759,270 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }, 3000);
 });
+
+
+/* =========================================================
+   DUE DATE HELPER (تاريخ استحقاق الديون)
+   ========================================================= */
+function getDueDateBadge(debt) {
+  if (!debt.dueDate || debt.status === 'paid') return '';
+  const today = todayString();
+  const diffDays = Math.round((new Date(debt.dueDate) - new Date(today)) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) {
+    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-500/15 text-rose-500 border border-rose-500/30 mr-1"><i class="fa-solid fa-triangle-exclamation"></i> متأخر ${Math.abs(diffDays)} يوم</span>`;
+  } else if (diffDays === 0) {
+    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500/20 text-amber-500 border border-amber-500/30 mr-1"><i class="fa-solid fa-bell"></i> مستحق اليوم!</span>`;
+  } else if (diffDays <= 3) {
+    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-orange-500/15 text-orange-400 border border-orange-500/30 mr-1"><i class="fa-regular fa-clock"></i> يستحق خلال ${diffDays} أيام</span>`;
+  }
+  return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-400 mr-1"><i class="fa-regular fa-calendar"></i> استحقاق: ${debt.dueDate}</span>`;
+}
+
+
+/* =========================================================
+   EXCEL XLSX EXPORT (SheetJS)
+   ========================================================= */
+function exportToExcel() {
+  if (!requireAuth()) return;
+  if (!hasFeature('export')) { showToast('التصدير غير متاح لدورك', 'error'); return; }
+  closeMenus();
+  
+  if (typeof XLSX === 'undefined') {
+    showToast('جاري استخدام تصدير CSV العادي...', 'info');
+    exportToCSV();
+    return;
+  }
+  
+  const activeTxs = getActiveTransactions();
+  if (!activeTxs.length) { showToast('لا توجد بيانات لتصديرها', 'error'); return; }
+
+  // 1. Transactions Sheet
+  const txRows = activeTxs.map(t => ({
+    "المعرف": t.id,
+    "النوع": typeName(t.type),
+    "المبلغ (ج.م)": Number(t.amount) || 0,
+    "المدفوع": Number(t.paidAmount) || 0,
+    "العميل": t.client || '-',
+    "التصنيف": t.category || '-',
+    "طريقة الدفع": t.paymentMethod || 'كاش نقدي',
+    "التاريخ": t.date,
+    "الوقت": t.time || '',
+    "تاريخ الاستحقاق": t.dueDate || '-',
+    "البيان / الملاحظات": t.notes || '',
+    "الحالة": t.status === 'paid' ? 'مسدد' : (t.status === 'pending' ? 'معلق' : 'منجز')
+  }));
+
+  // 2. Debts Sheet
+  const debts = activeTxs.filter(t => isDebt(t.type)).map(d => ({
+    "الطرف": d.client || 'غير محدد',
+    "النوع": d.type === 'debt_receivable' ? 'مستحق لي (أطلب)' : 'مستحق عليّ (مطلوب مني)',
+    "إجمالي الدين": Number(d.amount) || 0,
+    "سدد منه": Number(d.paidAmount) || 0,
+    "المتبقي": Math.max(0, (Number(d.amount) || 0) - (Number(d.paidAmount) || 0)),
+    "تاريخ التسجيل": d.date,
+    "تاريخ الاستحقاق": d.dueDate || '-',
+    "البيان": d.notes || '',
+    "الحالة": d.status === 'paid' ? 'مسدد بالكامل' : 'معلق'
+  }));
+
+  // 3. Wallets Summary Sheet
+  const metrics = calculateMetrics();
+  const walletRows = Object.keys(metrics.wallets).map(w => ({
+    "الخزينة / طريقة الدفع": w,
+    "الرصيد المتاح (ج.م)": metrics.wallets[w]
+  }));
+
+  const wb = XLSX.utils.book_new();
+  const wsTx = XLSX.utils.json_to_sheet(txRows);
+  const wsDebts = XLSX.utils.json_to_sheet(debts.length ? debts : [{ "تنبيه": "لا توجد ديون مسجلة" }]);
+  const wsWallets = XLSX.utils.json_to_sheet(walletRows);
+
+  XLSX.utils.book_append_sheet(wb, wsTx, "المعاملات المالية");
+  XLSX.utils.book_append_sheet(wb, wsDebts, "دفتر الديون");
+  XLSX.utils.book_append_sheet(wb, wsWallets, "أرصدة الخزائن");
+
+  XLSX.writeFile(wb, `احسبلي_a7sbley_${todayString()}.xlsx`);
+  showToast('تم تصدير ملف Excel الشامل بنجاح 🎉', 'success');
+}
+
+/* =========================================================
+   QUICK INSIGHTS (الذكاء المالي ومقارنة الفترات)
+   ========================================================= */
+function updateQuickInsights() {
+  const insightText = document.getElementById('insightText');
+  const insightBadge = document.getElementById('insightBadge');
+  if (!insightText || !insightBadge) return;
+
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  let curExpenses = 0;
+  let prevExpenses = 0;
+  const categoryCount = {};
+
+  getActiveTransactions().forEach(t => {
+    if (t.type === 'expense' || t.type === 'charity') {
+      const d = new Date(t.date + 'T12:00:00');
+      const amt = Number(t.amount) || 0;
+      if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+        curExpenses += amt;
+        const cat = t.category || 'أخرى';
+        categoryCount[cat] = (categoryCount[cat] || 0) + amt;
+      } else if (
+        (currentMonth === 0 && d.getFullYear() === currentYear - 1 && d.getMonth() === 11) ||
+        (d.getFullYear() === currentYear && d.getMonth() === currentMonth - 1)
+      ) {
+        prevExpenses += amt;
+      }
+    }
+  });
+
+  // Find top expense category
+  let topCat = null;
+  let topCatAmt = 0;
+  Object.keys(categoryCount).forEach(c => {
+    if (categoryCount[c] > topCatAmt) {
+      topCatAmt = categoryCount[c];
+      topCat = c;
+    }
+  });
+
+  if (curExpenses === 0 && prevExpenses === 0) {
+    insightText.textContent = 'سجل مصاريفك هذا الشهر للبدء في تتبع تحليلاتك المالية ومعدل الصرف.';
+    insightBadge.className = 'w-full sm:w-auto text-center shrink-0 px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-black';
+    insightBadge.innerHTML = '<i class="fa-solid fa-chart-simple"></i> بداية الشهر';
+    return;
+  }
+
+  if (prevExpenses > 0) {
+    const diff = curExpenses - prevExpenses;
+    const pct = Math.abs(Math.round((diff / prevExpenses) * 100));
+    if (diff > 0) {
+      insightText.innerHTML = `مصروفاتك هذا الشهر أعلى بـ <strong class="text-rose-400">${pct}%</strong> عن الشهر الماضي ${topCat ? `• الأكثر استهلاكاً: <strong class="text-orange-400">${escapeHTML(topCat)}</strong>` : ''}`;
+      insightBadge.className = 'w-full sm:w-auto text-center shrink-0 px-3 py-1.5 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-black';
+      insightBadge.innerHTML = `<i class="fa-solid fa-arrow-trend-up"></i> زيادة ${pct}%`;
+    } else {
+      insightText.innerHTML = `ممتاز! وفرت <strong class="text-emerald-400">${pct}%</strong> مقارنة بالشهر السابق ${topCat ? `• الأعلى: <strong class="text-orange-400">${escapeHTML(topCat)}</strong>` : ''}`;
+      insightBadge.className = 'w-full sm:w-auto text-center shrink-0 px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-black';
+      insightBadge.innerHTML = `<i class="fa-solid fa-arrow-trend-down"></i> وفر ${pct}%`;
+    }
+  } else {
+    insightText.innerHTML = `إجمالي مصروفات الشهر حتى الآن: <strong class="text-orange-400">${money(curExpenses)} ج.م</strong> ${topCat ? `(الأعلى: ${escapeHTML(topCat)})` : ''}`;
+    insightBadge.className = 'w-full sm:w-auto text-center shrink-0 px-3 py-1.5 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/30 text-xs font-black';
+    insightBadge.innerHTML = `<i class="fa-solid fa-calculator"></i> ${money(curExpenses)} ج.م`;
+  }
+}
+
+/* =========================================================
+   CLIENT LEDGER PDF EXPORT (html2pdf.js)
+   ========================================================= */
+function exportClientLedgerPDF() {
+  if (!activeClientName) return;
+  const clientName = activeClientName;
+  const txs = getActiveTransactions().filter(t => t.client && t.client.trim().toLowerCase() === clientName.toLowerCase())
+    .sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
+
+  let totalIncome = 0, totalDebtRec = 0, totalDebtPay = 0;
+  txs.forEach(t => {
+    const amt = Number(t.amount) || 0;
+    const paid = Number(t.paidAmount) || 0;
+    if (t.type === 'income') totalIncome += amt;
+    else if (t.type === 'debt_receivable' && t.status !== 'paid') totalDebtRec += Math.max(0, amt - paid);
+    else if (t.type === 'debt_payable' && t.status !== 'paid') totalDebtPay += Math.max(0, amt - paid);
+  });
+
+  const pdfContainer = document.createElement('div');
+  pdfContainer.style.padding = '30px';
+  pdfContainer.style.fontFamily = 'Cairo, Arial, sans-serif';
+  pdfContainer.style.direction = 'rtl';
+  pdfContainer.style.color = '#0f172a';
+  pdfContainer.style.backgroundColor = '#ffffff';
+
+  pdfContainer.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #f97316; padding-bottom:15px; margin-bottom:20px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <img src="logo.png" style="width:60px; height:60px; border-radius:14px; object-fit:contain;" alt="احسبلي">
+        <div>
+          <h1 style="margin:0; font-size:24px; font-weight:900; color:#0f172a;">احسبلي | a7sbley</h1>
+          <div style="font-size:11px; color:#f97316; font-weight:bold;">كشف حساب عميل معتمد</div>
+        </div>
+      </div>
+      <div style="text-align:left; font-size:11px; color:#64748b;">
+        <div>تاريخ الإصدار: <strong>${todayString()}</strong></div>
+        <div>الوقت: <strong>${formatTimeTo12Hour(currentInputTimeString())}</strong></div>
+      </div>
+    </div>
+
+    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:16px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-size:11px; color:#64748b;">العميل المحترم:</div>
+        <div style="font-size:20px; font-weight:900; color:#0f172a;">${escapeHTML(clientName)}</div>
+      </div>
+      <div style="display:flex; gap:15px;">
+        <div style="text-align:center;">
+          <div style="font-size:10px; color:#64748b;">إجمالي الخدمات</div>
+          <div style="font-size:14px; font-weight:900; color:#10b981;">${money(totalIncome)} ج.م</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:10px; color:#64748b;">متبقي عليه (لك)</div>
+          <div style="font-size:14px; font-weight:900; color:#06b6d4;">${money(totalDebtRec)} ج.م</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:10px; color:#64748b;">مستحق له (عليك)</div>
+          <div style="font-size:14px; font-weight:900; color:#8b5cf6;">${money(totalDebtPay)} ج.م</div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="font-size:14px; font-weight:900; margin-bottom:10px; color:#334155;">جدول المعاملات التفصيلي:</h3>
+    <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:right;">
+      <thead>
+        <tr style="background:#f97316; color:white;">
+          <th style="padding:8px 10px; border:1px solid #ea580c;">التاريخ</th>
+          <th style="padding:8px 10px; border:1px solid #ea580c;">النوع</th>
+          <th style="padding:8px 10px; border:1px solid #ea580c;">البيان والتفاصيل</th>
+          <th style="padding:8px 10px; border:1px solid #ea580c;">طريقة الدفع</th>
+          <th style="padding:8px 10px; border:1px solid #ea580c;">المبلغ</th>
+          <th style="padding:8px 10px; border:1px solid #ea580c;">الحالة</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${txs.map(t => `
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="padding:8px 10px; border:1px solid #e2e8f0; font-weight:bold;">${escapeHTML(t.date)}</td>
+            <td style="padding:8px 10px; border:1px solid #e2e8f0;">${escapeHTML(typeName(t.type))}</td>
+            <td style="padding:8px 10px; border:1px solid #e2e8f0;">${escapeHTML(t.notes || t.category)}</td>
+            <td style="padding:8px 10px; border:1px solid #e2e8f0;">${escapeHTML(t.paymentMethod || 'كاش')}</td>
+            <td style="padding:8px 10px; border:1px solid #e2e8f0; font-weight:900; color:${t.type==='income'?'#10b981':'#f43f5e'};">
+              ${money(t.amount)} ج.م
+            </td>
+            <td style="padding:8px 10px; border:1px solid #e2e8f0;">${t.status === 'paid' ? 'مسدد' : (isDebt(t.type) ? 'معلق' : 'منجز')}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <div style="margin-top:35px; text-align:center; font-size:11px; color:#94a3b8; border-top:1px dashed #cbd5e1; padding-top:15px;">
+      تم استخراج هذا التقرير تلقائياً بواسطة نظام <strong>احسبلي | a7sbley</strong> — شكراً لتعاملكم الراقي معنا ✨
+    </div>
+  `;
+
+  if (typeof html2pdf !== 'undefined') {
+    showToast('جاري إنشاء ملف PDF...', 'info');
+    const opt = {
+      margin: 8,
+      filename: `كشف_حساب_${clientName}_${todayString()}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(pdfContainer).save().then(() => {
+      showToast('تم تحميل كشف الحساب PDF بنجاح ✓', 'success');
+    }).catch(() => {
+      window.print();
+    });
+  } else {
+    window.print();
+  }
+}

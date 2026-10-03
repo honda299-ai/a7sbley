@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0f1117">
   <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
-  <title>احسبلي | Honda Financial Manager</title>
+  <title>احسبلي | a7sbley Financial Manager</title>
 
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,8 +16,9 @@
   <meta name="msapplication-TileColor" content="#f97316">
 
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/svg+xml" href="icon.svg">
-  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,6 +47,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <link rel="stylesheet" href="styles.css?v=9.5">
 </head>
@@ -58,13 +62,11 @@
   <header id="appHeader" class="sticky top-0 z-40 border-b border-slate-200 dark:border-dark-800 bg-white dark:bg-dark-900 shadow-sm no-print">
     <div class="max-w-7xl mx-auto px-3 sm:px-6">
       <div class="flex items-center justify-between min-h-16 py-2.5 gap-2">
-        <div class="flex items-center gap-2 shrink-0">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-400 flex items-center justify-center text-white shadow">
-            <i class="fa-solid fa-coins text-lg"></i>
-          </div>
+        <div class="flex items-center gap-2.5 shrink-0">
+          <img src="logo.png" class="w-10 h-10 rounded-xl object-contain shadow-md border border-orange-500/20" alt="احسبلي">
           <div>
             <h1 class="text-lg sm:text-xl font-black text-slate-900 dark:text-white leading-tight">احسبلي</h1>
-            <div class="text-[9px] font-black text-orange-500 tracking-wider">HONDA</div>
+            <div class="text-[9px] font-black text-orange-500 tracking-wider">a7sbley</div>
           </div>
           <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
             <i class="fa-solid fa-user"></i> مجاني
@@ -107,7 +109,8 @@
                 <i class="fa-solid fa-bell-slash"></i> <span>تفعيل الإشعارات</span>
               </button>
               <div class="my-1 border-t border-slate-100 dark:border-dark-800"></div>
-              <button onclick="exportToCSV()" data-feature="export" class="menu-item text-emerald-500"><i class="fa-solid fa-file-excel"></i> تصدير CSV</button>
+              <button onclick="exportToExcel()" data-feature="export" class="menu-item text-emerald-500"><i class="fa-solid fa-file-excel"></i> تصدير Excel (XLSX)</button>
+              <button onclick="exportToCSV()" data-feature="export" class="menu-item text-slate-400"><i class="fa-solid fa-file-csv"></i> تصدير CSV</button>
               <button onclick="openBackupModal()" data-feature="backup" class="menu-item text-teal-500"><i class="fa-solid fa-database"></i> النسخ الاحتياطي</button>
               <button onclick="openBudgetModal()" data-feature="budget" class="menu-item text-orange-500"><i class="fa-solid fa-wallet"></i> الميزانية الشهرية</button>
               <button onclick="openPinModal()" class="menu-item text-purple-500"><i class="fa-solid fa-lock"></i> قفل التطبيق</button>
@@ -306,6 +309,22 @@
         <div class="mt-1.5 flex items-center justify-between text-[9px] font-bold">
           <span id="statCharityRatio" class="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-500">0%</span>
         </div>
+      </div>
+    </section>
+
+    <!-- Quick Insights (تحليلات ذكية) -->
+    <section id="insightsSection" class="bg-gradient-to-r from-slate-900 to-dark-850 text-white rounded-2xl p-3.5 border border-orange-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 no-print shadow-md">
+      <div class="flex items-center gap-3 w-full sm:w-auto">
+        <div class="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 text-base">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+        </div>
+        <div class="min-w-0">
+          <div class="text-[10px] font-black text-orange-400 tracking-wider">موجز الذكاء المالي</div>
+          <div id="insightText" class="text-xs font-bold text-slate-200 mt-0.5 truncate">جاري تحليل بياناتك...</div>
+        </div>
+      </div>
+      <div id="insightBadge" class="w-full sm:w-auto text-center shrink-0 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-black">
+        -
       </div>
     </section>
 
@@ -515,8 +534,8 @@
   <!-- AUTH LOADING -->
   <div id="authLoading" class="fixed inset-0 z-[400] bg-dark-950 items-center justify-center flex">
     <div class="text-center text-white">
-      <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-400 flex items-center justify-center mx-auto animate-float">
-        <i class="fa-solid fa-coins text-2xl"></i>
+      <div class="w-20 h-20 rounded-3xl mx-auto animate-float overflow-hidden shadow-2xl border border-orange-500/30">
+        <img src="logo.png" class="w-full h-full object-contain" alt="احسبلي">
       </div>
       <div class="mt-4 text-sm font-black">احسبلي</div>
       <div class="mt-1 text-[10px] text-slate-400">جاري التحقق...</div>
@@ -527,11 +546,11 @@
   <div id="loginWall" class="hidden fixed inset-0 z-[300] bg-gradient-to-br from-slate-950 to-black text-white items-center justify-center p-4 overflow-y-auto">
     <div class="relative w-full max-w-md py-6">
       <div class="text-center">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-400 flex items-center justify-center mx-auto">
-          <i class="fa-solid fa-coins text-2xl"></i>
+        <div class="w-24 h-24 rounded-3xl mx-auto overflow-hidden shadow-2xl border-2 border-orange-500/40">
+          <img src="logo.png" class="w-full h-full object-contain" alt="احسبلي">
         </div>
-        <h1 class="text-2xl font-black mt-4">احسبلي</h1>
-        <div class="text-[10px] font-black text-orange-400 tracking-[.3em] mt-1">HONDA FINANCIAL MANAGER</div>
+        <h1 class="text-2xl font-black mt-3">احسبلي</h1>
+        <div class="text-[10px] font-black text-orange-400 tracking-[.25em] mt-0.5">a7sbley Financial System</div>
       </div>
 
       <div class="grid grid-cols-3 gap-1.5 mt-6 p-1 rounded-2xl bg-white/5 border border-white/10">
@@ -697,6 +716,14 @@
           </div>
         </div>
 
+        <div id="debtDueDateWrapper" class="hidden">
+          <label class="field-label flex items-center justify-between text-orange-500">
+            <span><i class="fa-solid fa-calendar-check"></i> تاريخ استحقاق الدين (تذكير بالسداد)</span>
+            <span class="text-[10px] text-slate-400">اختياري</span>
+          </label>
+          <input type="date" id="formDueDate" class="form-input border-orange-500/40">
+        </div>
+
         <div>
           <label class="field-label">اسم العميل (اختياري)</label>
           <input type="text" id="formClient" list="clientsDatalist" maxlength="60" placeholder="مثال: أحمد" class="form-input">
@@ -776,10 +803,13 @@
           <h3 id="clientModalName" class="text-base font-black truncate">كشف حساب</h3>
         </div>
         <div class="flex gap-1.5 shrink-0">
-          <button onclick="copyClientPortalLink()" class="p-2 rounded-xl bg-orange-500/10 text-orange-500 text-sm">
+          <button onclick="exportClientLedgerPDF()" title="تحميل كشف حساب PDF" class="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 text-white text-xs font-black flex items-center gap-1.5 shadow">
+            <i class="fa-solid fa-file-pdf"></i> <span class="hidden sm:inline">PDF كشف</span>
+          </button>
+          <button onclick="copyClientPortalLink()" title="نسخ الرابط" class="p-2 rounded-xl bg-orange-500/10 text-orange-500 text-sm">
             <i class="fa-solid fa-link"></i>
           </button>
-          <button onclick="shareClientPortalWhatsApp()" class="p-2 rounded-xl bg-emerald-500 text-white text-sm">
+          <button onclick="shareClientPortalWhatsApp()" title="مشاركة واتساب" class="p-2 rounded-xl bg-emerald-500 text-white text-sm">
             <i class="fa-brands fa-whatsapp"></i>
           </button>
           <button onclick="closeClientLedger()" class="w-9 h-9 rounded-xl text-slate-400 flex items-center justify-center">

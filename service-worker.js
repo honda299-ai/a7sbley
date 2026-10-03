@@ -1,14 +1,15 @@
 /* =========================================================
-   EHSEBLI / HONDA — Service Worker V9.5
-   Network-First Strategy for Instant GitHub Pages Updates
+   A7SBLEY / EHSEBLI — Service Worker V10.0
+   Network-First Strategy + Offline Cache + Push Notifications
    ========================================================= */
 
-const CACHE_VERSION = 'ehsebli-v9.5';
-const RUNTIME_CACHE = 'ehsebli-runtime-v9.5';
+const CACHE_VERSION = 'a7sbley-v10.0';
+const RUNTIME_CACHE = 'a7sbley-runtime-v10.0';
 
 const PRECACHE_ASSETS = [
   './', './index.html', './styles.css', './app.js',
-  './manifest.json', './icon.svg'
+  './manifest.json', './logo.png', './icon-192.png',
+  './icon-512.png', './favicon.png', './apple-touch-icon.png'
 ];
 
 /* ---------- Install ---------- */
@@ -19,7 +20,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-/* ---------- Activate: Delete all old caches immediately ---------- */
+/* ---------- Activate ---------- */
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -28,7 +29,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-/* ---------- Fetch: Network-First so updates on GitHub Pages take effect instantly ---------- */
+/* ---------- Fetch (Network-First) ---------- */
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -37,11 +38,10 @@ self.addEventListener('fetch', (event) => {
   const skipHosts = [
     'firebase', 'googleapis', 'gstatic', 'tailwindcss',
     'jsdelivr', 'cloudflare', 'wa.me', 'firebaseio',
-    'firebaseinstallations', 'google-analytics'
+    'firebaseinstallations', 'google-analytics', 'firebasestorage'
   ];
   if (skipHosts.some((h) => url.hostname.includes(h))) return;
 
-  // Network First, fallback to cache
   event.respondWith(
     fetch(request)
       .then((networkResponse) => {
@@ -58,10 +58,10 @@ self.addEventListener('fetch', (event) => {
 /* ---------- Push Notifications ---------- */
 self.addEventListener('push', (event) => {
   let data = {
-    title: 'احسبلي',
-    body: 'لديك تحديث جديد',
-    icon: './icon.svg',
-    badge: './icon.svg',
+    title: 'احسبلي | a7sbley',
+    body: 'لديك تنبيه جديد في الحسابات',
+    icon: './icon-192.png',
+    badge: './icon-192.png',
     url: './'
   };
 
@@ -76,10 +76,10 @@ self.addEventListener('push', (event) => {
 
   event.waitUntil(self.registration.showNotification(data.title, {
     body: data.body,
-    icon: data.icon || './icon.svg',
-    badge: data.badge || './icon.svg',
+    icon: data.icon || './icon-192.png',
+    badge: data.badge || './icon-192.png',
     vibrate: [200, 100, 200],
-    tag: data.tag || 'ehsebli-notification',
+    tag: data.tag || 'a7sbley-notification',
     renotify: true,
     requireInteraction: data.requireInteraction || false,
     data: { url: data.url || './', ...data.data },
@@ -110,7 +110,6 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-/* ---------- Message Handler ---------- */
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });

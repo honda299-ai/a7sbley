@@ -1,23 +1,25 @@
 {
-  "name": "احسبلي | Honda Financial Manager",
+  "name": "احسبلي | a7sbley",
   "short_name": "احسبلي",
-  "description": "إدارة مالية ذكية - مصاريف، ديون، عملاء، ميزانية",
+  "description": "إدارة مالية ذكية واحترافية - مصاريف، ديون، عملاء، ميزانية ومزامنة سحابية",
   "lang": "ar",
   "dir": "rtl",
   "start_url": "./",
   "scope": "./",
-  "id": "/ehsebli-honda/",
+  "id": "/a7sbley/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait-primary",
-  "background_color": "#0f1117",
+  "background_color": "#090a0f",
   "theme_color": "#f97316",
   "categories": ["finance", "productivity", "business"],
   "prefer_related_applications": false,
 
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
 
   "share_target": {
