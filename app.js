@@ -2669,7 +2669,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Splash hide
   const splash = document.getElementById('pwaSplash');
-  if (splash) setTimeout(() => splash.classList.add('hide'), 800);
+  if (splash) {
+    setTimeout(() => {
+      splash.classList.add('hide');
+      splash.style.display = 'none';
+      splash.style.pointerEvents = 'none';
+    }, 300);
+  }
 
   const isPortal = await checkPublicPortalMode();
   if (isPortal) return;
@@ -2718,5 +2724,5 @@ window.addEventListener('DOMContentLoaded', async () => {
       hideAuthLoading();
       showLoginWall();
     }
-  }, 8000);
+  }, 3000);
 });
