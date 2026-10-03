@@ -3,8 +3,8 @@
    Network-First Strategy + Offline Cache + Push Notifications
    ========================================================= */
 
-const CACHE_VERSION = 'a7sbley-v10.0';
-const RUNTIME_CACHE = 'a7sbley-runtime-v10.0';
+const CACHE_VERSION = 'a7sbley-v10.1';
+const RUNTIME_CACHE = 'a7sbley-runtime-v10.1';
 
 const PRECACHE_ASSETS = [
   './', './index.html', './styles.css', './app.js',

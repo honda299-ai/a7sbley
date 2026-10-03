@@ -1380,8 +1380,6 @@ auth.onAuthStateChanged(async user => {
   authResolved = true;
 
   const avatar = document.getElementById('userAvatar');
-  const cloudStatus = document.getElementById('cloudStatus');
-  const syncEmail = document.getElementById('syncUserEmail');
   const footerSync = document.getElementById('footerSyncStatus');
   const userProfile = document.getElementById('userProfile');
 
@@ -1389,20 +1387,23 @@ auth.onAuthStateChanged(async user => {
     currentUser = user;
     handleUserSwitch(user.uid);
     hideLoginWall();
-    userProfile.classList.remove('hidden');
-    userProfile.classList.add('flex');
-
-    if (user.photoURL) avatar.src = user.photoURL;
-    else {
-      const initial = (user.displayName || user.email || user.phoneNumber || 'U').charAt(0).toUpperCase();
-      avatar.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%23f97316'/><text x='50%' y='55%' text-anchor='middle' dominant-baseline='middle' font-size='20' font-family='Cairo' fill='white' font-weight='bold'>${escapeHTML(initial)}</text></svg>`;
+    if (userProfile) {
+      userProfile.classList.remove('hidden');
+      userProfile.classList.add('flex');
     }
 
-    cloudStatus.classList.remove('hidden');
-    cloudStatus.classList.add('flex');
+    if (avatar) {
+      if (user.photoURL) avatar.src = user.photoURL;
+      else {
+        const initial = (user.displayName || user.email || user.phoneNumber || 'U').charAt(0).toUpperCase();
+        avatar.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%23f97316'/><text x='50%' y='55%' text-anchor='middle' dominant-baseline='middle' font-size='20' font-family='Cairo' fill='white' font-weight='bold'>${escapeHTML(initial)}</text></svg>`;
+      }
+    }
+
     const userIdentifier = user.email || user.phoneNumber || 'مستخدم';
-    syncEmail.textContent = userIdentifier;
-    footerSync.innerHTML = `<i class="fa-solid fa-cloud-check text-emerald-500"></i> متصل بالسحاب (${escapeHTML(userIdentifier)})`;
+    if (footerSync) {
+      footerSync.innerHTML = `<i class="fa-solid fa-cloud-check text-emerald-500"></i> متصل بالسحاب (${escapeHTML(userIdentifier)})`;
+    }
 
     await loadUserRole(user.uid);
     await loadRolePermissions();
@@ -1495,7 +1496,7 @@ async function syncToCloud() {
     }, { merge: true });
   } catch (error) {
     console.error("Cloud sync error:", error);
-    showToast('فشل المزامنة: ' + (error.code || error.message), 'error');
+    showToast('فشل المزامنة للسحابة: ' + (error.code || error.message), 'error');
   }
 }
 
@@ -2705,14 +2706,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   initInstallPrompt();
   initNetworkStatus();
 
-  // Splash hide
+  // Splash hide if element exists
   const splash = document.getElementById('pwaSplash');
   if (splash) {
-    setTimeout(() => {
-      splash.classList.add('hide');
-      splash.style.display = 'none';
-      splash.style.pointerEvents = 'none';
-    }, 300);
+    splash.style.display = 'none';
   }
 
   const isPortal = await checkPublicPortalMode();
