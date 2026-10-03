@@ -2630,8 +2630,15 @@ function showToast(message, type = 'success', allowUndo = false) {
   }, allowUndo ? 6000 : 3500);
 }
 
-function toggleMenu() { document.getElementById('dropMenu').classList.toggle('hidden'); }
-function closeMenus() { document.getElementById('dropMenu').classList.add('hidden'); }
+function toggleMenu() {
+  const menu = document.getElementById('dropMenu');
+  if (!menu) return;
+  menu.classList.toggle('hidden');
+}
+function closeMenus() {
+  const menu = document.getElementById('dropMenu');
+  if (menu) menu.classList.add('hidden');
+}
 
 window.addEventListener('click', event => {
   const btn = document.getElementById('menuBtn');

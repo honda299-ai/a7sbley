@@ -59,78 +59,95 @@
 
 
   <!-- HEADER -->
-  <header id="appHeader" class="sticky top-0 z-40 border-b border-slate-200 dark:border-dark-800 bg-white dark:bg-dark-900 shadow-sm no-print">
-    <div class="max-w-7xl mx-auto px-3 sm:px-6">
-      <div class="flex items-center justify-between min-h-16 py-2.5 gap-2">
-        <div class="flex items-center gap-2.5 shrink-0">
-          <img src="logo.png" class="w-10 h-10 rounded-xl object-contain shadow-md border border-orange-500/20" alt="احسبلي">
-          <div>
-            <h1 class="text-lg sm:text-xl font-black text-slate-900 dark:text-white leading-tight">احسبلي</h1>
-            <div class="text-[9px] font-black text-orange-500 tracking-wider">a7sbley</div>
-          </div>
-          <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
+<header id="appHeader" class="sticky top-0 z-40 border-b border-slate-200 dark:border-dark-800 bg-white dark:bg-dark-900 shadow-sm no-print">
+  <div class="max-w-7xl mx-auto px-3 sm:px-6">
+    <div class="flex items-center justify-between min-h-16 py-2.5 gap-2">
+      
+      <!-- Logo & Brand -->
+      <div class="flex items-center gap-2.5 shrink-0">
+        <img src="logo.png" class="w-10 h-10 rounded-xl object-contain shadow-md border border-orange-500/20" alt="احسبلي">
+        <div>
+          <h1 class="text-lg sm:text-xl font-black text-slate-900 dark:text-white leading-tight">احسبلي</h1>
+          <div class="text-[9px] font-black text-orange-500 tracking-wider">a7sbley</div>
+        </div>
+      </div>
+
+      <!-- Right Actions -->
+      <div class="flex items-center gap-2">
+        <!-- زر إضافة عملية -->
+        <button onclick="openModal('expense')"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow">
+          <i class="fa-solid fa-circle-plus"></i>
+          <span class="hidden sm:inline">إضافة</span>
+        </button>
+
+        <!-- بروفايل المستخدم وشارة الخطة بجانب الثلاث نقط -->
+        <div id="userProfile" class="flex items-center gap-1.5">
+          <span id="roleBadge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
             <i class="fa-solid fa-user"></i> مجاني
           </span>
+          <img id="userAvatar" src="" class="w-8 h-8 rounded-lg border border-orange-500/40 object-cover" alt="User">
         </div>
 
-        <div class="flex items-center gap-1.5">
-          <div id="userProfile" class="hidden items-center gap-2">
-            <img id="userAvatar" src="" class="w-8 h-8 rounded-lg border border-orange-500/50" alt="User">
-            <button onclick="logout()" class="hidden sm:flex p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white text-xs transition">
-              <i class="fa-solid fa-power-off"></i>
+        <!-- زر الثلاث نقط -->
+        <div class="relative">
+          <button onclick="toggleMenu()" id="menuBtn"
+            class="p-2.5 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-slate-600 dark:text-slate-300 hover:text-orange-500 transition">
+            <i class="fa-solid fa-ellipsis-vertical"></i>
+          </button>
+          
+          <div id="dropMenu" class="hidden absolute left-0 mt-2 w-64 rounded-2xl shadow-2xl bg-white dark:bg-dark-850 border border-slate-200 dark:border-dark-750 p-1.5 z-50">
+            <!-- التبديل السريع: الثيم والخصوصية -->
+            <button onclick="toggleTheme()" class="menu-item text-amber-500">
+              <i id="themeIcon" class="fa-solid fa-sun"></i>
+              <span id="themeText">الوضع النهاري</span>
             </button>
-          </div>
-
-          <button onclick="togglePrivacyMode()" class="hidden sm:flex p-2 rounded-lg border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-slate-700 dark:text-slate-200 items-center gap-2 text-xs font-bold">
-            <i id="privacyIcon" class="fa-solid fa-eye text-orange-500"></i>
-          </button>
-
-          <button onclick="toggleTheme()" class="hidden sm:flex p-2 rounded-lg border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-slate-700 dark:text-slate-200">
-            <i id="themeIcon" class="fa-solid fa-sun text-amber-500"></i>
-            <span id="themeText" class="hidden lg:inline ml-1 text-xs font-bold">الوضع النهاري</span>
-          </button>
-
-          <button onclick="openModal('expense')"
-            class="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow">
-            <i class="fa-solid fa-circle-plus"></i>
-            <span class="hidden md:inline">إضافة</span>
-          </button>
-
-          <div class="relative">
-            <button onclick="toggleMenu()" id="menuBtn"
-              class="p-2.5 rounded-lg border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-slate-600 dark:text-slate-300">
-              <i class="fa-solid fa-ellipsis-vertical"></i>
+            <button onclick="togglePrivacyMode()" class="menu-item text-orange-500">
+              <i id="privacyIcon" class="fa-solid fa-eye"></i>
+              <span>وضع الخصوصية (إخفاء المبالغ)</span>
             </button>
-            <div id="dropMenu" class="hidden absolute left-0 mt-2 w-64 rounded-2xl shadow-2xl bg-white dark:bg-dark-850 border border-slate-200 dark:border-dark-750 p-1.5 z-50">
-              <button id="installAppBtn" onclick="installApp()" class="menu-item text-blue-500 hidden">
-                <i class="fa-solid fa-mobile-screen-button"></i> تثبيت التطبيق
-              </button>
-              <button id="notificationToggleBtn" onclick="togglePushNotifications()" class="menu-item text-amber-500">
-                <i class="fa-solid fa-bell-slash"></i> <span>تفعيل الإشعارات</span>
-              </button>
-              <div class="my-1 border-t border-slate-100 dark:border-dark-800"></div>
-              <button onclick="exportToExcel()" data-feature="export" class="menu-item text-emerald-500"><i class="fa-solid fa-file-excel"></i> تصدير Excel (XLSX)</button>
-              <button onclick="exportToCSV()" data-feature="export" class="menu-item text-slate-400"><i class="fa-solid fa-file-csv"></i> تصدير CSV</button>
-              <button onclick="openBackupModal()" data-feature="backup" class="menu-item text-teal-500"><i class="fa-solid fa-database"></i> النسخ الاحتياطي</button>
-              <button onclick="openBudgetModal()" data-feature="budget" class="menu-item text-orange-500"><i class="fa-solid fa-wallet"></i> الميزانية الشهرية</button>
-              <button onclick="openPinModal()" class="menu-item text-purple-500"><i class="fa-solid fa-lock"></i> قفل التطبيق</button>
-              <button onclick="printReport()" data-feature="reports" class="menu-item text-cyan-500"><i class="fa-solid fa-file-pdf"></i> تقرير PDF</button>
-              <button onclick="loadDemoData()" class="menu-item text-blue-500"><i class="fa-solid fa-rotate"></i> بيانات تجريبية</button>
-              <div class="my-1 border-t border-slate-100 dark:border-dark-800"></div>
-              <button id="adminPanelBtn" onclick="openAdminPanel()" class="menu-item text-rose-500" style="display:none">
-                <i class="fa-solid fa-shield-halved"></i> لوحة المدير
-              </button>
-              <button onclick="confirmClearData()" class="menu-item text-rose-600"><i class="fa-solid fa-trash-can"></i> تصفير البيانات</button>
-              <div class="my-1 border-t border-slate-100 dark:border-dark-800 sm:hidden"></div>
-              <button onclick="togglePrivacyMode()" class="menu-item text-orange-500 sm:hidden"><i class="fa-solid fa-eye"></i> خصوصية المبالغ</button>
-              <button onclick="toggleTheme()" class="menu-item text-amber-500 sm:hidden"><i class="fa-solid fa-moon"></i> تبديل الثيم</button>
-              <button onclick="logout()" class="menu-item text-rose-400 sm:hidden"><i class="fa-solid fa-power-off"></i> تسجيل الخروج</button>
-            </div>
+
+            <div class="my-1 border-t border-slate-100 dark:border-dark-800"></div>
+
+            <button onclick="exportToExcel()" data-feature="export" class="menu-item text-emerald-500">
+              <i class="fa-solid fa-file-excel"></i> تصدير Excel (XLSX)
+            </button>
+            <button onclick="exportToCSV()" data-feature="export" class="menu-item text-slate-400">
+              <i class="fa-solid fa-file-csv"></i> تصدير CSV
+            </button>
+            <button onclick="openBackupModal()" data-feature="backup" class="menu-item text-teal-500">
+              <i class="fa-solid fa-database"></i> النسخ الاحتياطي
+            </button>
+            <button onclick="openBudgetModal()" data-feature="budget" class="menu-item text-orange-500">
+              <i class="fa-solid fa-wallet"></i> الميزانية الشهرية
+            </button>
+            <button onclick="openPinModal()" class="menu-item text-purple-500">
+              <i class="fa-solid fa-lock"></i> قفل التطبيق
+            </button>
+            <button onclick="printReport()" data-feature="reports" class="menu-item text-cyan-500">
+              <i class="fa-solid fa-file-pdf"></i> تقرير PDF
+            </button>
+            <button onclick="loadDemoData()" class="menu-item text-blue-500">
+              <i class="fa-solid fa-rotate"></i> بيانات تجريبية
+            </button>
+
+            <div class="my-1 border-t border-slate-100 dark:border-dark-800"></div>
+
+            <button id="adminPanelBtn" onclick="openAdminPanel()" class="menu-item text-rose-500" style="display:none">
+              <i class="fa-solid fa-shield-halved"></i> لوحة المدير
+            </button>
+            <button onclick="confirmClearData()" class="menu-item text-rose-600">
+              <i class="fa-solid fa-trash-can"></i> تصفير البيانات
+            </button>
+            <button onclick="logout()" class="menu-item text-rose-400">
+              <i class="fa-solid fa-power-off"></i> تسجيل الخروج
+            </button>
           </div>
         </div>
       </div>
     </div>
-  </header>
+  </div>
+</header>
 
   <!-- CLIENT PORTAL -->
   <div id="clientPortalView" class="hidden max-w-4xl mx-auto px-4 py-6 w-full flex-1 space-y-5">
@@ -197,13 +214,7 @@
       <div id="toastInner"></div>
     </div>
 
-    <div id="cloudStatus" class="hidden items-center justify-between px-4 py-2 rounded-2xl bg-orange-500/10 border border-orange-500/30 text-orange-500 text-xs font-bold no-print">
-      <span class="flex items-center gap-2">
-        <i class="fa-solid fa-cloud-arrow-up"></i>
-        <span>جاري المزامنة...</span>
-      </span>
-      <span id="syncUserEmail" class="text-[10px] text-slate-400"></span>
-    </div>
+    
 
     <!-- Hero -->
     <section class="hidden md:block relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 to-black text-white p-6 border border-dark-800 shadow-xl no-print">
@@ -525,7 +536,7 @@
       <i class="fa-solid fa-users"></i>
       <span>العملاء</span>
     </button>
-    <button onclick="document.getElementById('menuBtn').click()" class="mob-nav-btn">
+    <button onclick="toggleMenu()" class="mob-nav-btn">
       <i class="fa-solid fa-ellipsis"></i>
       <span>المزيد</span>
     </button>
