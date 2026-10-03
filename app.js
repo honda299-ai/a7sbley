@@ -177,7 +177,7 @@ function normalizeTransaction(t) {
    PWA: MOBILE INSTALL DIALOG & PROMPTS
    ========================================================= */
 function isMobileDevice() {
-  return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth <= 768);
+  return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth <= 820);
 }
 
 function isAppStandalone() {
@@ -185,25 +185,35 @@ function isAppStandalone() {
 }
 
 function checkMobileInstallDialog() {
-  if (isAppStandalone()) return; // Don't show if already installed and opened as app
-  if (!isMobileDevice()) return; // Prioritize mobile visitors
-
-  const dismissedTime = localStorage.getItem('a7sbley_install_dismissed_time');
-  const now = Date.now();
-  // Don't show again if dismissed within the last 2 days
-  if (dismissedTime && (now - Number(dismissedTime) < 2 * 24 * 60 * 60 * 1000)) {
+  if (isAppStandalone()) {
+    const hBtn = document.getElementById('headerInstallBtn');
+    if (hBtn) hBtn.classList.add('hidden');
     return;
   }
 
-  // Show modal after 1.5 seconds of browsing
-  setTimeout(() => {
-    showMobileInstallModal();
-  }, 1500);
+  // Show header install button on mobile browsers
+  const hBtn = document.getElementById('headerInstallBtn');
+  if (hBtn && isMobileDevice()) {
+    hBtn.classList.remove('hidden');
+    hBtn.classList.add('flex');
+  }
+
+  // Check if dismissed in this browsing session
+  const sessionDismissed = sessionStorage.getItem('a7sbley_install_session_dismissed');
+  if (sessionDismissed) return;
+
+  // Auto show modal after 1.2s for mobile visitors
+  if (isMobileDevice()) {
+    setTimeout(() => {
+      showMobileInstallModal();
+    }, 1200);
+  }
 }
 
 function showMobileInstallModal() {
   const modal = document.getElementById('mobileInstallModal');
   if (!modal) return;
+  modal.style.display = 'flex';
   modal.classList.remove('hidden');
   modal.classList.add('flex');
 
@@ -216,7 +226,7 @@ function showMobileInstallModal() {
     if (acceptBtn) {
       acceptBtn.innerHTML = '<i class="fa-solid fa-arrow-up-from-bracket"></i> <span>طريقة التثبيت على الآيفون</span>';
       acceptBtn.onclick = () => {
-        showToast('اضغط زر المشاركة ⬆️ ثم اختر "إضافة إلى الشاشة الرئيسية"', 'info');
+        showToast('اضغط زر المشاركة ⬆️ أسفل الشاشة ثم "إضافة إلى الشاشة الرئيسية"', 'info');
       };
     }
   }
@@ -225,10 +235,11 @@ function showMobileInstallModal() {
 function dismissMobileInstall() {
   const modal = document.getElementById('mobileInstallModal');
   if (modal) {
+    modal.style.display = 'none';
     modal.classList.add('hidden');
     modal.classList.remove('flex');
   }
-  localStorage.setItem('a7sbley_install_dismissed_time', Date.now());
+  sessionStorage.setItem('a7sbley_install_session_dismissed', 'true');
 }
 
 function triggerMobileAppInstall() {
@@ -248,12 +259,12 @@ function triggerMobileAppInstall() {
   if (isIOS) {
     showToast('اضغط زر المشاركة ⬆️ ثم "إضافة إلى الشاشة الرئيسية"', 'info');
   } else {
-    showToast('إذا لم تظهر نافذة التثبيت، افتح قائمة المتصفح (⋮) واختر "تثبيت التطبيق"', 'info');
+    showToast('من قائمة المتصفح (⋮) اختر "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية"', 'info');
   }
 }
 
 function installApp() {
-  triggerMobileAppInstall();
+  showMobileInstallModal();
 }
 
 function initInstallPrompt() {
@@ -262,7 +273,6 @@ function initInstallPrompt() {
     deferredInstallPrompt = e;
     const btn = document.getElementById('installAppBtn');
     if (btn) btn.classList.remove('hidden');
-    // If on mobile and modal is not dismissed, show modal
     checkMobileInstallDialog();
   });
 
@@ -270,6 +280,8 @@ function initInstallPrompt() {
     deferredInstallPrompt = null;
     const btn = document.getElementById('installAppBtn');
     if (btn) btn.classList.add('hidden');
+    const hBtn = document.getElementById('headerInstallBtn');
+    if (hBtn) hBtn.classList.add('hidden');
     dismissMobileInstall();
     showToast('تم تثبيت التطبيق بنجاح 🎉', 'success');
   });
@@ -277,8 +289,7 @@ function initInstallPrompt() {
   if (isAppStandalone()) {
     document.body.classList.add('pwa-standalone');
   } else {
-    // If beforeinstallprompt hasn't fired yet or on iOS, also check after load
-    setTimeout(checkMobileInstallDialog, 2000);
+    setTimeout(checkMobileInstallDialog, 1500);
   }
 }
 

@@ -51,7 +51,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=10.2">
+  <link rel="stylesheet" href="styles.css?v=10.3">
 </head>
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans auth-pending">
@@ -74,6 +74,12 @@
 
       <!-- Right Actions -->
       <div class="flex items-center gap-2">
+        <!-- زر تثبيت التطبيق السريع في الهيدر -->
+        <button id="headerInstallBtn" onclick="showMobileInstallModal()"
+          class="hidden sm:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-orange-500/15 border border-orange-500/40 text-orange-400 font-black text-xs">
+          <i class="fa-solid fa-download"></i>
+          <span>تثبيت</span>
+        </button>
         <!-- زر إضافة عملية -->
         <button onclick="openModal('expense')"
           class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow">
@@ -97,6 +103,11 @@
           </button>
           
           <div id="dropMenu" class="hidden absolute left-0 mt-2 w-64 rounded-2xl shadow-2xl bg-white dark:bg-dark-850 border border-slate-200 dark:border-dark-750 p-1.5 z-50">
+            <!-- زر تثبيت التطبيق الرئيسي -->
+            <button id="installAppBtn" onclick="showMobileInstallModal()" class="menu-item text-orange-500 font-black bg-orange-500/10 mb-1">
+              <i class="fa-solid fa-mobile-screen-button"></i> <span>تثبيت التطبيق على الجوال</span>
+            </button>
+            <div class="my-1 border-t border-slate-100 dark:border-dark-800"></div>
             <!-- التبديل السريع: الثيم والخصوصية -->
             <button onclick="toggleTheme()" class="menu-item text-amber-500">
               <i id="themeIcon" class="fa-solid fa-sun"></i>
@@ -1071,7 +1082,7 @@
 
   <div id="printReport" class="print-only"></div>
 
-  <script src="app.js?v=10.2"></script>
+  <script src="app.js?v=10.3"></script>
 
   <!-- MOBILE INSTALL DIALOG -->
   <div id="mobileInstallModal" class="hidden fixed inset-0 z-[250] items-end sm:items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm transition-all duration-300">
