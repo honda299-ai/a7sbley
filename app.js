@@ -242,24 +242,30 @@ function dismissMobileInstall() {
   sessionStorage.setItem('a7sbley_install_session_dismissed', 'true');
 }
 
-function triggerMobileAppInstall() {
+async function triggerMobileAppInstall() {
   if (deferredInstallPrompt) {
-    deferredInstallPrompt.prompt();
-    deferredInstallPrompt.userChoice.then((choice) => {
+    try {
+      await deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
       if (choice.outcome === 'accepted') {
-        showToast('جاري تثبيت التطبيق على جهازك...', 'success');
+        showToast('جاري تثبيت التطبيق على جهازك بنجاح 🎉', 'success');
         dismissMobileInstall();
+      } else {
+        showToast('تم إلغاء التثبيت', 'info');
       }
-      deferredInstallPrompt = null;
-    });
+    } catch(err) {
+      console.warn("Prompt error:", err);
+    }
+    deferredInstallPrompt = null;
     return;
   }
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   if (isIOS) {
-    showToast('اضغط زر المشاركة ⬆️ ثم "إضافة إلى الشاشة الرئيسية"', 'info');
+    showToast('على الآيفون: اضغط زر المشاركة ⬆️ أسفل الشاشة ثم "إضافة إلى الشاشة الرئيسية"', 'info');
   } else {
-    showToast('من قائمة المتصفح (⋮) اختر "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية"', 'info');
+    // If deferred prompt hasn't arrived, guide Android users clearly
+    showToast('اضغط على قائمة المتصفح (⋮) بالأعلى واختر [تثبيت التطبيق] أو [إضافة للشاشة الرئيسية]', 'info');
   }
 }
 

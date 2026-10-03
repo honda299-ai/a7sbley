@@ -1,22 +1,29 @@
 /* =========================================================
-   A7SBLEY / EHSEBLI — Service Worker V10.0
-   Network-First Strategy + Offline Cache + Push Notifications
+   A7SBLEY / EHSEBLI — Service Worker V10.5
+   PWA Engine + Offline Precache + Push Notifications
    ========================================================= */
 
-const CACHE_VERSION = 'a7sbley-v10.4';
-const RUNTIME_CACHE = 'a7sbley-runtime-v10.1';
+const CACHE_VERSION = 'a7sbley-v10.5';
+const RUNTIME_CACHE = 'a7sbley-runtime-v10.5';
 
 const PRECACHE_ASSETS = [
-  './', './index.html', './styles.css', './app.js',
-  './manifest.json', './logo.png', './icon-192.png',
-  './icon-512.png', './favicon.png', './apple-touch-icon.png'
+  './',
+  './index.html',
+  './styles.css',
+  './app.js',
+  './manifest.json',
+  './logo.png',
+  './icon-192.png',
+  './icon-512.png',
+  './apple-touch-icon.png',
+  './favicon.png'
 ];
 
 /* ---------- Install ---------- */
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(PRECACHE_ASSETS).catch(() => {}))
+    caches.open(CACHE_VERSION).then((cache) => cache.addAll(PRECACHE_ASSETS).catch((err) => console.warn('Cache error:', err)))
   );
 });
 
@@ -29,7 +36,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-/* ---------- Fetch (Network-First) ---------- */
+/* ---------- Fetch (Network First, Cache Fallback) ---------- */
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -81,22 +88,13 @@ self.addEventListener('push', (event) => {
     vibrate: [200, 100, 200],
     tag: data.tag || 'a7sbley-notification',
     renotify: true,
-    requireInteraction: data.requireInteraction || false,
-    data: { url: data.url || './', ...data.data },
-    actions: data.actions || [
-      { action: 'open', title: 'فتح' },
-      { action: 'close', title: 'إغلاق' }
-    ]
+    data: { url: data.url || './', ...data.data }
   }));
 });
 
-/* ---------- Notification Click ---------- */
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  if (event.action === 'close') return;
-
   const targetUrl = event.notification.data?.url || './';
-
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {

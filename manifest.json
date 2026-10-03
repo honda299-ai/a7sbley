@@ -4,19 +4,13 @@
   "description": "إدارة مالية ذكية واحترافية - مصاريف، ديون، عملاء، ميزانية ومزامنة سحابية",
   "lang": "ar",
   "dir": "rtl",
-  "id": "./",
-  "start_url": "./",
+  "start_url": "index.html",
   "scope": "./",
+  "id": "a7sbley-financial-app",
   "display": "standalone",
-  "display_override": [
-    "standalone",
-    "minimal-ui",
-    "window-controls-overlay"
-  ],
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
   "background_color": "#090a0f",
   "theme_color": "#f97316",
-  "prefer_related_applications": false,
   "icons": [
     {
       "src": "icon-192.png",
