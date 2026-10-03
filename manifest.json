@@ -1,0 +1,35 @@
+{
+  "name": "احسبلي | Honda Financial Manager",
+  "short_name": "احسبلي",
+  "description": "إدارة مالية ذكية - مصاريف، ديون، عملاء، ميزانية",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "id": "/ehsebli-honda/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#0f1117",
+  "theme_color": "#f97316",
+  "categories": ["finance", "productivity", "business"],
+  "prefer_related_applications": false,
+
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+
+  "share_target": {
+    "action": "./?share=1",
+    "method": "GET",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  },
+
+  "file_handlers": [
+    {
+      "action": "./?file=restore",
+      "accept": { "application/json": [".json"] }
+    }
+  ]
+}
