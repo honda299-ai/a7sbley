@@ -174,40 +174,34 @@ function normalizeTransaction(t) {
 }
 
 /* =========================================================
-   PWA: MOBILE INSTALL DIALOG & PROMPTS
+   PWA: MANDATORY MOBILE INSTALL DIALOG (إجباري عند الفتح)
    ========================================================= */
-function isMobileDevice() {
-  return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth <= 820);
-}
-
 function isAppStandalone() {
-  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  return window.matchMedia('(display-mode: standalone)').matches || 
+         window.navigator.standalone === true ||
+         document.referrer.includes('android-app://');
 }
 
-function checkMobileInstallDialog() {
+function checkForcedInstallDialog() {
+  // إذا كان التطبيق مثبت ومفتوح بالفعل كتطبيق، لا تظهر الرسالة
   if (isAppStandalone()) {
+    document.body.classList.add('pwa-standalone');
     const hBtn = document.getElementById('headerInstallBtn');
     if (hBtn) hBtn.classList.add('hidden');
     return;
   }
 
-  // Show header install button on mobile browsers
+  // إظهار زر التثبيت في الهيدر والقائمة دائماً
   const hBtn = document.getElementById('headerInstallBtn');
-  if (hBtn && isMobileDevice()) {
+  if (hBtn) {
     hBtn.classList.remove('hidden');
     hBtn.classList.add('flex');
   }
 
-  // Check if dismissed in this browsing session
-  const sessionDismissed = sessionStorage.getItem('a7sbley_install_session_dismissed');
-  if (sessionDismissed) return;
-
-  // Auto show modal after 1.2s for mobile visitors
-  if (isMobileDevice()) {
-    setTimeout(() => {
-      showMobileInstallModal();
-    }, 1200);
-  }
+  // إظهار النافذة إجبارياً بعد نصف ثانية من فتح الموقع
+  setTimeout(() => {
+    showMobileInstallModal();
+  }, 600);
 }
 
 function showMobileInstallModal() {
@@ -219,15 +213,24 @@ function showMobileInstallModal() {
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const iosHelper = document.getElementById('iosInstallHelper');
+  const androidHelper = document.getElementById('androidInstallHelper');
   const acceptBtn = document.getElementById('mobileInstallAcceptBtn');
 
   if (isIOS) {
     if (iosHelper) iosHelper.classList.remove('hidden');
+    if (androidHelper) androidHelper.classList.add('hidden');
     if (acceptBtn) {
       acceptBtn.innerHTML = '<i class="fa-solid fa-arrow-up-from-bracket"></i> <span>طريقة التثبيت على الآيفون</span>';
       acceptBtn.onclick = () => {
-        showToast('اضغط زر المشاركة ⬆️ أسفل الشاشة ثم "إضافة إلى الشاشة الرئيسية"', 'info');
+        showToast('اضغط زر المشاركة ⬆️ أسفل الشاشة ثم اختر "إضافة إلى الشاشة الرئيسية"', 'info');
       };
+    }
+  } else {
+    if (iosHelper) iosHelper.classList.add('hidden');
+    // On Android
+    if (acceptBtn) {
+      acceptBtn.innerHTML = '<i class="fa-solid fa-download text-base"></i> <span>تثبيت التطبيق الآن</span>';
+      acceptBtn.onclick = triggerMobileAppInstall;
     }
   }
 }
@@ -239,7 +242,6 @@ function dismissMobileInstall() {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
   }
-  sessionStorage.setItem('a7sbley_install_session_dismissed', 'true');
 }
 
 async function triggerMobileAppInstall() {
@@ -251,7 +253,7 @@ async function triggerMobileAppInstall() {
         showToast('جاري تثبيت التطبيق على جهازك بنجاح 🎉', 'success');
         dismissMobileInstall();
       } else {
-        showToast('تم إلغاء التثبيت', 'info');
+        showToast('تم إلغاء التثبيت، يمكنك التثبيت لاحقاً من القائمة', 'info');
       }
     } catch(err) {
       console.warn("Prompt error:", err);
@@ -262,10 +264,12 @@ async function triggerMobileAppInstall() {
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   if (isIOS) {
-    showToast('على الآيفون: اضغط زر المشاركة ⬆️ أسفل الشاشة ثم "إضافة إلى الشاشة الرئيسية"', 'info');
+    showToast('على الآيفون: اضغط زر المشاركة ⬆️ ثم "إضافة إلى الشاشة الرئيسية"', 'info');
   } else {
-    // If deferred prompt hasn't arrived, guide Android users clearly
-    showToast('اضغط على قائمة المتصفح (⋮) بالأعلى واختر [تثبيت التطبيق] أو [إضافة للشاشة الرئيسية]', 'info');
+    // If browser didn't fire prompt yet or user needs guidance:
+    const androidHelper = document.getElementById('androidInstallHelper');
+    if (androidHelper) androidHelper.classList.remove('hidden');
+    showToast('من قائمة المتصفح (⋮) بالأعلى اختر [تثبيت التطبيق] أو [إضافة للشاشة الرئيسية]', 'info');
   }
 }
 
@@ -279,7 +283,8 @@ function initInstallPrompt() {
     deferredInstallPrompt = e;
     const btn = document.getElementById('installAppBtn');
     if (btn) btn.classList.remove('hidden');
-    checkMobileInstallDialog();
+    // Call forced dialog
+    checkForcedInstallDialog();
   });
 
   window.addEventListener('appinstalled', () => {
@@ -295,7 +300,8 @@ function initInstallPrompt() {
   if (isAppStandalone()) {
     document.body.classList.add('pwa-standalone');
   } else {
-    setTimeout(checkMobileInstallDialog, 1500);
+    // Always trigger forced dialog on load
+    checkForcedInstallDialog();
   }
 }
 

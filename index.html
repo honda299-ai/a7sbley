@@ -1084,62 +1084,69 @@
 
   <script src="app.js?v=10.5"></script>
 
-  <!-- MOBILE INSTALL DIALOG -->
-  <div id="mobileInstallModal" class="hidden fixed inset-0 z-[250] items-end sm:items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm transition-all duration-300">
-    <div class="relative w-full max-w-sm rounded-3xl bg-gradient-to-b from-dark-850 to-dark-950 border border-orange-500/40 p-5 shadow-2xl text-center modal-enter overflow-hidden">
+  <!-- MOBILE INSTALL DIALOG (إجباري عند الفتح) -->
+  <div id="mobileInstallModal" class="hidden fixed inset-0 z-[500] items-center justify-center p-4 bg-black/85 backdrop-blur-md transition-all duration-300">
+    <div class="relative w-full max-w-sm rounded-3xl bg-gradient-to-b from-[#161922] to-[#090a0f] border-2 border-orange-500/50 p-6 shadow-[0_20px_60px_-15px_rgba(249,115,22,0.4)] text-center modal-enter overflow-hidden">
       <!-- Glow ambient light -->
-      <div class="absolute -top-12 left-1/2 -translate-x-1/2 w-40 h-40 bg-orange-500/20 blur-3xl pointer-events-none rounded-full"></div>
+      <div class="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-48 bg-orange-500/25 blur-3xl pointer-events-none rounded-full"></div>
 
-      <!-- Close button -->
-      <button onclick="dismissMobileInstall()" class="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center text-xs transition">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
-
-      <!-- App Logo with glow ring -->
-      <div class="relative mx-auto w-20 h-20 mb-3 mt-1">
-        <div class="absolute inset-0 rounded-2xl bg-orange-500/30 blur-md animate-pulse"></div>
-        <img src="logo.png" class="relative w-full h-full rounded-2xl object-contain border border-orange-500/50 shadow-xl" alt="احسبلي">
+      <!-- App Logo with animated glow ring -->
+      <div class="relative mx-auto w-24 h-24 mb-4 mt-1">
+        <div class="absolute inset-0 rounded-3xl bg-gradient-to-tr from-orange-600 to-amber-400 blur-lg opacity-60 animate-pulse"></div>
+        <img src="logo.png" class="relative w-full h-full rounded-3xl object-contain border-2 border-orange-500/60 shadow-2xl" alt="احسبلي">
       </div>
 
-      <h3 class="text-lg font-black text-white">تثبيت تطبيق احسبلي</h3>
-      <p class="text-xs text-slate-400 mt-1">احصل على تجربة التطبيق الكاملة على هاتفك</p>
+      <h3 class="text-xl font-black text-white">تثبيت تطبيق احسبلي</h3>
+      <p class="text-xs font-bold text-orange-400 mt-1">a7sbley Financial App</p>
+      <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+        للحصول على أفضل تجربة وسرعة، يرجى تثبيت التطبيق على جهازك.
+      </p>
 
       <!-- Benefits features -->
-      <div class="mt-4 p-3 rounded-2xl bg-white/5 border border-white/10 text-right space-y-2 text-xs font-bold text-slate-300">
-        <div class="flex items-center gap-2">
-          <i class="fa-solid fa-bolt text-amber-400 text-sm w-5 text-center"></i>
-          <span>فتح فوري بلمسة واحدة بدون متصفح</span>
+      <div class="mt-4 p-3.5 rounded-2xl bg-white/5 border border-white/10 text-right space-y-2.5 text-xs font-bold text-slate-200">
+        <div class="flex items-center gap-2.5">
+          <div class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-bolt text-xs"></i>
+          </div>
+          <span>تشغيل فوري بلمسة واحدة بدون متصفح</span>
         </div>
-        <div class="flex items-center gap-2">
-          <i class="fa-solid fa-wifi text-emerald-400 text-sm w-5 text-center"></i>
-          <span>تسجيل ومتابعة العمليات حتى بدون إنترنت</span>
+        <div class="flex items-center gap-2.5">
+          <div class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-wifi text-xs"></i>
+          </div>
+          <span>تسجيل الحسابات والعمليات حتى بدون إنترنت</span>
         </div>
-        <div class="flex items-center gap-2">
-          <i class="fa-solid fa-shield-halved text-cyan-400 text-sm w-5 text-center"></i>
-          <span>مزامنة سريعة وتنبيهات مالية لمواعيد الديون</span>
+        <div class="flex items-center gap-2.5">
+          <div class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-shield-halved text-xs"></i>
+          </div>
+          <span>مزامنة سحابية آمنة وتنبيهات مالية</span>
         </div>
       </div>
 
       <!-- Action buttons -->
-      <div class="mt-5 space-y-2">
+      <div class="mt-6 space-y-2.5">
         <button id="mobileInstallAcceptBtn" onclick="triggerMobileAppInstall()"
-          class="w-full py-3.5 px-4 rounded-2xl font-black text-sm text-white bg-gradient-to-r from-orange-600 via-orange-500 to-amber-500 shadow-[0_8px_25px_-5px_rgba(249,115,22,0.6)] hover:shadow-[0_10px_30px_-4px_rgba(249,115,22,0.8)] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+          class="w-full py-4 px-4 rounded-2xl font-black text-sm text-white bg-gradient-to-r from-orange-600 via-orange-500 to-amber-500 shadow-[0_10px_30px_-5px_rgba(249,115,22,0.7)] hover:shadow-[0_15px_35px_-4px_rgba(249,115,22,0.9)] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 border border-amber-400/30">
           <i class="fa-solid fa-download text-base"></i>
           <span>تثبيت التطبيق الآن</span>
         </button>
 
         <button onclick="dismissMobileInstall()"
-          class="w-full py-2.5 text-xs font-bold text-slate-400 hover:text-slate-200 transition">
-          لاحقاً
+          class="w-full py-3 px-4 rounded-2xl text-xs font-black text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 active:scale-[0.98] transition">
+          المتابعة من المتصفح (لاحقاً) ←
         </button>
       </div>
 
-      <!-- iOS specific instructions box (hidden by default, shown if on iPhone/iPad Safari) -->
-      <div id="iosInstallHelper" class="hidden mt-3 pt-3 border-t border-white/10 text-[11px] text-slate-300 text-center leading-relaxed">
-        لأجهزة آيفون: اضغط على زر المشاركة <span class="text-orange-400 font-black">⬆️</span> ثم اختر <strong class="text-white">"إضافة إلى الشاشة الرئيسية"</strong>
+      <!-- Android manual guidance (if beforeinstallprompt didn't fire) -->
+      <div id="androidInstallHelper" class="hidden mt-3 p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-[11px] text-orange-300 text-center leading-relaxed font-bold">
+        إذا لم تظهر نافذة التثبيت تلقائياً: اضغط على قائمة المتصفح <strong class="text-white">(⋮)</strong> بالأعلى واختر <strong class="text-white">"تثبيت التطبيق"</strong>.
+      </div>
+
+      <!-- iOS specific instructions box -->
+      <div id="iosInstallHelper" class="hidden mt-3 p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-[11px] text-orange-300 text-center leading-relaxed font-bold">
+        على الآيفون: اضغط على زر المشاركة <span class="text-white font-black text-sm">⬆️</span> أسفل الشاشة ثم اختر <strong class="text-white">"إضافة إلى الشاشة الرئيسية"</strong>.
       </div>
     </div>
   </div>
-
 </body>
-</html>
