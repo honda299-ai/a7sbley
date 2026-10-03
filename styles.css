@@ -1,21 +1,25 @@
 /* =========================================================
-   EHSEBLI / HONDA — Styles V9.3 (MOBILE-FIXED)
+   EHSEBLI / HONDA — Styles V9.4 (ULTIMATE MOBILE SCROLL FIX)
    ========================================================= */
 
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
 
-html, body {
-  width: 100%;
-  min-height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  height: 100%;
 }
 
 body {
-  overscroll-behavior-y: contain;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  position: relative;
 }
 
 ::selection { background: #f97316; color: white; }
@@ -35,14 +39,6 @@ body {
     transform: translateY(-2px);
     box-shadow: 0 10px 30px -10px rgba(249, 115, 22, .25);
     border-color: rgba(249, 115, 22, .4);
-  }
-}
-
-/* Glass - disabled on mobile for performance */
-@supports (backdrop-filter: blur(1px)) {
-  @media (min-width: 768px) {
-    .glass-dark { background: rgba(15, 17, 23, .86); backdrop-filter: blur(14px); }
-    .glass-light { background: rgba(255, 255, 255, .9); backdrop-filter: blur(14px); }
   }
 }
 
@@ -128,7 +124,6 @@ body.portal-mode #mobileBottomNav { display: none !important; }
   box-shadow: 0 0 0 3px rgba(249, 115, 22, .12);
 }
 
-/* iOS only - prevent zoom */
 @supports (-webkit-touch-callout: none) {
   @media (max-width: 767px) {
     input, select, textarea, .form-input {
@@ -310,7 +305,7 @@ body.privacy-active .money-val {
 }
 
 /* =========================================================
-   📱 MOBILE BOTTOM NAV (بدون blur - سرعة قصوى)
+   📱 MOBILE BOTTOM NAV
    ========================================================= */
 .mobile-bottom-nav {
   display: none;
@@ -322,7 +317,6 @@ body.privacy-active .money-val {
   padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
   justify-content: space-around;
   align-items: center;
-  will-change: transform;
 }
 html:not(.dark) .mobile-bottom-nav {
   background: #ffffff;
@@ -406,42 +400,12 @@ html:not(.dark) .mob-nav-fab { border-color: #ffffff; }
 }
 
 /* =========================================================
-   PWA SPLASH
+   PWA SPLASH - NEVER BLOCK TOUCHES
    ========================================================= */
 .pwa-splash {
-  position: fixed; inset: 0; z-index: 9999;
-  background: linear-gradient(135deg, #0f1117 0%, #1a1d26 50%, #090a0f 100%);
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 20px;
-  transition: opacity .3s ease, visibility .3s ease;
+  display: none !important;
+  pointer-events: none !important;
 }
-.pwa-splash.hide { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
-
-.pwa-splash-logo {
-  width: 80px; height: 80px; border-radius: 24px;
-  background: linear-gradient(135deg, #ea580c, #f97316, #fbbf24);
-  display: flex; align-items: center; justify-content: center;
-  color: white; font-size: 34px;
-  box-shadow: 0 20px 60px -15px rgba(249, 115, 22, .6);
-}
-.pwa-splash-title {
-  font-family: Cairo, sans-serif;
-  font-size: 28px; font-weight: 900; color: white;
-}
-.pwa-splash-loader { display: flex; gap: 8px; }
-.pwa-splash-loader span {
-  width: 9px; height: 9px; border-radius: 50%;
-  background: #f97316;
-  animation: splashBounce 1.4s ease-in-out infinite both;
-}
-.pwa-splash-loader span:nth-child(2) { animation-delay: 160ms; }
-.pwa-splash-loader span:nth-child(3) { animation-delay: 320ms; }
-@keyframes splashBounce {
-  0%, 80%, 100% { transform: scale(.6); opacity: .5; }
-  40% { transform: scale(1); opacity: 1; }
-}
-body:not(.pwa-standalone) .pwa-splash { display: none; }
 
 /* =========================================================
    OFFLINE / UPDATE / INSTALL BANNERS
@@ -514,7 +478,6 @@ body.offline::before {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;

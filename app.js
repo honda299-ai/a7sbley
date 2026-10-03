@@ -2571,10 +2571,7 @@ function switchTab(tab) {
   document.querySelectorAll('.mob-nav-btn[data-tab]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
-  if (window.innerWidth < 768) {
-    const tabs = document.getElementById('tabBtnTransactions');
-    if (tabs && tabs.scrollIntoView) tabs.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+
   if (isClients) renderClients();
 }
 
