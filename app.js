@@ -174,30 +174,86 @@ function normalizeTransaction(t) {
 }
 
 /* =========================================================
-   PWA: INSTALL PROMPT
+   PWA: MOBILE INSTALL DIALOG & PROMPTS
    ========================================================= */
-function installApp() {
+function isMobileDevice() {
+  return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth <= 768);
+}
+
+function isAppStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function checkMobileInstallDialog() {
+  if (isAppStandalone()) return; // Don't show if already installed and opened as app
+  if (!isMobileDevice()) return; // Prioritize mobile visitors
+
+  const dismissedTime = localStorage.getItem('a7sbley_install_dismissed_time');
+  const now = Date.now();
+  // Don't show again if dismissed within the last 2 days
+  if (dismissedTime && (now - Number(dismissedTime) < 2 * 24 * 60 * 60 * 1000)) {
+    return;
+  }
+
+  // Show modal after 1.5 seconds of browsing
+  setTimeout(() => {
+    showMobileInstallModal();
+  }, 1500);
+}
+
+function showMobileInstallModal() {
+  const modal = document.getElementById('mobileInstallModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const iosHelper = document.getElementById('iosInstallHelper');
+  const acceptBtn = document.getElementById('mobileInstallAcceptBtn');
+
+  if (isIOS) {
+    if (iosHelper) iosHelper.classList.remove('hidden');
+    if (acceptBtn) {
+      acceptBtn.innerHTML = '<i class="fa-solid fa-arrow-up-from-bracket"></i> <span>طريقة التثبيت على الآيفون</span>';
+      acceptBtn.onclick = () => {
+        showToast('اضغط زر المشاركة ⬆️ ثم اختر "إضافة إلى الشاشة الرئيسية"', 'info');
+      };
+    }
+  }
+}
+
+function dismissMobileInstall() {
+  const modal = document.getElementById('mobileInstallModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+  localStorage.setItem('a7sbley_install_dismissed_time', Date.now());
+}
+
+function triggerMobileAppInstall() {
   if (deferredInstallPrompt) {
     deferredInstallPrompt.prompt();
     deferredInstallPrompt.userChoice.then((choice) => {
-      if (choice.outcome === 'accepted') showToast('جاري تثبيت التطبيق...', 'success');
+      if (choice.outcome === 'accepted') {
+        showToast('جاري تثبيت التطبيق على جهازك...', 'success');
+        dismissMobileInstall();
+      }
       deferredInstallPrompt = null;
-      const btn = document.getElementById('installAppBtn');
-      if (btn) btn.classList.add('hidden');
     });
     return;
   }
+
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  if (isIOS) showToast('اضغط زر المشاركة ⬆️ ثم "إضافة إلى الشاشة الرئيسية"', 'info');
-  else showToast('التطبيق مثبّت بالفعل أو غير مدعوم في هذا المتصفح', 'info');
+  if (isIOS) {
+    showToast('اضغط زر المشاركة ⬆️ ثم "إضافة إلى الشاشة الرئيسية"', 'info');
+  } else {
+    showToast('إذا لم تظهر نافذة التثبيت، افتح قائمة المتصفح (⋮) واختر "تثبيت التطبيق"', 'info');
+  }
 }
 
-function registerServiceWorker() {
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    navigator.serviceWorker.register('./service-worker.js').catch((err) => {
-      console.warn('SW registration failed:', err);
-    });
-  }
+function installApp() {
+  triggerMobileAppInstall();
 }
 
 function initInstallPrompt() {
@@ -206,16 +262,24 @@ function initInstallPrompt() {
     deferredInstallPrompt = e;
     const btn = document.getElementById('installAppBtn');
     if (btn) btn.classList.remove('hidden');
+    // If on mobile and modal is not dismissed, show modal
+    checkMobileInstallDialog();
   });
+
   window.addEventListener('appinstalled', () => {
     deferredInstallPrompt = null;
     const btn = document.getElementById('installAppBtn');
     if (btn) btn.classList.add('hidden');
-    showToast('تم تثبيت التطبيق على جهازك بنجاح 🎉', 'success');
+    dismissMobileInstall();
+    showToast('تم تثبيت التطبيق بنجاح 🎉', 'success');
   });
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-    || window.navigator.standalone === true;
-  if (isStandalone) document.body.classList.add('pwa-standalone');
+
+  if (isAppStandalone()) {
+    document.body.classList.add('pwa-standalone');
+  } else {
+    // If beforeinstallprompt hasn't fired yet or on iOS, also check after load
+    setTimeout(checkMobileInstallDialog, 2000);
+  }
 }
 
 /* =========================================================
@@ -394,42 +458,6 @@ function applyUpdate() {
     navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
   }
   setTimeout(() => window.location.reload(), 300);
-}
-
-/* =========================================================
-   PWA: INSTALL BANNER (بعد 3 زيارات)
-   ========================================================= */
-function checkInstallPrompt() {
-  const visits = Number(localStorage.getItem('ehsebli_visits') || 0) + 1;
-  localStorage.setItem('ehsebli_visits', visits);
-  const dismissed = localStorage.getItem('ehsebli_install_dismissed') === 'true';
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-  if (visits >= 3 && !dismissed && !isStandalone && deferredInstallPrompt) showInstallBanner();
-}
-
-function showInstallBanner() {
-  if (document.getElementById('installBanner')) return;
-  const banner = document.createElement('div');
-  banner.id = 'installBanner';
-  banner.className = 'install-prompt';
-  banner.innerHTML = `
-    <div class="install-prompt-icon"><i class="fa-solid fa-mobile-screen-button"></i></div>
-    <div class="install-prompt-content">
-      <div class="install-prompt-title">ثبّت التطبيق على جوالك</div>
-      <div class="install-prompt-desc">وصول سريع بدون متصفح + عمل أوفلاين</div>
-    </div>
-    <div class="install-prompt-actions">
-      <button class="install-prompt-dismiss" onclick="dismissInstallBanner()">لاحقاً</button>
-      <button class="install-prompt-accept" onclick="installApp()">تثبيت</button>
-    </div>
-  `;
-  document.body.appendChild(banner);
-}
-
-function dismissInstallBanner() {
-  localStorage.setItem('ehsebli_install_dismissed', 'true');
-  const banner = document.getElementById('installBanner');
-  if (banner) banner.remove();
 }
 
 /* =========================================================
@@ -2738,7 +2766,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }, 100);
 
   // PWA: Install banner check (after 3 visits)
-  setTimeout(checkInstallPrompt, 2000);
+  
 
   // PWA: Service Worker update detection
   if ('serviceWorker' in navigator) {
