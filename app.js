@@ -1,4 +1,23 @@
 /* =========================================================
+   PUBLIC PORTAL INSTANT CHECK (الحل الجذري الفوري لصفحة العميل)
+   ========================================================= */
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('client')) {
+    window.isPortalModeActive = true;
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.classList.add('portal-mode');
+      const loading = document.getElementById('authLoading');
+      if (loading) loading.style.display = 'none';
+      const wall = document.getElementById('loginWall');
+      if (wall) wall.classList.add('hidden');
+      checkPublicPortalMode();
+    });
+  }
+})();
+
+
+/* =========================================================
    EHSEBLI / HONDA FINANCIAL MANAGER V9.3
    PWA Edition + Push Notifications (Clean Edition)
    ========================================================= */
@@ -615,6 +634,7 @@ async function checkPublicPortalMode() {
   isPortalModeActive = true;
   document.body.classList.add('portal-mode');
   hideAuthLoading();
+  hideLoginWall();
 
   let clientTransactions = [];
   if (uidParam) {
@@ -625,10 +645,20 @@ async function checkPublicPortalMode() {
       }
     } catch(e) { console.warn("Cloud load failed:", e); }
   }
-  if (!clientTransactions.length) {
-    loadLocalData();
-    clientTransactions = transactions;
+  
+  // If cloud load failed or returned empty, try querying the specific user document or fallback
+  if (!clientTransactions.length && uidParam) {
+    try {
+      const userRef = db.collection('users').doc(uidParam);
+      const snapshot = await userRef.get();
+      if (snapshot.exists && snapshot.data().transactions) {
+        clientTransactions = (snapshot.data().transactions || []).filter(validateTransaction);
+      }
+    } catch(err) {
+      console.warn("Fallback query error:", err);
+    }
   }
+
   renderPublicPortal(clientParam, clientTransactions);
   return true;
 }
@@ -1426,6 +1456,7 @@ function handleUserSwitch(uid) {
    AUTH STATE
    ========================================================= */
 auth.onAuthStateChanged(async user => {
+  if (window.isPortalModeActive || isPortalModeActive) return;
   if (isPortalModeActive) return;
   hideAuthLoading();
   authResolved = true;
@@ -3382,47 +3413,60 @@ async function shareDebtCardWhatsApp() {
 💰 *إجمالي الحساب:* ${money(total)} ج.م
 ${paid > 0 ? `💵 *المسدد:* ${money(paid)} ج.م\n` : ''}🔴 *المبلغ المطلوب سداده:* ${money(rem)} ج.م
 
-تم إرفاق صورة بطاقة إشعار الاستحقاق المالي.
 يرجى التكرم بالسداد لإغلاق العملية. شاكرين جداً لحسن تعاملكم الراقي معنا ✨
 — *احسبلي | a7sbley*`;
 
   const canvas = document.getElementById('debtCardCanvas');
 
-  // 1. محاولة نسخ الصورة مباشرة إلى الحافظة (Clipboard)
+  // الحل الجذري: استخدام نظام المشاركة الأصلية للموبايل (Web Share API with Files)
+  // هذا النظام يفتح قائمة المشاركة وتختار منها WhatsApp ليقوم بإرسال الصورة والنص معاً بضغطة زر واحدة!
+  if (canvas && navigator.canShare) {
+    try {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (blob) {
+        const file = new File([blob], `مطالبة_${d.client || 'عميل'}.png`, { type: 'image/png' });
+        const shareData = {
+          files: [file],
+          title: 'بطاقة مطالبة مالية | احسبلي',
+          text: text
+        };
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          showToast('تمت مشاركة الصورة والنص بنجاح ✓', 'success');
+          return;
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.warn("Native share fallback:", err);
+      } else {
+        return; // User cancelled
+      }
+    }
+  }
+
+  // إذا لم يدعم المتصفح مشاركة الملفات مباشرة (مثل بعض أجهزة الكمبيوتر):
+  // نقوم بنسخ الصورة للحافظة + تحميلها وتوجيه المستخدم للواتساب
   let copiedImage = false;
   if (canvas && navigator.clipboard && window.ClipboardItem) {
     try {
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
       if (blob) {
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob })
-        ]);
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
         copiedImage = true;
       }
-    } catch (e) {
-      console.warn("Clipboard image write failed:", e);
-    }
+    } catch (e) {}
   }
 
-  // إذا لم ينجح النسخ في الحافظة، نقوم بحفظ الصورة تلقائياً كملف تنزيل
   if (!copiedImage) {
     const downloadBtn = document.getElementById('downloadDebtCardBtn');
-    if (downloadBtn && downloadBtn.href) {
-      downloadBtn.click();
-    }
+    if (downloadBtn && downloadBtn.href) downloadBtn.click();
   }
 
-  // 2. إظهار تنبيه توجيهي للمستخدم
-  if (copiedImage) {
-    showToast('تم نسخ الصورة للحافظة 📋! اضغط "لصق / Paste" في شات الواتساب', 'success');
-  } else {
-    showToast('تم حفظ الصورة بجهازك! أرفقها من المعرض في الواتساب', 'info');
-  }
-
-  // 3. فتح شات الواتساب بالنص المكتوب
+  showToast(copiedImage ? 'تم نسخ الصورة للحافظة 📋! اضغط (لصق) في الواتساب' : 'تم حفظ الصورة! أرفقها من المعرض', 'info');
   setTimeout(() => {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-  }, 450);
+  }, 400);
 }
 
 async function shareViaSystemSheet() {

@@ -3,7 +3,7 @@
    PWA Engine + Offline Precache + Push Notifications
    ========================================================= */
 
-const CACHE_VERSION = 'a7sbley-v11.2';
+const CACHE_VERSION = 'a7sbley-v11.5';
 const RUNTIME_CACHE = 'a7sbley-runtime-v10.5';
 
 const PRECACHE_ASSETS = [
