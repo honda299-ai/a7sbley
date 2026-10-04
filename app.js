@@ -1388,6 +1388,7 @@ function hideAuthLoading() {
   document.getElementById('authLoading').style.display = 'none';
 }
 function showLoginWall() {
+  if (window.isPortalModeActive || new URLSearchParams(window.location.search).has('client')) return;
   if (isPortalModeActive) return;
   document.body.classList.add('not-authed');
   document.getElementById('loginWall').classList.remove('hidden');
@@ -1426,6 +1427,7 @@ function handleUserSwitch(uid) {
    AUTH STATE
    ========================================================= */
 auth.onAuthStateChanged(async user => {
+  if (window.isPortalModeActive || new URLSearchParams(window.location.search).has('client')) return;
   if (isPortalModeActive) return;
   hideAuthLoading();
   authResolved = true;
