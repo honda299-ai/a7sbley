@@ -2639,7 +2639,7 @@ async function forgotPinUnlock() {
 /* =========================================================
    TABS & TOAST
    ========================================================= */
-function switchTab(tab) {
+function switchTab(tab, shouldScroll = false) {
   if (tab === 'debts' && !hasFeature('debts')) { showToast('دفتر الديون غير متاح لدورك', 'error'); return; }
   currentTab = tab;
   const isTx = tab === 'transactions';
@@ -2656,6 +2656,25 @@ function switchTab(tab) {
   });
 
   if (isClients) renderClients();
+  else if (isDebts) renderDebts();
+  else if (isTx) renderTransactions();
+
+  // عند الضغط من الموبايل: النزول تلقائياً للقسم وفتحه
+  if (shouldScroll) {
+    setTimeout(() => {
+      const target = document.getElementById('tabBtnTransactions') || 
+                     document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1));
+      if (target) {
+        const headerOffset = 60;
+        const elementPosition = target.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+        window.scrollTo({
+          top: Math.max(0, offsetPosition),
+          behavior: 'smooth'
+        });
+      }
+    }, 50);
+  }
 }
 
 let toastTimer = null;
