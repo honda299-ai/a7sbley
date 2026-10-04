@@ -2682,7 +2682,8 @@ function showToast(message, type = 'success', allowUndo = false) {
   }, allowUndo ? 6000 : 3500);
 }
 
-function toggleMenu() {
+function toggleMenu(event) {
+  if (event && event.stopPropagation) event.stopPropagation();
   const menu = document.getElementById('dropMenu');
   if (!menu) return;
   menu.classList.toggle('hidden');
@@ -2694,8 +2695,16 @@ function closeMenus() {
 
 window.addEventListener('click', event => {
   const btn = document.getElementById('menuBtn');
+  const moreBtn = document.getElementById('mobileMoreBtn');
   const menu = document.getElementById('dropMenu');
-  if (btn && menu && !btn.contains(event.target) && !menu.contains(event.target)) menu.classList.add('hidden');
+  if (menu && !menu.classList.contains('hidden')) {
+    const clickedInsideBtn = btn && btn.contains(event.target);
+    const clickedInsideMore = moreBtn && moreBtn.contains(event.target);
+    const clickedInsideMenu = menu.contains(event.target);
+    if (!clickedInsideBtn && !clickedInsideMore && !clickedInsideMenu) {
+      menu.classList.add('hidden');
+    }
+  }
 });
 
 function confirmClearData() {

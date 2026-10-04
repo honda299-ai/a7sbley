@@ -532,22 +532,22 @@
 
   <!-- BOTTOM NAV -->
   <nav id="mobileBottomNav" class="mobile-bottom-nav no-print">
-    <button onclick="switchTab('transactions')" class="mob-nav-btn active" data-tab="transactions">
+    <button onclick="switchTab('transactions', true)" class="mob-nav-btn active" data-tab="transactions">
       <i class="fa-solid fa-list-check"></i>
       <span>المعاملات</span>
     </button>
-    <button onclick="switchTab('debts')" class="mob-nav-btn" data-tab="debts" data-feature="debts">
+    <button onclick="switchTab('debts', true)" class="mob-nav-btn" data-tab="debts" data-feature="debts">
       <i class="fa-solid fa-handshake"></i>
       <span>الديون</span>
     </button>
     <button onclick="openModal('expense')" class="mob-nav-fab" aria-label="إضافة">
       <i class="fa-solid fa-plus"></i>
     </button>
-    <button onclick="switchTab('clients')" class="mob-nav-btn" data-tab="clients">
+    <button onclick="switchTab('clients', true)" class="mob-nav-btn" data-tab="clients">
       <i class="fa-solid fa-users"></i>
       <span>العملاء</span>
     </button>
-    <button onclick="toggleMenu()" class="mob-nav-btn">
+    <button onclick="toggleMenu(event)" id="mobileMoreBtn" class="mob-nav-btn" aria-label="المزيد">
       <i class="fa-solid fa-ellipsis"></i>
       <span>المزيد</span>
     </button>
