@@ -1,23 +1,4 @@
 /* =========================================================
-   PUBLIC PORTAL INSTANT CHECK (الحل الجذري الفوري لصفحة العميل)
-   ========================================================= */
-(function() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.has('client')) {
-    window.isPortalModeActive = true;
-    document.addEventListener('DOMContentLoaded', () => {
-      document.body.classList.add('portal-mode');
-      const loading = document.getElementById('authLoading');
-      if (loading) loading.style.display = 'none';
-      const wall = document.getElementById('loginWall');
-      if (wall) wall.classList.add('hidden');
-      checkPublicPortalMode();
-    });
-  }
-})();
-
-
-/* =========================================================
    EHSEBLI / HONDA FINANCIAL MANAGER V9.3
    PWA Edition + Push Notifications (Clean Edition)
    ========================================================= */
@@ -634,7 +615,6 @@ async function checkPublicPortalMode() {
   isPortalModeActive = true;
   document.body.classList.add('portal-mode');
   hideAuthLoading();
-  hideLoginWall();
 
   let clientTransactions = [];
   if (uidParam) {
@@ -645,20 +625,10 @@ async function checkPublicPortalMode() {
       }
     } catch(e) { console.warn("Cloud load failed:", e); }
   }
-  
-  // If cloud load failed or returned empty, try querying the specific user document or fallback
-  if (!clientTransactions.length && uidParam) {
-    try {
-      const userRef = db.collection('users').doc(uidParam);
-      const snapshot = await userRef.get();
-      if (snapshot.exists && snapshot.data().transactions) {
-        clientTransactions = (snapshot.data().transactions || []).filter(validateTransaction);
-      }
-    } catch(err) {
-      console.warn("Fallback query error:", err);
-    }
+  if (!clientTransactions.length) {
+    loadLocalData();
+    clientTransactions = transactions;
   }
-
   renderPublicPortal(clientParam, clientTransactions);
   return true;
 }
@@ -899,12 +869,28 @@ function getLoginMethod() {
 function switchAdminTab(tab) {
   adminActiveTab = tab;
   const isUsers = tab === 'users';
-  document.getElementById('adminTabUsers').classList.toggle('active', isUsers);
-  document.getElementById('adminTabPerms').classList.toggle('active', !isUsers);
-  document.getElementById('adminPanelUsers').classList.toggle('hidden', !isUsers);
-  document.getElementById('adminPanelPerms').classList.toggle('hidden', isUsers);
+  const isReqs = tab === 'requests';
+  const isPerms = tab === 'permissions';
+  
+  const tabUsr = document.getElementById('adminTabUsers');
+  const tabReq = document.getElementById('adminTabRequests');
+  const tabPrm = document.getElementById('adminTabPerms');
+  
+  if (tabUsr) tabUsr.classList.toggle('active', isUsers);
+  if (tabReq) tabReq.classList.toggle('active', isReqs);
+  if (tabPrm) tabPrm.classList.toggle('active', isPerms);
+  
+  const panUsr = document.getElementById('adminPanelUsers');
+  const panReq = document.getElementById('adminPanelRequests');
+  const panPrm = document.getElementById('adminPanelPerms');
+  
+  if (panUsr) panUsr.classList.toggle('hidden', !isUsers);
+  if (panReq) panReq.classList.toggle('hidden', !isReqs);
+  if (panPrm) panPrm.classList.toggle('hidden', !isPerms);
+
   if (isUsers) renderUsersList();
-  else renderPermissionsEditor();
+  else if (isReqs) renderAdminRequests();
+  else if (isPerms) renderPermissionsEditor();
 }
 
 async function openAdminPanel() {
@@ -1456,7 +1442,6 @@ function handleUserSwitch(uid) {
    AUTH STATE
    ========================================================= */
 auth.onAuthStateChanged(async user => {
-  if (window.isPortalModeActive || isPortalModeActive) return;
   if (isPortalModeActive) return;
   hideAuthLoading();
   authResolved = true;
@@ -3533,4 +3518,174 @@ function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
   ctx.closePath();
   if (fill) ctx.fill();
   if (stroke) ctx.stroke();
+}
+
+
+/* =========================================================
+   CLIENT PENDING REQUESTS & APPROVAL SYSTEM (طلبات العملاء المعلقة)
+   ========================================================= */
+let pendingRequestsCache = [];
+
+async function submitClientPendingRequest(event) {
+  event.preventDefault();
+  const params = new URLSearchParams(window.location.search);
+  const clientName = params.get('client') || document.getElementById('portalClientName')?.textContent || 'عميل';
+  const uidParam = params.get('uid');
+  if (!uidParam) { showToast('معرّف المتجر غير صالح', 'error'); return; }
+
+  const type = document.getElementById('portalReqType').value;
+  const amount = Number(document.getElementById('portalReqAmount').value);
+  const notes = sanitizeString(document.getElementById('portalReqNotes').value, 200);
+
+  if (!amount || amount <= 0) { showToast('أدخل مبلغ صحيح', 'error'); return; }
+  if (!notes) { showToast('اكتب بيان الخدمة أو السبب', 'error'); return; }
+
+  const newReq = {
+    id: 'req-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+    client: clientName,
+    type,
+    amount,
+    category: type === 'debt_receivable' ? 'دين مستحق' : type === 'income' ? 'إيراد / دفعة' : 'مصروف',
+    notes,
+    date: todayString(),
+    time: formatTimeTo12Hour(currentInputTimeString()),
+    paymentMethod: 'معلق / طلب عميل',
+    status: 'pending_approval',
+    createdAt: Date.now()
+  };
+
+  try {
+    const userRef = db.collection('users').doc(uidParam);
+    await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(userRef);
+      let currentReqs = [];
+      if (doc.exists && Array.isArray(doc.data().pendingRequests)) {
+        currentReqs = doc.data().pendingRequests;
+      }
+      currentReqs.unshift(newReq);
+      transaction.set(userRef, { pendingRequests: currentReqs }, { merge: true });
+    });
+
+    showToast('تم إرسال طلبك بنجاح، في انتظار مراجعة وقبول المتجر ✓', 'success');
+    event.target.reset();
+  } catch (error) {
+    console.error("Failed to submit client request:", error);
+    showToast('فشل إرسال الطلب للسحابة', 'error');
+  }
+}
+
+function renderAdminRequests() {
+  const container = document.getElementById('adminRequestsList');
+  const badge = document.getElementById('pendingReqBadge');
+  if (!container) return;
+  container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> جاري التحميل...</div>';
+
+  if (!currentUser) return;
+  db.collection('users').doc(currentUser.uid).get().then(doc => {
+    if (!doc.exists) { container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400">لا توجد طلبات</div>'; return; }
+    const data = doc.data();
+    const reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
+    pendingRequestsCache = reqs;
+    if (badge) badge.textContent = reqs.length;
+
+    container.innerHTML = '';
+    if (!reqs.length) {
+      container.innerHTML = '<div class="text-center py-8 text-xs text-slate-400 font-bold"><i class="fa-solid fa-circle-check text-3xl mb-2 text-emerald-500 opacity-60"></i><p>لا توجد طلبات معلقة من العملاء</p></div>';
+      return;
+    }
+
+    reqs.forEach(req => {
+      const card = document.createElement('div');
+      card.className = 'p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+      card.innerHTML = `
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 text-[10px] font-black">طلب عميل جديد</span>
+            <span class="text-xs font-black text-slate-800 dark:text-white">${escapeHTML(req.client)}</span>
+          </div>
+          <div class="text-xs font-bold text-slate-700 dark:text-slate-200 mt-1">${escapeHTML(req.notes)}</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">${escapeHTML(typeName(req.type))} • ${money(req.amount)} ج.م • ${escapeHTML(req.date)}</div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button onclick="approveClientRequest('${req.id}')" class="px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-black hover:bg-emerald-600 transition flex items-center gap-1">
+            <i class="fa-solid fa-check"></i> موافق
+          </button>
+          <button onclick="rejectClientRequest('${req.id}')" class="px-3 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white text-xs font-black transition flex items-center gap-1">
+            <i class="fa-solid fa-xmark"></i> رفض
+          </button>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }).catch(err => {
+    container.innerHTML = '<div class="text-center py-4 text-xs text-rose-500">خطأ في جلب الطلبات</div>';
+  });
+}
+
+async function approveClientRequest(reqId) {
+  if (!currentUser) return;
+  const req = pendingRequestsCache.find(r => r.id === reqId);
+  if (!req) return;
+
+  openConfirm('قبول طلب العميل؟', `سيتم اعتماد معاملة لـ <strong>${escapeHTML(req.client)}</strong> بمبلغ <strong>${money(req.amount)} ج.م</strong> وإضافتها لحساباتك رسمياً.`, async () => {
+    try {
+      const userRef = db.collection('users').doc(currentUser.uid);
+      await db.runTransaction(async (transaction) => {
+        const doc = await transaction.get(userRef);
+        if (!doc.exists) return;
+        const data = doc.data();
+        let reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
+        let txs = Array.isArray(data.transactions) ? data.transactions : [];
+
+        // Remove from pending
+        reqs = reqs.filter(r => r.id !== reqId);
+
+        // Add to verified transactions
+        const newTx = normalizeTransaction({
+          id: 'tx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          type: req.type,
+          amount: req.amount,
+          date: req.date,
+          time: req.time,
+          client: req.client,
+          category: req.category,
+          paymentMethod: 'مقبول من العميل',
+          notes: req.notes,
+          status: isDebt(req.type) ? 'pending' : null,
+          _updatedAt: Date.now()
+        });
+        txs.unshift(newTx);
+
+        transaction.set(userRef, { pendingRequests: reqs, transactions: txs }, { merge: true });
+      });
+
+      showToast('تم قبول الطلب وإضافته للمعاملات بنجاح 🎉', 'success');
+      renderAdminRequests();
+      loadLocalData();
+      refreshAll();
+    } catch (error) {
+      showToast('فشل قبول الطلب', 'error');
+    }
+  });
+}
+
+async function rejectClientRequest(reqId) {
+  if (!currentUser) return;
+  openConfirm('رفض وحذف الطلب؟', 'سيتم تجاهل هذا الطلب وحذفه نهائياً.', async () => {
+    try {
+      const userRef = db.collection('users').doc(currentUser.uid);
+      await db.runTransaction(async (transaction) => {
+        const doc = await transaction.get(userRef);
+        if (!doc.exists) return;
+        let reqs = Array.isArray(doc.data().pendingRequests) ? doc.data().pendingRequests : [];
+        reqs = reqs.filter(r => r.id !== reqId);
+        transaction.set(userRef, { pendingRequests: reqs }, { merge: true });
+      });
+
+      showToast('تم رفض وحذف الطلب', 'info');
+      renderAdminRequests();
+    } catch (error) {
+      showToast('فشل رفض الطلب', 'error');
+    }
+  });
 }
