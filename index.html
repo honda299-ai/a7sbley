@@ -95,10 +95,10 @@
           <img id="userAvatar" src="" class="w-8 h-8 rounded-lg border border-orange-500/40 object-cover" alt="User">
         </div>
 
-        <!-- زر الثلاث نقط -->
+        <!-- زر الثلاث نقط (مخفي في الموبايل ومتاح في الديسكتوب فقط) -->
         <div class="relative">
-          <button onclick="toggleMenu()" id="menuBtn"
-            class="p-2.5 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-slate-600 dark:text-slate-300 hover:text-orange-500 transition">
+          <button onclick="toggleMenu(event)" id="menuBtn"
+            class="hidden sm:flex p-2.5 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-slate-600 dark:text-slate-300 hover:text-orange-500 transition items-center justify-center">
             <i class="fa-solid fa-ellipsis-vertical"></i>
           </button>
           
