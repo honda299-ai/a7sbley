@@ -1,4 +1,23 @@
 /* =========================================================
+   PUBLIC PORTAL INSTANT CHECK (الحل الجذري الفوري لصفحة العميل)
+   ========================================================= */
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('client')) {
+    window.isPortalModeActive = true;
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.classList.add('portal-mode');
+      const loading = document.getElementById('authLoading');
+      if (loading) loading.style.display = 'none';
+      const wall = document.getElementById('loginWall');
+      if (wall) wall.classList.add('hidden');
+      checkPublicPortalMode();
+    });
+  }
+})();
+
+
+/* =========================================================
    EHSEBLI / HONDA FINANCIAL MANAGER V9.3
    PWA Edition + Push Notifications (Clean Edition)
    ========================================================= */
@@ -624,8 +643,19 @@ async function checkPublicPortalMode() {
       if (doc.exists && doc.data().transactions) {
         clientTransactions = (doc.data().transactions || []).filter(validateTransaction);
       }
-    } catch(e) {
-      console.warn("Portal cloud load error:", e);
+    } catch(e) { console.warn("Cloud load failed:", e); }
+  }
+  
+  // If cloud load failed or returned empty, try querying the specific user document or fallback
+  if (!clientTransactions.length && uidParam) {
+    try {
+      const userRef = db.collection('users').doc(uidParam);
+      const snapshot = await userRef.get();
+      if (snapshot.exists && snapshot.data().transactions) {
+        clientTransactions = (snapshot.data().transactions || []).filter(validateTransaction);
+      }
+    } catch(err) {
+      console.warn("Fallback query error:", err);
     }
   }
 
@@ -1388,7 +1418,6 @@ function hideAuthLoading() {
   document.getElementById('authLoading').style.display = 'none';
 }
 function showLoginWall() {
-  if (window.isPortalModeActive || new URLSearchParams(window.location.search).has('client')) return;
   if (isPortalModeActive) return;
   document.body.classList.add('not-authed');
   document.getElementById('loginWall').classList.remove('hidden');
@@ -1427,7 +1456,7 @@ function handleUserSwitch(uid) {
    AUTH STATE
    ========================================================= */
 auth.onAuthStateChanged(async user => {
-  if (window.isPortalModeActive || new URLSearchParams(window.location.search).has('client')) return;
+  if (window.isPortalModeActive || isPortalModeActive) return;
   if (isPortalModeActive) return;
   hideAuthLoading();
   authResolved = true;
