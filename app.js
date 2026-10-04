@@ -1904,7 +1904,10 @@ function renderDebts() {
           <i class="fa-solid ${paid ? 'fa-circle-check' : 'fa-clock'}"></i>
           ${paid ? 'تم السداد بالكامل ✓' : isReceivable ? 'مستحق لي - معلق' : 'مستحق عليّ - معلق'}
         </span>
-        <div class="flex items-center gap-1.5">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button onclick="openDebtCardModal('${d.id}')" title="بطاقة مطالبة وتذكير بالدين" class="px-2.5 py-1.5 rounded-xl bg-orange-500/15 text-orange-400 hover:bg-orange-500 hover:text-white text-[10px] font-black transition flex items-center gap-1 border border-orange-500/30">
+            <i class="fa-solid fa-receipt"></i> <span>بطاقة مطالبة</span>
+          </button>
           ${!paid ? `<button onclick="openDebtPaymentModal('${d.id}')" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white text-[10px] font-black transition"><i class="fa-solid fa-hand-holding-dollar"></i> دفعة جزئية</button>` : ''}
           <button onclick="toggleDebtStatus('${d.id}')" class="px-2.5 py-1.5 rounded-xl ${paid ? 'bg-slate-200 dark:bg-dark-750 text-slate-700 dark:text-slate-300' : 'bg-orange-500 text-white'} text-[10px] font-black">${paid ? 'إعادة كمعلق' : 'تم السداد ✓'}</button>
           <button onclick="editTransaction('${d.id}')" class="p-2 rounded-xl text-slate-400 hover:text-orange-500"><i class="fa-solid fa-pen text-xs"></i></button>
@@ -3108,4 +3111,298 @@ function exportClientLedgerPDF() {
   } else {
     window.print();
   }
+}
+
+
+/* =========================================================
+   DEBT REMINDER CARD (توليد بطاقة المطالبة والتذكير)
+   ========================================================= */
+let currentCardDebt = null;
+
+async function openDebtCardModal(debtId) {
+  const debt = transactions.find(t => t.id === debtId);
+  if (!debt) return;
+  currentCardDebt = debt;
+  showToast('جاري تصميم بطاقة المطالبة...', 'info');
+
+  const canvas = document.getElementById('debtCardCanvas');
+  const ctx = canvas.getContext('2d');
+  
+  // High-res canvas for crystal clear quality
+  const W = 800;
+  const hasImage = !!debt.receipt;
+  const H = hasImage ? 1080 : 880;
+  canvas.width = W;
+  canvas.height = H;
+
+  // Background Gradient
+  const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+  bgGrad.addColorStop(0, '#11141c');
+  bgGrad.addColorStop(0.5, '#090a0f');
+  bgGrad.addColorStop(1, '#050608');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Outer Glowing Border
+  ctx.strokeStyle = '#f97316';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(15, 15, W - 30, H - 30);
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(24, 24, W - 48, H - 48);
+
+  // Ambient top light
+  const ambientGrad = ctx.createRadialGradient(W / 2, 0, 10, W / 2, 0, 450);
+  ambientGrad.addColorStop(0, 'rgba(249, 115, 22, 0.25)');
+  ambientGrad.addColorStop(1, 'transparent');
+  ctx.fillStyle = ambientGrad;
+  ctx.fillRect(0, 0, W, 400);
+
+  // Load Logo
+  try {
+    const logoImg = new Image();
+    logoImg.src = 'logo.png';
+    await new Promise((resolve) => {
+      logoImg.onload = resolve;
+      logoImg.onerror = resolve;
+    });
+    if (logoImg.complete && logoImg.naturalWidth !== 0) {
+      ctx.drawImage(logoImg, 50, 45, 90, 90);
+    }
+  } catch (e) {}
+
+  // Header Title
+  ctx.direction = 'rtl';
+  ctx.textAlign = 'right';
+
+  ctx.font = '900 34px Cairo, sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('احسبلي | a7sbley', W - 50, 80);
+
+  ctx.font = '700 18px Cairo, sans-serif';
+  ctx.fillStyle = '#f97316';
+  ctx.fillText('إشعار استحقاق مالي ومطالبة خدمة', W - 50, 115);
+
+  // Divider
+  ctx.strokeStyle = 'rgba(249, 115, 22, 0.35)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(50, 155);
+  ctx.lineTo(W - 50, 155);
+  ctx.stroke();
+
+  // Meta row (Date & Reference)
+  ctx.font = '700 15px Cairo, sans-serif';
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText(`تاريخ التسجيل: ${debt.date} ${debt.time ? `(${debt.time})` : ''}`, W - 50, 195);
+  
+  ctx.textAlign = 'left';
+  ctx.fillText(`المرجع: #${debt.id.slice(-6).toUpperCase()}`, 50, 195);
+
+  // Client Box
+  ctx.textAlign = 'right';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+  ctx.lineWidth = 1;
+  roundRect(ctx, 50, 225, W - 100, 95, 16, true, true);
+
+  ctx.font = '700 15px Cairo, sans-serif';
+  ctx.fillStyle = '#f97316';
+  ctx.fillText('العميل / الطرف المحترم:', W - 75, 260);
+
+  ctx.font = '900 24px Cairo, sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(debt.client || 'عميل محترم', W - 75, 295);
+
+  // Service Details Box
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+  roundRect(ctx, 50, 335, W - 100, 105, 16, true, true);
+
+  ctx.font = '700 15px Cairo, sans-serif';
+  ctx.fillStyle = '#f97316';
+  ctx.fillText('تفاصيل الخدمة / العملية:', W - 75, 370);
+
+  ctx.font = '800 21px Cairo, sans-serif';
+  ctx.fillStyle = '#f1f5f9';
+  const notesText = debt.notes || debt.category || 'خدمة صيانة وسوفت وير';
+  ctx.fillText(notesText.slice(0, 50), W - 75, 410);
+
+  let currentY = 460;
+
+  // Optional: Image of Device / Receipt
+  if (hasImage) {
+    try {
+      const receiptImg = new Image();
+      receiptImg.crossOrigin = 'anonymous';
+      receiptImg.src = debt.receipt;
+      await new Promise((resolve) => {
+        receiptImg.onload = resolve;
+        receiptImg.onerror = resolve;
+      });
+
+      if (receiptImg.complete && receiptImg.naturalWidth !== 0) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.strokeStyle = 'rgba(249, 115, 22, 0.3)';
+        roundRect(ctx, 50, currentY, W - 100, 200, 16, true, true);
+
+        // Draw image clipped inside
+        ctx.save();
+        ctx.beginPath();
+        roundRect(ctx, 55, currentY + 5, W - 110, 190, 12, false, false);
+        ctx.clip();
+        
+        // draw cover
+        const imgRatio = receiptImg.width / receiptImg.height;
+        const boxW = W - 110;
+        const boxH = 190;
+        let dw = boxW;
+        let dh = boxW / imgRatio;
+        if (dh < boxH) {
+          dh = boxH;
+          dw = boxH * imgRatio;
+        }
+        const dx = 55 + (boxW - dw) / 2;
+        const dy = (currentY + 5) + (boxH - dh) / 2;
+        ctx.drawImage(receiptImg, dx, dy, dw, dh);
+        ctx.restore();
+
+        // Badge on image
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        roundRect(ctx, W - 190, currentY + 15, 120, 30, 8, true, false);
+        ctx.font = '800 13px Cairo, sans-serif';
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillText('📷 صورة الجهاز', W - 85, currentY + 36);
+
+        currentY += 215;
+      }
+    } catch (e) {
+      console.warn("Failed drawing card receipt image:", e);
+    }
+  }
+
+  // Financial Big Box
+  const total = Number(debt.amount) || 0;
+  const paidAmt = Number(debt.paidAmount) || 0;
+  const remaining = Math.max(0, total - paidAmt);
+
+  const finGrad = ctx.createLinearGradient(50, currentY, W - 50, currentY + 140);
+  finGrad.addColorStop(0, 'rgba(234, 88, 12, 0.25)');
+  finGrad.addColorStop(1, 'rgba(249, 115, 22, 0.08)');
+  ctx.fillStyle = finGrad;
+  ctx.strokeStyle = '#f97316';
+  ctx.lineWidth = 2;
+  roundRect(ctx, 50, currentY, W - 100, 140, 20, true, true);
+
+  // Labels inside financial box
+  ctx.font = '700 15px Cairo, sans-serif';
+  ctx.fillStyle = '#cbd5e1';
+  ctx.fillText('إجمالي المبلغ:', W - 80, currentY + 45);
+  ctx.fillText('المسدد منه:', W - 80, currentY + 95);
+
+  ctx.textAlign = 'left';
+  ctx.font = '800 18px Cairo, sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(`${money(total)} ج.م`, W / 2 + 30, currentY + 45);
+  ctx.fillText(`${money(paidAmt)} ج.م`, W / 2 + 30, currentY + 95);
+
+  // Big Highlight for Remaining Amount
+  ctx.fillStyle = '#ea580c';
+  roundRect(ctx, 65, currentY + 20, (W / 2) - 80, 100, 16, true, false);
+
+  ctx.textAlign = 'center';
+  ctx.font = '700 14px Cairo, sans-serif';
+  ctx.fillStyle = '#ffedd5';
+  ctx.fillText('المتبقي المطلوب سداده', 65 + ((W / 2) - 80) / 2, currentY + 52);
+
+  ctx.font = '900 28px Cairo, sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(`${money(remaining)} ج.م`, 65 + ((W / 2) - 80) / 2, currentY + 95);
+
+  currentY += 160;
+
+  // Formal polite footer text
+  ctx.textAlign = 'right';
+  ctx.font = '700 13px Cairo, sans-serif';
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText('• يرجى التكرم بسداد المبلغ المستحق أعلاه لإغلاق حساب العملية، شاكرين ومقدرين حسن تعاونكم معنا.', W - 50, currentY);
+
+  if (debt.dueDate) {
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillText(`• موعد الاستحقاق المتفق عليه: ${debt.dueDate}`, W - 50, currentY + 28);
+  }
+
+  // Watermark footer
+  ctx.textAlign = 'center';
+  ctx.font = '800 12px Cairo, sans-serif';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.fillText('احسبلي | a7sbley Financial Management System', W / 2, H - 25);
+
+  // Convert canvas to image
+  const dataUrl = canvas.toDataURL('image/png', 0.95);
+  const previewImg = document.getElementById('debtCardImg');
+  const downloadBtn = document.getElementById('downloadDebtCardBtn');
+  
+  if (previewImg) previewImg.src = dataUrl;
+  if (downloadBtn) {
+    downloadBtn.href = dataUrl;
+    downloadBtn.download = `مطالبة_${debt.client || 'عميل'}_${debt.date}.png`;
+  }
+
+  // Open modal
+  const modal = document.getElementById('debtCardModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+}
+
+function closeDebtCardModal() {
+  const modal = document.getElementById('debtCardModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+  currentCardDebt = null;
+}
+
+function shareDebtCardWhatsApp() {
+  if (!currentCardDebt) return;
+  const d = currentCardDebt;
+  const total = Number(d.amount) || 0;
+  const paid = Number(d.paidAmount) || 0;
+  const rem = Math.max(0, total - paid);
+
+  const text = `السلام عليكم ورحمة الله،
+أهلاً بحضرتك يا ${d.client || 'فندم'} 🤝
+
+نحيطكم علماً بأنه تم إنجاز الخدمة التالية بنجاح:
+📌 *الخدمة:* ${d.notes || d.category || 'خدمة صيانة'}
+📅 *التاريخ:* ${d.date}
+💰 *إجمالي الحساب:* ${money(total)} ج.م
+${paid > 0 ? `💵 *المسدد:* ${money(paid)} ج.م
+` : ''}🔴 *المبلغ المطلوب سداده:* ${money(rem)} ج.م
+
+تم إرفاق صورة بطاقة إشعار الاستحقاق المالي.
+يرجى التكرم بالسداد لإغلاق العملية. شاكرين جداً لحسن تعاملكم الراقي معنا ✨
+— *احسبلي | a7sbley*`;
+
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+}
+
+// Utility to draw rounded rect on canvas
+function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+  if (fill) ctx.fill();
+  if (stroke) ctx.stroke();
 }

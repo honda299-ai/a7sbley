@@ -1149,4 +1149,42 @@
       </div>
     </div>
   </div>
+
+  <!-- DEBT REMINDER CARD MODAL -->
+  <div id="debtCardModal" class="fixed inset-0 z-[120] hidden items-center justify-center p-3 bg-black/85 backdrop-blur-sm" onclick="closeDebtCardModal()">
+    <div class="relative max-w-lg w-full bg-slate-900 border border-orange-500/40 rounded-3xl p-4 sm:p-5 shadow-2xl modal-enter overflow-hidden flex flex-col items-center" onclick="event.stopPropagation()">
+      <div class="w-full flex items-center justify-between pb-3 border-b border-white/10 mb-3">
+        <div class="flex items-center gap-2 text-white font-black text-sm">
+          <i class="fa-solid fa-receipt text-orange-500"></i>
+          <span>بطاقة المطالبة المالية</span>
+        </div>
+        <button onclick="closeDebtCardModal()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Preview Image of the Card -->
+      <div id="debtCardPreviewContainer" class="w-full max-h-[60vh] overflow-y-auto rounded-2xl border border-white/10 bg-black/50 p-1 flex justify-center">
+        <img id="debtCardImg" class="max-w-full rounded-xl shadow-lg object-contain" alt="بطاقة المطالبة">
+      </div>
+
+      <!-- Hidden canvas for rendering -->
+      <canvas id="debtCardCanvas" style="display:none;"></canvas>
+
+      <!-- Actions -->
+      <div class="w-full grid grid-cols-2 gap-2.5 mt-4">
+        <a id="downloadDebtCardBtn" href="" download="debt-notice.png"
+           class="py-3 px-3 rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg hover:brightness-110 active:scale-95 transition text-center">
+          <i class="fa-solid fa-download"></i>
+          <span>تحميل الصورة</span>
+        </a>
+        <button id="shareDebtCardWhatsAppBtn" onclick="shareDebtCardWhatsApp()"
+           class="py-3 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg active:scale-95 transition text-center">
+          <i class="fa-brands fa-whatsapp text-sm"></i>
+          <span>إرسال واتساب</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
 </body>
