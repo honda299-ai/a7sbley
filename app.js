@@ -3366,7 +3366,7 @@ function closeDebtCardModal() {
   currentCardDebt = null;
 }
 
-function shareDebtCardWhatsApp() {
+async function shareDebtCardWhatsApp() {
   if (!currentCardDebt) return;
   const d = currentCardDebt;
   const total = Number(d.amount) || 0;
@@ -3380,14 +3380,98 @@ function shareDebtCardWhatsApp() {
 📌 *الخدمة:* ${d.notes || d.category || 'خدمة صيانة'}
 📅 *التاريخ:* ${d.date}
 💰 *إجمالي الحساب:* ${money(total)} ج.م
-${paid > 0 ? `💵 *المسدد:* ${money(paid)} ج.م
-` : ''}🔴 *المبلغ المطلوب سداده:* ${money(rem)} ج.م
+${paid > 0 ? `💵 *المسدد:* ${money(paid)} ج.م\n` : ''}🔴 *المبلغ المطلوب سداده:* ${money(rem)} ج.م
 
 تم إرفاق صورة بطاقة إشعار الاستحقاق المالي.
 يرجى التكرم بالسداد لإغلاق العملية. شاكرين جداً لحسن تعاملكم الراقي معنا ✨
 — *احسبلي | a7sbley*`;
 
-  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  const canvas = document.getElementById('debtCardCanvas');
+
+  // 1. محاولة نسخ الصورة مباشرة إلى الحافظة (Clipboard)
+  let copiedImage = false;
+  if (canvas && navigator.clipboard && window.ClipboardItem) {
+    try {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (blob) {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        copiedImage = true;
+      }
+    } catch (e) {
+      console.warn("Clipboard image write failed:", e);
+    }
+  }
+
+  // إذا لم ينجح النسخ في الحافظة، نقوم بحفظ الصورة تلقائياً كملف تنزيل
+  if (!copiedImage) {
+    const downloadBtn = document.getElementById('downloadDebtCardBtn');
+    if (downloadBtn && downloadBtn.href) {
+      downloadBtn.click();
+    }
+  }
+
+  // 2. إظهار تنبيه توجيهي للمستخدم
+  if (copiedImage) {
+    showToast('تم نسخ الصورة للحافظة 📋! اضغط "لصق / Paste" في شات الواتساب', 'success');
+  } else {
+    showToast('تم حفظ الصورة بجهازك! أرفقها من المعرض في الواتساب', 'info');
+  }
+
+  // 3. فتح شات الواتساب بالنص المكتوب
+  setTimeout(() => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  }, 450);
+}
+
+async function shareViaSystemSheet() {
+  if (!currentCardDebt) return;
+  const d = currentCardDebt;
+  const total = Number(d.amount) || 0;
+  const paid = Number(d.paidAmount) || 0;
+  const rem = Math.max(0, total - paid);
+
+  const text = `السلام عليكم ورحمة الله،
+أهلاً بحضرتك يا ${d.client || 'فندم'} 🤝
+
+نحيطكم علماً بأنه تم إنجاز الخدمة التالية بنجاح:
+📌 *الخدمة:* ${d.notes || d.category || 'خدمة صيانة'}
+📅 *التاريخ:* ${d.date}
+💰 *إجمالي الحساب:* ${money(total)} ج.م
+${paid > 0 ? `💵 *المسدد:* ${money(paid)} ج.م\n` : ''}🔴 *المبلغ المطلوب سداده:* ${money(rem)} ج.م
+
+تم إرفاق صورة بطاقة إشعار الاستحقاق المالي.
+يرجى التكرم بالسداد لإغلاق العملية. شاكرين جداً لحسن تعاملكم الراقي معنا ✨
+— *احسبلي | a7sbley*`;
+
+  const canvas = document.getElementById('debtCardCanvas');
+  if (canvas && navigator.canShare) {
+    try {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (blob) {
+        const file = new File([blob], `مطالبة_${d.client || 'عميل'}.png`, { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'بطاقة مطالبة مالية | احسبلي',
+            text: text
+          });
+          showToast('تم فتح نافذة المشاركة بنجاح ✓', 'success');
+          return;
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.warn("Share API fallback:", err);
+      } else {
+        return;
+      }
+    }
+  }
+
+  // Fallback
+  shareDebtCardWhatsApp();
 }
 
 // Utility to draw rounded rect on canvas

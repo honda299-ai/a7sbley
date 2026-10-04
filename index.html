@@ -1172,18 +1172,28 @@
       <canvas id="debtCardCanvas" style="display:none;"></canvas>
 
       <!-- Actions -->
-      <div class="w-full grid grid-cols-2 gap-2.5 mt-4">
-        <a id="downloadDebtCardBtn" href="" download="debt-notice.png"
-           class="py-3 px-3 rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg hover:brightness-110 active:scale-95 transition text-center">
-          <i class="fa-solid fa-download"></i>
-          <span>تحميل الصورة</span>
-        </a>
+      <div class="w-full space-y-2 mt-4">
         <button id="shareDebtCardWhatsAppBtn" onclick="shareDebtCardWhatsApp()"
-           class="py-3 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg active:scale-95 transition text-center">
-          <i class="fa-brands fa-whatsapp text-sm"></i>
-          <span>إرسال واتساب</span>
+           class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 active:scale-[0.98] transition text-center">
+          <i class="fa-brands fa-whatsapp text-base"></i>
+          <span>إرسال للواتساب (نسخ الصورة وتجهيز الكلام)</span>
         </button>
+        <div class="grid grid-cols-2 gap-2">
+          <a id="downloadDebtCardBtn" href="" download="debt-notice.png"
+             class="py-2.5 px-3 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-orange-400 font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition text-center">
+            <i class="fa-solid fa-download"></i>
+            <span>حفظ بالمعرض</span>
+          </a>
+          <button onclick="shareViaSystemSheet()"
+             class="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition text-center">
+            <i class="fa-solid fa-share-nodes"></i>
+            <span>مشاركة كاملة</span>
+          </button>
+        </div>
       </div>
+      <p class="text-[10px] text-slate-400 mt-2 text-center">
+        💡 عند فتح الواتساب، اضغط <strong class="text-emerald-400">"لصق / Paste"</strong> في صندوق الكتابة لإرسال الصورة مباشرة.
+      </p>
     </div>
   </div>
 
