@@ -3800,6 +3800,7 @@ async function approveGlobalClientRequest(reqId) {
   const req = pendingRequestsCache.find(r => r.id === reqId);
   if (!req) return;
 
+  closeClientRequestsModal();
   openConfirm('قبول طلب العميل؟', `سيتم اعتماد معاملة لـ <strong>${escapeHTML(req.client)}</strong> بمبلغ <strong>${money(req.amount)} ج.م</strong> وإضافتها لحساباتك رسمياً.`, async () => {
     try {
       const userRef = db.collection('users').doc(currentUser.uid);
@@ -3831,6 +3832,7 @@ async function approveGlobalClientRequest(reqId) {
       });
 
       showToast('تم قبول الطلب وإضافته للمعاملات بنجاح 🎉', 'success');
+      updateGlobalPendingAlert(reqs);
       renderGlobalClientRequests();
       loadLocalData();
       refreshAll();
@@ -3842,6 +3844,7 @@ async function approveGlobalClientRequest(reqId) {
 
 async function rejectGlobalClientRequest(reqId) {
   if (!currentUser) return;
+  closeClientRequestsModal();
   openConfirm('رفض وحذف الطلب؟', 'سيتم تجاهل هذا الطلب وحذفه نهائياً.', async () => {
     try {
       const userRef = db.collection('users').doc(currentUser.uid);
@@ -3854,6 +3857,7 @@ async function rejectGlobalClientRequest(reqId) {
       });
 
       showToast('تم رفض وحذف الطلب', 'info');
+      updateGlobalPendingAlert(reqs);
       renderGlobalClientRequests();
     } catch (error) {
       showToast('فشل رفض الطلب', 'error');
