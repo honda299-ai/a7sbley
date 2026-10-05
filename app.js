@@ -3728,3 +3728,135 @@ function updateGlobalPendingAlert(reqs) {
     alertEl.classList.remove('flex');
   }
 }
+
+
+/* =========================================================
+   FREE CLIENT REQUESTS APPROVAL MODAL (متاح لكل الحسابات)
+   ========================================================= */
+function openClientRequestsModal() {
+  if (!requireAuth()) return;
+  const modal = document.getElementById('clientRequestsModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  renderGlobalClientRequests();
+}
+
+function closeClientRequestsModal() {
+  const modal = document.getElementById('clientRequestsModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+function renderGlobalClientRequests() {
+  const container = document.getElementById('globalClientRequestsList');
+  if (!container) return;
+  container.innerHTML = '<div class="text-center py-6 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin text-orange-500 text-base"></i><p class="mt-2">جاري جلب الطلبات...</p></div>';
+
+  if (!currentUser) return;
+  db.collection('users').doc(currentUser.uid).get().then(doc => {
+    if (!doc.exists) { container.innerHTML = '<div class="text-center py-6 text-xs text-slate-400 font-bold">لا توجد طلبات</div>'; return; }
+    const data = doc.data();
+    const reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
+    pendingRequestsCache = reqs;
+
+    container.innerHTML = '';
+    if (!reqs.length) {
+      container.innerHTML = '<div class="text-center py-10 text-xs text-slate-400 font-bold"><i class="fa-solid fa-circle-check text-3xl mb-2 text-emerald-500 opacity-80"></i><p>لا توجد طلبات معلقة من العملاء حالياً</p></div>';
+      return;
+    }
+
+    reqs.forEach(req => {
+      const card = document.createElement('div');
+      card.className = 'p-3.5 rounded-2xl border border-amber-500/30 bg-black/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+      card.innerHTML = `
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black">طلب جديد</span>
+            <span class="text-xs font-black text-white">${escapeHTML(req.client)}</span>
+          </div>
+          <div class="text-xs font-bold text-slate-200 mt-1">${escapeHTML(req.notes)}</div>
+          <div class="text-[10px] text-orange-400 mt-0.5 font-bold">${escapeHTML(typeName(req.type))} • ${money(req.amount)} ج.م • ${escapeHTML(req.date)}</div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button onclick="approveGlobalClientRequest('${req.id}')" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition flex items-center gap-1 shadow">
+            <i class="fa-solid fa-check"></i> موافق
+          </button>
+          <button onclick="rejectGlobalClientRequest('${req.id}')" class="px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500 text-rose-400 hover:text-white text-xs font-black transition flex items-center gap-1">
+            <i class="fa-solid fa-xmark"></i> رفض
+          </button>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }).catch(err => {
+    container.innerHTML = '<div class="text-center py-6 text-xs text-rose-500 font-bold">خطأ في جلب الطلبات من السحابة</div>';
+  });
+}
+
+async function approveGlobalClientRequest(reqId) {
+  if (!currentUser) return;
+  const req = pendingRequestsCache.find(r => r.id === reqId);
+  if (!req) return;
+
+  openConfirm('قبول طلب العميل؟', `سيتم اعتماد معاملة لـ <strong>${escapeHTML(req.client)}</strong> بمبلغ <strong>${money(req.amount)} ج.م</strong> وإضافتها لحساباتك رسمياً.`, async () => {
+    try {
+      const userRef = db.collection('users').doc(currentUser.uid);
+      await db.runTransaction(async (transaction) => {
+        const doc = await transaction.get(userRef);
+        if (!doc.exists) return;
+        const data = doc.data();
+        let reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
+        let txs = Array.isArray(data.transactions) ? data.transactions : [];
+
+        reqs = reqs.filter(r => r.id !== reqId);
+
+        const newTx = normalizeTransaction({
+          id: 'tx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          type: req.type,
+          amount: req.amount,
+          date: req.date,
+          time: req.time,
+          client: req.client,
+          category: req.category,
+          paymentMethod: 'مقبول من العميل',
+          notes: req.notes,
+          status: isDebt(req.type) ? 'pending' : null,
+          _updatedAt: Date.now()
+        });
+        txs.unshift(newTx);
+
+        transaction.set(userRef, { pendingRequests: reqs, transactions: txs }, { merge: true });
+      });
+
+      showToast('تم قبول الطلب وإضافته للمعاملات بنجاح 🎉', 'success');
+      renderGlobalClientRequests();
+      loadLocalData();
+      refreshAll();
+    } catch (error) {
+      showToast('فشل قبول الطلب', 'error');
+    }
+  });
+}
+
+async function rejectGlobalClientRequest(reqId) {
+  if (!currentUser) return;
+  openConfirm('رفض وحذف الطلب؟', 'سيتم تجاهل هذا الطلب وحذفه نهائياً.', async () => {
+    try {
+      const userRef = db.collection('users').doc(currentUser.uid);
+      await db.runTransaction(async (transaction) => {
+        const doc = await transaction.get(userRef);
+        if (!doc.exists) return;
+        let reqs = Array.isArray(doc.data().pendingRequests) ? doc.data().pendingRequests : [];
+        reqs = reqs.filter(r => r.id !== reqId);
+        transaction.set(userRef, { pendingRequests: reqs }, { merge: true });
+      });
+
+      showToast('تم رفض وحذف الطلب', 'info');
+      renderGlobalClientRequests();
+    } catch (error) {
+      showToast('فشل رفض الطلب', 'error');
+    }
+  });
+}

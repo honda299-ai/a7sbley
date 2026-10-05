@@ -82,7 +82,7 @@
         </button>
         
         <!-- تنبيه طلبات العملاء المعلقة (ينور أحمر ونابض) -->
-        <div id="globalPendingAlert" onclick="openAdminPanel(); switchAdminTab('requests');" 
+        <div id="globalPendingAlert" onclick="openClientRequestsModal()" 
              class="hidden cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/50 text-rose-400 font-black text-xs animate-pulse shadow-[0_0_15px_rgba(244,63,94,0.5)] transition hover:scale-105">
           <i class="fa-solid fa-bell text-rose-500"></i>
           <span class="hidden sm:inline">طلبات عملاء جديدة</span>
@@ -1252,6 +1252,29 @@
       <p class="text-[10px] text-slate-400 mt-2 text-center">
         💡 عند فتح الواتساب، اضغط <strong class="text-emerald-400">"لصق / Paste"</strong> في صندوق الكتابة لإرسال الصورة مباشرة.
       </p>
+    </div>
+  </div>
+
+
+  <!-- CLIENT REQUESTS MODAL (متاح لكل الحسابات مجاناً) -->
+  <div id="clientRequestsModal" class="fixed inset-0 z-[130] hidden items-center justify-center p-3 bg-black/80 backdrop-blur-sm" onclick="closeClientRequestsModal()">
+    <div class="relative max-w-lg w-full bg-slate-900 border border-amber-500/40 rounded-3xl p-4 sm:p-5 shadow-2xl modal-enter overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+      <div class="w-full flex items-center justify-between pb-3 border-b border-white/10 mb-3 shrink-0">
+        <div class="flex items-center gap-2 text-white font-black text-sm">
+          <i class="fa-solid fa-clock-rotate-left text-amber-500"></i>
+          <span>طلبات العملاء المعلقة (بانتظار موافقتك)</span>
+        </div>
+        <button onclick="closeClientRequestsModal()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="text-xs font-bold text-slate-400 mb-2">الطلبات المرسلة من صفحة العملاء:</div>
+      <div id="globalClientRequestsList" class="overflow-y-auto space-y-2.5 flex-1 max-h-[60vh] pr-1"></div>
+
+      <button onclick="closeClientRequestsModal()" class="w-full mt-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-black text-xs transition">
+        إغلاق
+      </button>
     </div>
   </div>
 
