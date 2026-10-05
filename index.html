@@ -80,6 +80,15 @@
           <i class="fa-solid fa-download"></i>
           <span>تثبيت</span>
         </button>
+        
+        <!-- تنبيه طلبات العملاء المعلقة (ينور أحمر ونابض) -->
+        <div id="globalPendingAlert" onclick="openAdminPanel(); switchAdminTab('requests');" 
+             class="hidden cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/50 text-rose-400 font-black text-xs animate-pulse shadow-[0_0_15px_rgba(244,63,94,0.5)] transition hover:scale-105">
+          <i class="fa-solid fa-bell text-rose-500"></i>
+          <span class="hidden sm:inline">طلبات عملاء جديدة</span>
+          <span id="globalPendingCount" class="w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center font-black">0</span>
+        </div>
+
         <!-- زر إضافة عملية -->
         <button onclick="openModal('expense')"
           class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow">

@@ -1146,6 +1146,7 @@ function subscribeToUserDoc(uid) {
     const data = doc.data();
     if (!isSuperAdmin && data.role && ROLES_META[data.role]) userRole = data.role;
     currentUserPermissionsOverride = data.permissionsOverride || null;
+    updateGlobalPendingAlert(data.pendingRequests || []);
     applyRoleUI();
     refreshAll();
   });
@@ -3709,4 +3710,21 @@ async function rejectClientRequest(reqId) {
       showToast('فشل رفض الطلب', 'error');
     }
   });
+}
+
+
+function updateGlobalPendingAlert(reqs) {
+  const alertEl = document.getElementById('globalPendingAlert');
+  const countEl = document.getElementById('globalPendingCount');
+  if (!alertEl || !countEl) return;
+  
+  const count = Array.isArray(reqs) ? reqs.length : 0;
+  if (count > 0) {
+    alertEl.classList.remove('hidden');
+    alertEl.classList.add('flex');
+    countEl.textContent = count;
+  } else {
+    alertEl.classList.add('hidden');
+    alertEl.classList.remove('flex');
+  }
 }
