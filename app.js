@@ -1302,11 +1302,15 @@ async function submitEmailAuth() {
 async function sendPasswordReset() {
   hideEmailError();
   const email = (document.getElementById('emailInput').value || '').trim().toLowerCase();
-  if (!email) { showEmailError('❌ اكتب الإيميل أولاً'); return; }
+  if (!email) { showEmailError('❌ اكتب الإيميل في الحقل بالأعلى أولاً'); return; }
+  showToast('جاري إرسال إيميل الاستعادة...', 'info');
   try {
     await auth.sendPasswordResetEmail(email);
-    showToast('تم إرسال رابط استعادة كلمة السر للإيميل', 'success');
-  } catch (error) { showEmailError('❌ ' + (error.message || error.code)); }
+    showToast('تم إرسال رابط استعادة كلمة السر للإيميل بنجاح 📧 (تحقق من Spam)', 'success');
+  } catch (error) { 
+    showEmailError('❌ خطأ: ' + (error.message || error.code));
+    showToast('فشل الإرسال: ' + error.code, 'error');
+  }
 }
 
 function initRecaptcha() {
