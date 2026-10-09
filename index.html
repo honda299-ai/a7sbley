@@ -1264,6 +1264,17 @@
   </div>
 
 
+  
+            <button onclick="openRecurringModal()" class="menu-item text-orange-400">
+              <i class="fa-solid fa-repeat"></i> المصاريف المتكررة والثابتة
+            </button>
+            <button onclick="openDrawerModal()" class="menu-item text-emerald-400">
+              <i class="fa-solid fa-cash-register"></i> مطابقة الدرج والخزينة الفعلي
+            </button>
+            <button onclick="openKPIModal()" class="menu-item text-cyan-400">
+              <i class="fa-solid fa-chart-line"></i> مؤشرات الأداء والتحليلات (KPIs)
+            </button>
+
   <!-- PROFIT MARGIN CALCULATOR MODAL -->
   <div id="profitModal" class="fixed inset-0 z-[125] hidden items-center justify-center p-3 bg-black/80 backdrop-blur-sm" onclick="closeProfitModal()">
     <div class="relative max-w-md w-full bg-slate-900 border border-amber-500/40 rounded-3xl p-5 shadow-2xl modal-enter" onclick="event.stopPropagation()">
@@ -1336,6 +1347,86 @@
           حفظ في المخزن
         </button>
       </form>
+    </div>
+  </div>
+
+
+
+  <!-- RECURRING EXPENSES MODAL -->
+  <div id="recurringModal" class="fixed inset-0 z-[125] hidden items-center justify-center p-3 bg-black/80 backdrop-blur-sm" onclick="closeRecurringModal()">
+    <div class="relative max-w-lg w-full bg-slate-900 border border-orange-500/40 rounded-3xl p-5 shadow-2xl modal-enter max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+        <div class="flex items-center gap-2 text-white font-black text-sm">
+          <i class="fa-solid fa-repeat text-orange-500"></i>
+          <span>المصاريف الثابتة والمتكررة (إيجار، إنترنت، سيرفرات)</span>
+        </div>
+        <button onclick="closeRecurringModal()" class="w-8 h-8 rounded-full bg-white/5 text-slate-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="space-y-3">
+        <div class="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+          <input type="text" id="recName" placeholder="اسم المصروف الثابت (مثال: إيجار المحل)" class="form-input text-xs">
+          <div class="grid grid-cols-2 gap-2">
+            <input type="number" id="recAmount" placeholder="المبلغ (ج.م)" class="form-input text-xs">
+            <select id="recPeriod" class="form-input text-xs">
+              <option value="monthly">شهرياً</option>
+              <option value="weekly">أسبوعياً</option>
+              <option value="daily">يومياً</option>
+            </select>
+          </div>
+          <button onclick="addRecurringExpense()" class="w-full py-2.5 rounded-xl bg-orange-500 text-white font-black text-xs">إضافة مصروف متكرر</button>
+        </div>
+        <div id="recurringList" class="space-y-2 max-h-[40vh] overflow-y-auto"></div>
+      </div>
+      <button onclick="closeRecurringModal()" class="w-full mt-4 py-2.5 rounded-xl bg-white/10 text-white font-black text-xs">إغلاق</button>
+    </div>
+  </div>
+
+  <!-- CASH DRAWER RECONCILIATION MODAL -->
+  <div id="drawerModal" class="fixed inset-0 z-[125] hidden items-center justify-center p-3 bg-black/80 backdrop-blur-sm" onclick="closeDrawerModal()">
+    <div class="relative max-w-md w-full bg-slate-900 border border-emerald-500/40 rounded-3xl p-5 shadow-2xl modal-enter" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+        <div class="flex items-center gap-2 text-white font-black text-sm">
+          <i class="fa-solid fa-cash-register text-emerald-500"></i>
+          <span>مطابقة نقدية الدرج (الخزينة الفعلية)</span>
+        </div>
+        <button onclick="closeDrawerModal()" class="w-8 h-8 rounded-full bg-white/5 text-slate-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="space-y-3">
+        <div class="p-3 rounded-2xl bg-white/5 border border-white/10 text-xs space-y-1">
+          <div class="text-slate-400">الرصيد المتوقع في النظام (كاش):</div>
+          <div id="drawerExpected" class="text-lg font-black text-emerald-400">0.00 ج.م</div>
+        </div>
+        <div>
+          <label class="field-label">النقدية الفعلية الموجودة في الدرج (ج.م)</label>
+          <input type="number" id="drawerActual" step="0.01" placeholder="0.00" class="form-input" oninput="calculateDrawerDiff()">
+        </div>
+        <div class="p-3 rounded-2xl bg-white/5 border border-white/10 text-xs space-y-1">
+          <div class="text-slate-400">الفرق (عجز / زيادة):</div>
+          <div id="drawerDiff" class="text-base font-black text-slate-200">0.00 ج.م</div>
+        </div>
+      </div>
+      <button onclick="closeDrawerModal()" class="w-full mt-4 py-3 rounded-2xl bg-emerald-600 text-white font-black text-xs">تم المطابقة</button>
+    </div>
+  </div>
+
+  <!-- PERFORMANCE KPIs MODAL -->
+  <div id="kpiModal" class="fixed inset-0 z-[125] hidden items-center justify-center p-3 bg-black/80 backdrop-blur-sm" onclick="closeKPIModal()">
+    <div class="relative max-w-lg w-full bg-slate-900 border border-cyan-500/40 rounded-3xl p-5 shadow-2xl modal-enter max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+        <div class="flex items-center gap-2 text-white font-black text-sm">
+          <i class="fa-solid fa-chart-line text-cyan-500"></i>
+          <span>مؤشرات الأداء والتحليلات المتقدمة (KPIs)</span>
+        </div>
+        <button onclick="closeKPIModal()" class="w-8 h-8 rounded-full bg-white/5 text-slate-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="kpiContent" class="space-y-3 text-xs text-slate-200"></div>
+      <button onclick="closeKPIModal()" class="w-full mt-4 py-2.5 rounded-xl bg-cyan-600 text-white font-black text-xs">إغلاق</button>
     </div>
   </div>
 

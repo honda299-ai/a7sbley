@@ -654,6 +654,7 @@ async function checkPublicPortalMode() {
   if (!clientTransactions.length) {
     loadLocalData();
   loadInventory();
+  loadRecurring();
   loadAuditLog();
   checkOverdueDebtsAlert();
     clientTransactions = transactions;
@@ -1265,6 +1266,7 @@ function loginAsGuest() {
   isSuperAdmin = false;
   loadLocalData();
   loadInventory();
+  loadRecurring();
   loadAuditLog();
   refreshAll();
   switchTab('transactions');
@@ -1541,6 +1543,7 @@ auth.onAuthStateChanged(async user => {
 
     loadLocalData();
   loadInventory();
+  loadRecurring();
   loadAuditLog();
   checkOverdueDebtsAlert();
     refreshAll();
@@ -1571,6 +1574,7 @@ auth.onAuthStateChanged(async user => {
     footerSync.innerHTML = `<i class="fa-solid fa-database text-amber-500"></i> سجّل الدخول للمزامنة`;
     loadLocalData();
   loadInventory();
+  loadRecurring();
   loadAuditLog();
   checkOverdueDebtsAlert();
     applyRoleUI();
@@ -1669,6 +1673,7 @@ async function loadCloudData(uid) {
   } catch (error) {
     loadLocalData();
   loadInventory();
+  loadRecurring();
   loadAuditLog();
   checkOverdueDebtsAlert();
     refreshAll();
@@ -2896,6 +2901,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   initPrivacyMode();
   loadLocalData();
   loadInventory();
+  loadRecurring();
   loadAuditLog();
   checkOverdueDebtsAlert();
   refreshAll();
@@ -3746,6 +3752,7 @@ async function approveClientRequest(reqId) {
       renderAdminRequests();
       loadLocalData();
   loadInventory();
+  loadRecurring();
   loadAuditLog();
   checkOverdueDebtsAlert();
       refreshAll();
@@ -3919,6 +3926,7 @@ async function approveGlobalClientRequest(reqId) {
       updateGlobalPendingAlert(reqs);
       loadLocalData();
   loadInventory();
+  loadRecurring();
   loadAuditLog();
   checkOverdueDebtsAlert();
       refreshAll();
@@ -4090,6 +4098,7 @@ async function approveGlobalClientRequest(reqId) {
       renderGlobalClientRequests();
       loadLocalData();
   loadInventory();
+  loadRecurring();
   loadAuditLog();
   checkOverdueDebtsAlert();
       refreshAll();
@@ -4249,6 +4258,7 @@ async function approveGlobalClientRequest(reqId) {
       renderGlobalClientRequests();
       loadLocalData();
   loadInventory();
+  loadRecurring();
   loadAuditLog();
   checkOverdueDebtsAlert();
       refreshAll();
@@ -4488,4 +4498,161 @@ function checkOverdueDebtsAlert() {
       showToast(`⚠️ تنبيه: لديك (${overdue.length}) ديون متأخرة الموعد تستوجب المتابعة!`, 'error');
     }, 1200);
   }
+}
+
+/* =========================================================
+   RECURRING EXPENSES (المصاريف المتكررة والثابتة)
+   ========================================================= */
+const RECURRING_KEY = 'ehsebli_recurring_v1';
+let recurringExpenses = [];
+
+function loadRecurring() {
+  try {
+    const saved = localStorage.getItem(RECURRING_KEY);
+    recurringExpenses = saved ? JSON.parse(saved) : [];
+  } catch(e) { recurringExpenses = []; }
+}
+function saveRecurring() {
+  localStorage.setItem(RECURRING_KEY, JSON.stringify(recurringExpenses));
+}
+function openRecurringModal() {
+  closeMenus();
+  loadRecurring();
+  renderRecurringList();
+  const modal = document.getElementById('recurringModal');
+  if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+}
+function closeRecurringModal() {
+  const modal = document.getElementById('recurringModal');
+  if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+}
+function addRecurringExpense() {
+  const name = sanitizeString(document.getElementById('recName').value, 100);
+  const amount = Number(document.getElementById('recAmount').value) || 0;
+  const period = document.getElementById('recPeriod').value;
+  if (!name || amount <= 0) { showToast('أدخل اسم المصروف والمبلغ بشكل صحيح', 'error'); return; }
+
+  recurringExpenses.push({
+    id: 'rec-' + Date.now(),
+    name, amount, period,
+    lastApplied: todayString()
+  });
+  saveRecurring();
+  renderRecurringList();
+  document.getElementById('recName').value = '';
+  document.getElementById('recAmount').value = '';
+  showToast('تم حفظ المصروف الثابت ✓', 'success');
+}
+function deleteRecurring(id) {
+  recurringExpenses = recurringExpenses.filter(r => r.id !== id);
+  saveRecurring();
+  renderRecurringList();
+  showToast('تم حذف المصروف', 'info');
+}
+function renderRecurringList() {
+  const container = document.getElementById('recurringList');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!recurringExpenses.length) {
+    container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400">لا توجد مصاريف ثابتة مسجلة</div>';
+    return;
+  }
+  recurringExpenses.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'p-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between gap-2';
+    card.innerHTML = `
+      <div>
+        <div class="font-black text-xs text-white">${escapeHTML(r.name)}</div>
+        <div class="text-[10px] text-orange-400 mt-0.5">${money(r.amount)} ج.م (${r.period === 'monthly' ? 'شهرياً' : r.period === 'weekly' ? 'أسبوعياً' : 'يومياً'})</div>
+      </div>
+      <button onclick="deleteRecurring('${r.id}')" class="p-2 text-rose-400 hover:text-rose-500"><i class="fa-solid fa-trash-can text-xs"></i></button>
+    `;
+    container.appendChild(card);
+  });
+}
+
+/* =========================================================
+   CASH DRAWER RECONCILIATION (مطابقة الدرج)
+   ========================================================= */
+function openDrawerModal() {
+  closeMenus();
+  const metrics = calculateMetrics();
+  const cashWallet = metrics.wallets['كاش نقدي'] || 0;
+  document.getElementById('drawerExpected').textContent = money(cashWallet) + ' ج.م';
+  document.getElementById('drawerActual').value = '';
+  document.getElementById('drawerDiff').textContent = '0.00 ج.م';
+  const modal = document.getElementById('drawerModal');
+  if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+}
+function closeDrawerModal() {
+  const modal = document.getElementById('drawerModal');
+  if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+}
+function calculateDrawerDiff() {
+  const metrics = calculateMetrics();
+  const expected = metrics.wallets['كاش نقدي'] || 0;
+  const actual = Number(document.getElementById('drawerActual').value) || 0;
+  const diff = actual - expected;
+  const diffEl = document.getElementById('drawerDiff');
+  diffEl.textContent = money(diff) + ' ج.م ' + (diff === 0 ? '(مطابق تماماً ✓)' : diff > 0 ? '(زيادة في الدرج 📈)' : '(عجز في الدرج 📉)');
+  diffEl.className = 'text-base font-black ' + (diff === 0 ? 'text-emerald-400' : diff > 0 ? 'text-cyan-400' : 'text-rose-400');
+}
+
+/* =========================================================
+   PERFORMANCE KPIs (مؤشرات الأداء المتقدمة)
+   ========================================================= */
+function openKPIModal() {
+  closeMenus();
+  const activeTxs = getActiveTransactions();
+  let totalIn = 0, totalExp = 0;
+  const clientMap = {};
+  const serviceMap = {};
+
+  activeTxs.forEach(t => {
+    const amt = Number(t.amount) || 0;
+    if (t.type === 'income') {
+      totalIn += amt;
+      if (t.client) clientMap[t.client] = (clientMap[t.client] || 0) + amt;
+      if (t.category) serviceMap[t.category] = (serviceMap[t.category] || 0) + amt;
+    } else if (t.type === 'expense') {
+      totalExp += amt;
+    }
+  });
+
+  // Top client
+  let topClient = 'لا يوجد';
+  let topClientAmt = 0;
+  Object.keys(clientMap).forEach(c => {
+    if (clientMap[c] > topClientAmt) { topClientAmt = clientMap[c]; topClient = c; }
+  });
+
+  // Top service
+  let topService = 'لا يوجد';
+  let topServiceAmt = 0;
+  Object.keys(serviceMap).forEach(s => {
+    if (serviceMap[s] > topServiceAmt) { topServiceAmt = serviceMap[s]; topService = s; }
+  });
+
+  const netProfit = totalIn - totalExp;
+  const profitMargin = totalIn > 0 ? ((netProfit / totalIn) * 100).toFixed(1) : 0;
+
+  const content = document.getElementById('kpiContent');
+  content.innerHTML = `
+    <div class="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+      <div class="flex justify-between font-bold"><span>إجمالي الإيرادات المسجلة:</span><span class="text-emerald-400 font-black">${money(totalIn)} ج.م</span></div>
+      <div class="flex justify-between font-bold"><span>إجمالي المصاريف المسجلة:</span><span class="text-rose-400 font-black">${money(totalExp)} ج.م</span></div>
+      <div class="flex justify-between font-bold"><span>صافي العائد الصافي:</span><span class="text-cyan-400 font-black">${money(netProfit)} ج.م (${profitMargin}%)</span></div>
+    </div>
+    <div class="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+      <div class="flex justify-between font-bold"><span>أكثر عميل تعاملاً وربحية:</span><span class="text-orange-400 font-black">${escapeHTML(topClient)} (${money(topClientAmt)} ج.م)</span></div>
+      <div class="flex justify-between font-bold"><span>الخدمة / التصنيف الأعلى دخلاً:</span><span class="text-amber-400 font-black">${escapeHTML(topService)} (${money(topServiceAmt)} ج.م)</span></div>
+    </div>
+  `;
+
+  const modal = document.getElementById('kpiModal');
+  if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+}
+function closeKPIModal() {
+  const modal = document.getElementById('kpiModal');
+  if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
 }
