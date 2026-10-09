@@ -1234,14 +1234,42 @@ async function saveRolePermissions() {
    ========================================================= */
 function switchLoginMethod(method) {
   currentLoginMethod = method;
-  ['google', 'email', 'phone'].forEach(m => {
+  ['google', 'guest'].forEach(m => {
     const tab = document.getElementById('loginTab' + m.charAt(0).toUpperCase() + m.slice(1));
     const panel = document.getElementById('loginPanel' + m.charAt(0).toUpperCase() + m.slice(1));
     if (tab) tab.classList.toggle('active', m === method);
     if (panel) panel.classList.toggle('hidden', m !== method);
   });
-  hideEmailError();
-  hidePhoneError();
+}
+
+function loginAsGuest() {
+  currentUser = {
+    uid: 'guest-user-' + Date.now(),
+    displayName: 'زائر (Guest)',
+    email: 'guest@a7sbley.local',
+    isAnonymous: true,
+    providerData: [{ providerId: 'guest' }]
+  };
+  showToast('مرحباً بك في وضع الزائر 👋', 'success');
+  hideLoginWall();
+  const userProfile = document.getElementById('userProfile');
+  if (userProfile) {
+    userProfile.classList.remove('hidden');
+    userProfile.classList.add('flex');
+  }
+  const footerSync = document.getElementById('footerSyncStatus');
+  if (footerSync) {
+    footerSync.innerHTML = `<i class="fa-solid fa-user-secret text-orange-500"></i> وضع الزائر (محلي)`;
+  }
+  userRole = 'free';
+  isSuperAdmin = false;
+  loadLocalData();
+  loadInventory();
+  loadAuditLog();
+  refreshAll();
+  switchTab('transactions');
+  applyRoleUI();
+  updatePinUI();
 }
 
 function setEmailMode(mode) {
