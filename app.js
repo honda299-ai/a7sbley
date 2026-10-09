@@ -50,6 +50,13 @@ const PRIVACY_KEY = 'ehsebli_privacy_v1';
 const LAST_UID_KEY = 'ehsebli_last_uid';
 const PERMS_CACHE_KEY = 'ehsebli_perms_cache';
 
+const INVENTORY_KEY = 'ehsebli_inventory_v1';
+const AUDIT_KEY = 'ehsebli_audit_v1';
+let inventoryItems = [];
+let auditLogs = [];
+let editingInvId = null;
+
+
 /* ---------- State ---------- */
 let currentUser = null;
 let transactions = [];
@@ -646,6 +653,9 @@ async function checkPublicPortalMode() {
   }
   if (!clientTransactions.length) {
     loadLocalData();
+  loadInventory();
+  loadAuditLog();
+  checkOverdueDebtsAlert();
     clientTransactions = transactions;
   }
   renderPublicPortal(clientParam, clientTransactions);
@@ -1498,6 +1508,9 @@ auth.onAuthStateChanged(async user => {
     await loadRolePermissions();
 
     loadLocalData();
+  loadInventory();
+  loadAuditLog();
+  checkOverdueDebtsAlert();
     refreshAll();
     switchTab('transactions');
 
@@ -1525,6 +1538,9 @@ auth.onAuthStateChanged(async user => {
     showLoginWall();
     footerSync.innerHTML = `<i class="fa-solid fa-database text-amber-500"></i> سجّل الدخول للمزامنة`;
     loadLocalData();
+  loadInventory();
+  loadAuditLog();
+  checkOverdueDebtsAlert();
     applyRoleUI();
   }
 });
@@ -1620,6 +1636,9 @@ async function loadCloudData(uid) {
     }
   } catch (error) {
     loadLocalData();
+  loadInventory();
+  loadAuditLog();
+  checkOverdueDebtsAlert();
     refreshAll();
   }
 }
@@ -2697,6 +2716,13 @@ function switchTab(tab, shouldScroll = false) {
   });
 
   if (isClients) renderClients();
+  const isInventory = tab === 'inventory';
+  const isAudit = tab === 'audit';
+  document.getElementById('panelInventory').classList.toggle('hidden', !isInventory);
+  document.getElementById('panelAudit').classList.toggle('hidden', !isAudit);
+  if (isInventory) renderInventory();
+  else if (isAudit) renderAuditLog();
+
   else if (isDebts) renderDebts();
   else if (isTx) renderTransactions();
 
@@ -2837,6 +2863,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   initPrivacyMode();
   loadLocalData();
+  loadInventory();
+  loadAuditLog();
+  checkOverdueDebtsAlert();
   refreshAll();
   switchTab('transactions');
   document.getElementById('formDate').value = todayString();
@@ -3684,6 +3713,9 @@ async function approveClientRequest(reqId) {
       showToast('تم قبول الطلب وإضافته للمعاملات بنجاح 🎉', 'success');
       renderAdminRequests();
       loadLocalData();
+  loadInventory();
+  loadAuditLog();
+  checkOverdueDebtsAlert();
       refreshAll();
     } catch (error) {
       showToast('فشل قبول الطلب', 'error');
@@ -3854,6 +3886,9 @@ async function approveGlobalClientRequest(reqId) {
       showToast('تم قبول الطلب وإضافته للمعاملات بنجاح 🎉', 'success');
       updateGlobalPendingAlert(reqs);
       loadLocalData();
+  loadInventory();
+  loadAuditLog();
+  checkOverdueDebtsAlert();
       refreshAll();
     } catch (error) {
       console.error("Approve error:", error);
@@ -4022,6 +4057,9 @@ async function approveGlobalClientRequest(reqId) {
       updateGlobalPendingAlert(remainingReqs);
       renderGlobalClientRequests();
       loadLocalData();
+  loadInventory();
+  loadAuditLog();
+  checkOverdueDebtsAlert();
       refreshAll();
     } catch (error) {
       console.error("Approve error:", error);
@@ -4178,6 +4216,9 @@ async function approveGlobalClientRequest(reqId) {
       updateGlobalPendingAlert(reqs);
       renderGlobalClientRequests();
       loadLocalData();
+  loadInventory();
+  loadAuditLog();
+  checkOverdueDebtsAlert();
       refreshAll();
     } catch (error) {
       showToast('فشل قبول الطلب', 'error');
@@ -4206,4 +4247,213 @@ async function rejectGlobalClientRequest(reqId) {
       showToast('فشل رفض الطلب', 'error');
     }
   });
+}
+
+/* =========================================================
+   PROFIT MARGIN CALCULATOR
+   ========================================================= */
+function openProfitModal() {
+  closeMenus();
+  document.getElementById('calcCost').value = '';
+  document.getElementById('calcPrice').value = '';
+  document.getElementById('resProfit').textContent = '0.00 ج.م';
+  document.getElementById('resMargin').textContent = '0%';
+  const modal = document.getElementById('profitModal');
+  if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+}
+function closeProfitModal() {
+  const modal = document.getElementById('profitModal');
+  if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+}
+function calculateProfit() {
+  const cost = Number(document.getElementById('calcCost').value) || 0;
+  const price = Number(document.getElementById('calcPrice').value) || 0;
+  const profit = price - cost;
+  const margin = price > 0 ? ((profit / price) * 100).toFixed(1) : 0;
+  document.getElementById('resProfit').textContent = money(profit) + ' ج.م';
+  document.getElementById('resMargin').textContent = margin + '%';
+}
+
+/* =========================================================
+   INVENTORY / PARTS TRACKER (مخزن قطع الغيار)
+   ========================================================= */
+function loadInventory() {
+  try {
+    const saved = localStorage.getItem(INVENTORY_KEY);
+    inventoryItems = saved ? JSON.parse(saved) : [];
+  } catch(e) { inventoryItems = []; }
+}
+function saveInventory() {
+  localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventoryItems));
+}
+function openInventoryModal(id = null) {
+  closeMenus();
+  editingInvId = id;
+  const modal = document.getElementById('inventoryModal');
+  document.getElementById('invName').value = '';
+  document.getElementById('invQty').value = '';
+  document.getElementById('invPrice').value = '';
+  document.getElementById('invNotes').value = '';
+  document.getElementById('invEditId').value = '';
+  if (id) {
+    const item = inventoryItems.find(i => i.id === id);
+    if (item) {
+      document.getElementById('invModalTitle').textContent = 'تعديل صنف';
+      document.getElementById('invName').value = item.name;
+      document.getElementById('invQty').value = item.qty;
+      document.getElementById('invPrice').value = item.price || '';
+      document.getElementById('invNotes').value = item.notes || '';
+      document.getElementById('invEditId').value = item.id;
+    }
+  } else {
+    document.getElementById('invModalTitle').textContent = 'إضافة صنف للمخزن';
+  }
+  if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+}
+function closeInventoryModal() {
+  const modal = document.getElementById('inventoryModal');
+  if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+  editingInvId = null;
+}
+function handleInventorySubmit(e) {
+  e.preventDefault();
+  const name = sanitizeString(document.getElementById('invName').value, 100);
+  const qty = parseInt(document.getElementById('invQty').value, 10) || 0;
+  const price = Number(document.getElementById('invPrice').value) || 0;
+  const notes = sanitizeString(document.getElementById('invNotes').value, 150);
+  const editId = document.getElementById('invEditId').value;
+
+  if (!name) { showToast('أدخل اسم الصنف', 'error'); return; }
+
+  if (editId) {
+    const item = inventoryItems.find(i => i.id === editId);
+    if (item) {
+      item.name = name; item.qty = qty; item.price = price; item.notes = notes;
+      item._updatedAt = Date.now();
+    }
+    showToast('تم تحديث الصنف بنجاح', 'success');
+  } else {
+    const newItem = {
+      id: 'inv-' + Date.now(),
+      name, qty, price, notes,
+      _updatedAt: Date.now()
+    };
+    inventoryItems.unshift(newItem);
+    showToast('تم إضافة الصنف للمخزن ✓', 'success');
+  }
+  saveInventory();
+  renderInventory();
+  closeInventoryModal();
+  logAudit('تعديل مخزن', `إضافة/تعديل صنف: ${name} (كمية: ${qty})`);
+}
+function deleteInventoryItem(id) {
+  openConfirm('حذف الصنف؟', 'سيتم إزالة هذا الصنف من المخزن.', () => {
+    inventoryItems = inventoryItems.filter(i => i.id !== id);
+    saveInventory();
+    renderInventory();
+    showToast('تم حذف الصنف', 'info');
+    logAudit('حذف صنف', `تم حذف صنف من المخزن ID: ${id}`);
+  });
+}
+function renderInventory() {
+  const container = document.getElementById('inventoryContainer');
+  const empty = document.getElementById('emptyInventoryState');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!inventoryItems.length) {
+    if (empty) empty.classList.remove('hidden');
+    return;
+  }
+  if (empty) empty.classList.add('hidden');
+
+  inventoryItems.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'p-4 rounded-2xl border border-slate-200 dark:border-dark-750 bg-slate-50 dark:bg-dark-850 flex flex-col justify-between';
+    card.innerHTML = `
+      <div>
+        <div class="flex items-start justify-between gap-2">
+          <h4 class="font-black text-sm text-slate-800 dark:text-slate-100">${escapeHTML(item.name)}</h4>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${item.qty > 2 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
+            الكمية: ${item.qty}
+          </span>
+        </div>
+        ${item.price > 0 ? `<div class="text-xs font-bold text-orange-500 mt-1">السعر: ${money(item.price)} ج.م</div>` : ''}
+        ${item.notes ? `<div class="text-[10px] text-slate-400 mt-1"><i class="fa-solid fa-location-dot"></i> ${escapeHTML(item.notes)}</div>` : ''}
+      </div>
+      <div class="mt-4 pt-3 border-t border-slate-200/60 dark:border-dark-800 flex items-center justify-between">
+        <span class="text-[9px] text-slate-400">مخزن قطع الغيار</span>
+        <div class="flex items-center gap-1">
+          <button onclick="openInventoryModal('${item.id}')" class="p-2 rounded-xl text-slate-400 hover:text-orange-500 transition"><i class="fa-solid fa-pen text-xs"></i></button>
+          <button onclick="deleteInventoryItem('${item.id}')" class="p-2 rounded-xl text-slate-400 hover:text-rose-500 transition"><i class="fa-solid fa-trash-can text-xs"></i></button>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+/* =========================================================
+   AUDIT LOG / ACTIVITY HISTORY (سجل النشاطات)
+   ========================================================= */
+function loadAuditLog() {
+  try {
+    const saved = localStorage.getItem(AUDIT_KEY);
+    auditLogs = saved ? JSON.parse(saved) : [];
+  } catch(e) { auditLogs = []; }
+}
+function saveAuditLog() {
+  localStorage.setItem(AUDIT_KEY, JSON.stringify(auditLogs));
+}
+function logAudit(action, details) {
+  const log = {
+    id: 'audit-' + Date.now(),
+    action,
+    details,
+    date: new Date().toLocaleString('ar-EG')
+  };
+  auditLogs.unshift(log);
+  if (auditLogs.length > 100) auditLogs = auditLogs.slice(0, 100);
+  saveAuditLog();
+}
+function clearAuditLog() {
+  openConfirm('مسح سجل النشاطات؟', 'سيتم مسح كافة سجلات التعديلات والأحداث.', () => {
+    auditLogs = [];
+    saveAuditLog();
+    renderAuditLog();
+    showToast('تم مسح السجل', 'info');
+  });
+}
+function renderAuditLog() {
+  const tbody = document.getElementById('auditTbody');
+  const empty = document.getElementById('emptyAuditState');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  if (!auditLogs.length) {
+    if (empty) empty.classList.remove('hidden');
+    return;
+  }
+  if (empty) empty.classList.add('hidden');
+
+  auditLogs.forEach(log => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-slate-50 dark:hover:bg-dark-850/60';
+    tr.innerHTML = `
+      <td class="py-3 px-3 font-bold text-slate-500 dark:text-slate-400">${escapeHTML(log.date)}</td>
+      <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-lg bg-orange-500/10 text-orange-500 font-black text-[10px]">${escapeHTML(log.action)}</span></td>
+      <td class="py-3 px-3 text-slate-700 dark:text-slate-200 font-medium">${escapeHTML(log.details)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+/* =========================================================
+   STARTUP OVERDUE DEBTS CHECK
+   ========================================================= */
+function checkOverdueDebtsAlert() {
+  const overdue = getActiveTransactions().filter(t => isDebt(t.type) && t.status !== 'paid' && t.dueDate && t.dueDate < todayString());
+  if (overdue.length > 0) {
+    setTimeout(() => {
+      showToast(`⚠️ تنبيه: لديك (${overdue.length}) ديون متأخرة الموعد تستوجب المتابعة!`, 'error');
+    }, 1200);
+  }
 }

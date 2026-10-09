@@ -157,6 +157,17 @@
             <button id="adminPanelBtn" onclick="openAdminPanel()" class="menu-item text-rose-500" style="display:none">
               <i class="fa-solid fa-shield-halved"></i> لوحة المدير
             </button>
+            
+            <button onclick="openProfitModal()" class="menu-item text-amber-500">
+              <i class="fa-solid fa-calculator"></i> حاسبة الأرباح والهامش
+            </button>
+            <button onclick="switchTab('inventory')" class="menu-item text-cyan-500">
+              <i class="fa-solid fa-boxes-stacked"></i> مخزن قطع الغيار والأدوات
+            </button>
+            <button onclick="switchTab('audit')" class="menu-item text-purple-500">
+              <i class="fa-solid fa-clock-rotate-left"></i> سجل العمليات والنشاطات
+            </button>
+
             <button onclick="confirmClearData()" class="menu-item text-rose-600">
               <i class="fa-solid fa-trash-can"></i> تصفير البيانات
             </button>
@@ -564,6 +575,48 @@
           <i class="fa-solid fa-user-group text-2xl"></i>
         </div>
         <p class="text-sm font-black">لا يوجد عملاء</p>
+      </div>
+    </section>
+
+    <!-- Inventory Panel (مخزن قطع الغيار) -->
+    <section id="panelInventory" class="hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
+      <div class="p-3 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between gap-2">
+        <h3 class="text-sm font-black"><i class="fa-solid fa-boxes-stacked text-orange-500"></i> إدارة مخزن قطع الغيار والأدوات</h3>
+        <button onclick="openInventoryModal()" class="px-3 py-2 rounded-lg bg-orange-500 text-white font-black text-xs">
+          <i class="fa-solid fa-plus"></i> إضافة صنف جديد
+        </button>
+      </div>
+      <div id="inventoryContainer" class="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      <div id="emptyInventoryState" class="hidden py-12 text-center">
+        <div class="w-14 h-14 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mx-auto mb-3">
+          <i class="fa-solid fa-box-archive text-2xl"></i>
+        </div>
+        <p class="text-sm font-black">المخزن فارغ</p>
+      </div>
+    </section>
+
+    <!-- Audit Log Panel (سجل الأنشطة) -->
+    <section id="panelAudit" class="hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
+      <div class="p-3 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between gap-2">
+        <h3 class="text-sm font-black"><i class="fa-solid fa-clock-rotate-left text-orange-500"></i> سجل العمليات والتعديلات (Audit Log)</h3>
+        <button onclick="clearAuditLog()" class="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-500 font-bold text-xs">
+          مسح السجل
+        </button>
+      </div>
+      <div class="overflow-x-auto mobile-table-wrap p-3">
+        <table class="w-full text-right text-xs">
+          <thead>
+            <tr class="text-[10px] font-black text-slate-400 bg-slate-50 dark:bg-dark-850">
+              <th class="py-2.5 px-3">الوقت والتاريخ</th>
+              <th class="py-2.5 px-3">نوع الحدث</th>
+              <th class="py-2.5 px-3">التفاصيل</th>
+            </tr>
+          </thead>
+          <tbody id="auditTbody" class="divide-y divide-slate-100 dark:divide-dark-800"></tbody>
+        </table>
+      </div>
+      <div id="emptyAuditState" class="hidden py-12 text-center text-xs text-slate-400 font-bold">
+        لا توجد سجلات نشاط حتى الآن
       </div>
     </section>
 
@@ -1278,5 +1331,82 @@
       </button>
     </div>
   </div>
+
+
+  <!-- PROFIT MARGIN CALCULATOR MODAL -->
+  <div id="profitModal" class="fixed inset-0 z-[125] hidden items-center justify-center p-3 bg-black/80 backdrop-blur-sm" onclick="closeProfitModal()">
+    <div class="relative max-w-md w-full bg-slate-900 border border-amber-500/40 rounded-3xl p-5 shadow-2xl modal-enter" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+        <div class="flex items-center gap-2 text-white font-black text-sm">
+          <i class="fa-solid fa-calculator text-amber-500"></i>
+          <span>حاسبة الأرباح وهامش المكسب</span>
+        </div>
+        <button onclick="closeProfitModal()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="field-label">تكلفة الخدمة / القطعة (ج.م)</label>
+          <input type="number" id="calcCost" step="0.01" placeholder="100" class="form-input" oninput="calculateProfit()">
+        </div>
+        <div>
+          <label class="field-label">سعر البيع للعميل (ج.م)</label>
+          <input type="number" id="calcPrice" step="0.01" placeholder="150" class="form-input" oninput="calculateProfit()">
+        </div>
+        <div class="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2 mt-4">
+          <div class="flex justify-between text-xs font-bold">
+            <span class="text-slate-400">صافي الربح:</span>
+            <span id="resProfit" class="money-val font-black text-emerald-400 text-sm">0.00 ج.م</span>
+          </div>
+          <div class="flex justify-between text-xs font-bold">
+            <span class="text-slate-400">هامش الربح:</span>
+            <span id="resMargin" class="font-black text-orange-400 text-sm">0%</span>
+          </div>
+        </div>
+      </div>
+      <button onclick="closeProfitModal()" class="w-full mt-4 py-3 rounded-2xl bg-orange-500 text-white font-black text-xs">إغلاق</button>
+    </div>
+  </div>
+
+  <!-- INVENTORY ITEM MODAL -->
+  <div id="inventoryModal" class="fixed inset-0 z-[125] hidden items-center justify-center p-3 bg-black/80 backdrop-blur-sm" onclick="closeInventoryModal()">
+    <div class="relative max-w-md w-full bg-slate-900 border border-orange-500/40 rounded-3xl p-5 shadow-2xl modal-enter" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+        <div class="flex items-center gap-2 text-white font-black text-sm">
+          <i class="fa-solid fa-boxes-stacked text-orange-500"></i>
+          <span id="invModalTitle">إضافة صنف للمخزن</span>
+        </div>
+        <button onclick="closeInventoryModal()" class="w-8 h-8 rounded-full bg-white/5 text-slate-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <form onsubmit="handleInventorySubmit(event)" class="space-y-3">
+        <input type="hidden" id="invEditId">
+        <div>
+          <label class="field-label">اسم القطعة / الصنف *</label>
+          <input type="text" id="invName" required placeholder="مثال: شاشة سامسونج A12 أصلية" class="form-input">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">الكمية *</label>
+            <input type="number" id="invQty" required min="0" placeholder="5" class="form-input">
+          </div>
+          <div>
+            <label class="field-label">سعر القطعة (ج.م)</label>
+            <input type="number" id="invPrice" step="0.01" min="0" placeholder="250" class="form-input">
+          </div>
+        </div>
+        <div>
+          <label class="field-label">ملاحظات / مكان التخزين</label>
+          <input type="text" id="invNotes" placeholder="رف رقم 2" class="form-input">
+        </div>
+        <button type="submit" class="w-full mt-4 py-3 rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs">
+          حفظ في المخزن
+        </button>
+      </form>
+    </div>
+  </div>
+
 
 </body>
