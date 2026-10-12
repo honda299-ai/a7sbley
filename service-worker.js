@@ -110,4 +110,15 @@ self.addEventListener('notificationclick', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data?.type === 'SHOW_LOCAL_NOTIFICATION') {
+    const { title, body, url } = event.data;
+    self.registration.showNotification(title || 'احسبلي | a7sbley', {
+      body: body || '',
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      vibrate: [200, 100, 200],
+      tag: 'a7sbley-local-notification',
+      data: { url: url || './' }
+    });
+  }
 });

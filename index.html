@@ -97,7 +97,7 @@
           <span class="hidden sm:inline">إضافة عملية</span>
         </button>
 
-        <!-- أزرار الوصول السريع: الخصوصية والوضع الليلي -->
+        <!-- أزرار الوصول السريع: الخصوصية والوضع الليلي في الهيدر مباشرة -->
         <button onclick="togglePrivacyMode()" title="وضع الخصوصية (إخفاء المبالغ)"
           class="w-9 h-9 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-orange-500 hover:bg-orange-500/10 transition flex items-center justify-center">
           <i id="privacyIcon" class="fa-solid fa-eye text-sm"></i>
@@ -1376,6 +1376,45 @@
 
 
 
+  <!-- REPORT PRINT & PDF PREVIEW MODAL (معاينة وطباعة التقرير المالي المباشر) -->
+  <div id="reportPrintModal" class="fixed inset-0 z-[150] hidden items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md" onclick="closeReportModal()">
+    <div class="relative max-w-4xl w-full bg-slate-900 border border-orange-500/40 rounded-3xl p-4 sm:p-5 shadow-2xl modal-enter max-h-[95vh] flex flex-col overflow-hidden" onclick="event.stopPropagation()">
+      
+      <!-- Modal Header (Hidden on print) -->
+      <div id="reportModalHeader" class="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-lg font-black">
+            <i class="fa-solid fa-file-pdf"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black text-white">معاينة التقرير المالي والطباعة</h3>
+            <p class="text-[10px] text-slate-400 font-bold">معاينة حية ومباشرة للورقة المطبوعة A4</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="downloadReportPDF()" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 hover:brightness-110 text-white font-black text-xs flex items-center gap-1.5 shadow">
+            <i class="fa-solid fa-download"></i> <span>تحميل PDF مباشر</span>
+          </button>
+          <button onclick="window.print()" class="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs flex items-center gap-1.5 shadow">
+            <i class="fa-solid fa-print"></i> <span>طباعة</span>
+          </button>
+          <button onclick="closeReportModal()" class="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Printable A4 Paper Container -->
+      <div class="flex-1 overflow-y-auto py-3 px-1 sm:px-3 flex justify-center bg-slate-950/60 rounded-2xl my-2 border border-white/5">
+        <div id="reportA4Paper" class="w-full max-w-[800px] bg-white text-slate-900 rounded-xl shadow-2xl p-6 sm:p-8" style="min-height: 1000px; font-family: 'Cairo', Arial, sans-serif; direction: rtl;">
+          <!-- Content dynamically rendered by renderReportPreview() -->
+          <div class="text-center py-12 text-slate-400 font-bold text-xs">جاري تجهيز التقرير...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- CONTROL CENTER MODAL (مركز التحكم الشامل والمنظم - بديل الثلاث نقط) -->
   <div id="controlCenterModal" class="fixed inset-0 z-[120] hidden items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md" onclick="closeControlCenter()">
     <div class="relative max-w-2xl w-full bg-slate-900 border border-orange-500/30 rounded-3xl p-5 shadow-2xl modal-enter max-h-[92vh] flex flex-col overflow-hidden" onclick="event.stopPropagation()">
@@ -1475,13 +1514,13 @@
             <span>التقارير والمخزن وتصدير البيانات</span>
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            <button onclick="generateFinancialReportPDF()" data-feature="reports" class="p-3.5 rounded-2xl bg-white/5 hover:bg-cyan-500/15 border border-white/10 hover:border-cyan-500/40 text-right transition group flex flex-col justify-between">
+            <button onclick="closeControlCenter(); openReportModal();" data-feature="reports" class="p-3.5 rounded-2xl bg-white/5 hover:bg-cyan-500/15 border border-white/10 hover:border-cyan-500/40 text-right transition group flex flex-col justify-between">
               <div class="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-sm mb-2 group-hover:scale-110 transition">
                 <i class="fa-solid fa-file-pdf"></i>
               </div>
               <div>
                 <div class="text-xs font-black text-white group-hover:text-cyan-400">تقرير مالي PDF</div>
-                <div class="text-[9px] text-slate-400 font-bold mt-0.5">توليد وتحميل مباشر معتمد</div>
+                <div class="text-[9px] text-slate-400 font-bold mt-0.5">معاينة وطباعة وتحميل مباشر</div>
               </div>
             </button>
 

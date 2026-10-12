@@ -54,12 +54,15 @@ body {
 }
 .animate-float { animation: floatY 3s ease-in-out infinite; }
 
-/* Print Styles — Professional Multi-page pagination */
+/* =========================================================
+   PRINT STYLES — ROBUST MULTI-PAGE PAGINATION
+   ========================================================= */
 .print-only { display: none; }
+
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 8mm;
   }
   html, body {
     height: auto !important;
@@ -67,38 +70,52 @@ body {
     overflow: visible !important;
     background: #ffffff !important;
     color: #0f172a !important;
-    font-family: 'Cairo', sans-serif !important;
+    font-family: 'Cairo', Arial, sans-serif !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  body > *:not(#printReport):not(#clientPortalView) {
+  
+  /* Hide all main app interface elements */
+  #appHeader, #appMain, #appFooter, #mobileBottomNav, #toastBox, .no-print,
+  #lockScreen, #loginWall, #authLoading, #controlCenterModal,
+  .modal-backdrop, .modal-header, .modal-actions, #reportModalHeader {
     display: none !important;
   }
-  .no-print, header, nav, footer, #mobileBottomNav, #toastBox, .modal-enter, #appHeader, #appMain, #appFooter {
-    display: none !important;
+
+  /* Show print report modal contents seamlessly */
+  #reportPrintModal {
+    position: static !important;
+    display: block !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
   }
-  #printReport {
+
+  #reportA4Paper {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  #printReport, #clientPortalView {
     display: block !important;
     position: static !important;
     width: 100% !important;
     padding: 0 !important;
     background: #ffffff !important;
     color: #0f172a !important;
-    visibility: visible !important;
   }
-  #printReport * {
-    visibility: visible !important;
-  }
-  #clientPortalView {
-    display: block !important;
-    position: static !important;
-    width: 100% !important;
-    padding: 0 !important;
-    visibility: visible !important;
-  }
-  #clientPortalView * {
-    visibility: visible !important;
-  }
+
   table {
     width: 100% !important;
     border-collapse: collapse !important;
@@ -112,6 +129,7 @@ body {
     display: table-header-group !important;
   }
 }
+
 
 /* Body states */
 body.auth-pending #appHeader,

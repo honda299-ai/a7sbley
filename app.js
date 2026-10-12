@@ -803,11 +803,9 @@ function applyRoleUI() {
     el.style.display = hasFeature(el.dataset.feature) ? '' : 'none';
   });
   const adminBtn = document.getElementById('adminPanelBtn');
-  const adminCtrlBtn = document.getElementById('adminPanelControlBtn');
   const adminDivider = document.getElementById('adminDivider');
   const showAdmin = (userRole === 'admin');
   if (adminBtn) adminBtn.style.display = showAdmin ? '' : 'none';
-  if (adminCtrlBtn) adminCtrlBtn.style.display = showAdmin ? '' : 'none';
   if (adminDivider) adminDivider.style.display = showAdmin ? '' : 'none';
 
   const badge = document.getElementById('roleBadge');
@@ -2597,34 +2595,49 @@ function exportToCSV() {
   showToast('تم تصدير ملف Excel CSV بنجاح', 'success');
 }
 
-function generateFinancialReportPDF() {
+
+/* =========================================================
+   REPORT LIVE PREVIEW & DIRECT PDF GENERATOR
+   ========================================================= */
+function openReportModal() {
   if (!requireAuth()) return;
   if (!hasFeature('reports')) { showToast('التقارير غير متاحة لدورك', 'error'); return; }
-  closeControlCenter();
+  closeControlCenter(); closeReportModal();
   closeMenus();
+  renderReportPreview();
+  const modal = document.getElementById('reportPrintModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+}
 
-  showToast('جاري تجهيز تقرير PDF الاحترافي...', 'info');
+function closeReportModal() {
+  const modal = document.getElementById('reportPrintModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+
+function renderReportPreview() {
+  const paper = document.getElementById('reportA4Paper');
+  if (!paper) return;
 
   const metrics = calculateMetrics();
   const periodName = document.getElementById('periodLabel')?.textContent || 'كل البيانات';
   const periodTransactions = getPeriodTransactions().sort((a,b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
 
-  const pdfContainer = document.createElement('div');
-  pdfContainer.style.padding = '25px';
-  pdfContainer.style.fontFamily = 'Cairo, Arial, sans-serif';
-  pdfContainer.style.direction = 'rtl';
-  pdfContainer.style.color = '#0f172a';
-  pdfContainer.style.backgroundColor = '#ffffff';
-
   let walletRows = '';
   Object.keys(metrics.wallets).forEach(w => {
-    walletRows += `<div style="display:inline-block; margin-left:15px; margin-bottom:5px; font-size:11px; font-weight:bold;">
+    walletRows += `<div style="display:inline-block; margin-left:14px; margin-bottom:6px; font-size:11px; font-weight:bold;">
       <span style="color:#64748b;">${escapeHTML(w)}:</span> 
       <span style="color:${metrics.wallets[w] >= 0 ? '#10b981' : '#f43f5e'}; font-weight:900;">${money(metrics.wallets[w])} ج.م</span>
     </div>`;
   });
 
-  pdfContainer.innerHTML = `
+  paper.innerHTML = `
+    <!-- Report Header -->
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #f97316; padding-bottom:15px; margin-bottom:20px;">
       <div style="display:flex; align-items:center; gap:12px;">
         <img src="logo.png" style="width:55px; height:55px; border-radius:12px; object-fit:contain;" alt="احسبلي">
@@ -2634,22 +2647,22 @@ function generateFinancialReportPDF() {
         </div>
       </div>
       <div style="text-align:left; font-size:11px; color:#64748b;">
-        <div>تاريخ الإصدار: <strong>${todayString()}</strong></div>
+        <div>تاريخ التقرير: <strong>${todayString()}</strong></div>
         <div>الوقت: <strong>${formatTimeTo12Hour(currentInputTimeString())}</strong></div>
       </div>
     </div>
 
     <!-- Summary KPI Boxes -->
-    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:20px;">
-      <div style="border:1px solid #e2e8f0; border-radius:12px; padding:12px; background:#f0fdf4;">
+    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:18px;">
+      <div style="border:1px solid #bbf7d0; border-radius:12px; padding:12px; background:#f0fdf4;">
         <div style="font-size:10px; color:#166534; font-weight:bold;">إجمالي الإيرادات</div>
         <div style="font-size:16px; font-weight:900; color:#15803d; margin-top:4px;">+${money(metrics.income)} ج.م</div>
       </div>
-      <div style="border:1px solid #e2e8f0; border-radius:12px; padding:12px; background:#fff1f2;">
+      <div style="border:1px solid #fecdd3; border-radius:12px; padding:12px; background:#fff1f2;">
         <div style="font-size:10px; color:#9f1239; font-weight:bold;">إجمالي المصروفات</div>
         <div style="font-size:16px; font-weight:900; color:#be123c; margin-top:4px;">-${money(metrics.expense)} ج.م</div>
       </div>
-      <div style="border:1px solid #e2e8f0; border-radius:12px; padding:12px; background:#fff7ed;">
+      <div style="border:1px solid #fed7aa; border-radius:12px; padding:12px; background:#fff7ed;">
         <div style="font-size:10px; color:#9a3412; font-weight:bold;">باب الخير والصدقات</div>
         <div style="font-size:16px; font-weight:900; color:#ea580c; margin-top:4px;">-${money(metrics.charity)} ج.م</div>
       </div>
@@ -2659,10 +2672,10 @@ function generateFinancialReportPDF() {
       </div>
     </div>
 
-    <!-- Wallets breakdown -->
+    <!-- Wallets Breakdown -->
     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:10px 14px; margin-bottom:20px;">
       <div style="font-size:10px; font-weight:900; color:#334155; margin-bottom:6px;">أرصدة الخزائن الحالية:</div>
-      ${walletRows || '<span style="font-size:10px; color:#94a3b8;">لا توجد حركات</span>'}
+      ${walletRows || '<span style="font-size:10px; color:#94a3b8;">لا توجد حركات مسجلة</span>'}
     </div>
 
     <!-- Transactions Table -->
@@ -2700,32 +2713,43 @@ function generateFinancialReportPDF() {
       تم استخراج هذا التقرير تلقائياً بواسطة نظام <strong>احسبلي | a7sbley</strong> © ${new Date().getFullYear()} — شكراً لحسن تعاونكم.
     </div>
   `;
+}
 
-  const report = document.getElementById('printReport');
-  if (report) report.innerHTML = pdfContainer.innerHTML;
+function downloadReportPDF() {
+  const paper = document.getElementById('reportA4Paper');
+  if (!paper) return;
+  showToast('جاري إنشاء ملف PDF وتنزيله...', 'info');
+
+  const opt = {
+    margin: [8, 8, 8, 8],
+    filename: `تقرير_مالي_${todayString()}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      scrollY: 0
+    },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+  };
 
   if (typeof html2pdf !== 'undefined') {
-    const opt = {
-      margin: [8, 8, 8, 8],
-      filename: `تقرير_مالي_${todayString()}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    html2pdf().set(opt).from(pdfContainer).save().then(() => {
+    html2pdf().set(opt).from(paper).save().then(() => {
       showToast('تم تحميل التقرير المالي PDF بنجاح 🎉', 'success');
     }).catch(err => {
-      console.warn("html2pdf fallback to window.print():", err);
-      setTimeout(() => window.print(), 300);
+      console.warn("html2pdf failed, fallback to print:", err);
+      window.print();
     });
   } else {
-    setTimeout(() => window.print(), 300);
+    window.print();
   }
 }
 
 function printReport() {
-  generateFinancialReportPDF();
+  openReportModal();
 }
+
 
 function reportBox(title, value, color) {
   return `<div style="border:1px solid #ddd;border-radius:14px;padding:15px;">
@@ -2952,7 +2976,7 @@ function refreshAll() {
 
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
-    closeControlCenter(); closeModal(); closeConfirm(); closeBackupModal();
+    closeModal(); closeConfirm(); closeBackupModal();
     closeBudgetModal(); closePinModal(); closeMenus();
     closeAdminPanel(); closeUserPermissionsModal();
     closeDebtPaymentModal(); closeReceiptViewer();
@@ -3281,21 +3305,34 @@ function exportClientLedgerPDF() {
     </div>
   `;
 
+  // Attach to DOM offscreen so html2canvas computes positive dimensions and fonts
+  pdfContainer.style.position = 'fixed';
+  pdfContainer.style.top = '0';
+  pdfContainer.style.left = '0';
+  pdfContainer.style.width = '794px';
+  pdfContainer.style.zIndex = '-9999';
+  pdfContainer.style.opacity = '1';
+  pdfContainer.style.pointerEvents = 'none';
+  document.body.appendChild(pdfContainer);
+
   if (typeof html2pdf !== 'undefined') {
-    showToast('جاري إنشاء ملف PDF...', 'info');
+    showToast('جاري إنشاء كشف الحساب PDF...', 'info');
     const opt = {
       margin: 8,
       filename: `كشف_حساب_${clientName}_${todayString()}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
     html2pdf().set(opt).from(pdfContainer).save().then(() => {
       showToast('تم تحميل كشف الحساب PDF بنجاح ✓', 'success');
+      pdfContainer.remove();
     }).catch(() => {
+      pdfContainer.remove();
       window.print();
     });
   } else {
+    pdfContainer.remove();
     window.print();
   }
 }
@@ -4384,23 +4421,4 @@ function openKPIModal() {
 function closeKPIModal() {
   const modal = document.getElementById('kpiModal');
   if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
-}
-
-/* =========================================================
-   CONTROL CENTER (مركز التحكم الموحد - بديل القائمة القديمة)
-   ========================================================= */
-function openControlCenter() {
-  const modal = document.getElementById('controlCenterModal');
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-  }
-}
-
-function closeControlCenter() {
-  const modal = document.getElementById('controlCenterModal');
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-  }
 }
