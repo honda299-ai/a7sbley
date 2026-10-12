@@ -54,18 +54,63 @@ body {
 }
 .animate-float { animation: floatY 3s ease-in-out infinite; }
 
-/* Print */
+/* Print Styles — Professional Multi-page pagination */
 .print-only { display: none; }
 @media print {
-  body * { visibility: hidden !important; }
-  #printReport, #printReport *, #clientPortalView, #clientPortalView * { visibility: visible !important; }
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+  html, body {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-family: 'Cairo', sans-serif !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body > *:not(#printReport):not(#clientPortalView) {
+    display: none !important;
+  }
+  .no-print, header, nav, footer, #mobileBottomNav, #toastBox, .modal-enter, #appHeader, #appMain, #appFooter {
+    display: none !important;
+  }
   #printReport {
     display: block !important;
-    position: absolute; inset: 0;
-    background: white !important; color: #111 !important;
-    padding: 30px;
+    position: static !important;
+    width: 100% !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    visibility: visible !important;
   }
-  .no-print { display: none !important; }
+  #printReport * {
+    visibility: visible !important;
+  }
+  #clientPortalView {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    padding: 0 !important;
+    visibility: visible !important;
+  }
+  #clientPortalView * {
+    visibility: visible !important;
+  }
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+  thead {
+    display: table-header-group !important;
+  }
 }
 
 /* Body states */
