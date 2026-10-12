@@ -167,13 +167,22 @@
             <button onclick="switchTab('audit')" class="menu-item text-purple-500">
               <i class="fa-solid fa-clock-rotate-left"></i> سجل العمليات والنشاطات
             </button>
+            <button onclick="openWalletTransferModal()" class="menu-item text-emerald-400">
+              <i class="fa-solid fa-money-bill-transfer"></i> تحويل بين الخزائن
+            </button>
+            <button onclick="openTicketsModal()" class="menu-item text-cyan-400">
+              <i class="fa-solid fa-screwdriver-wrench"></i> إيصالات استلام الأجهزة والصيانة
+            </button>
+            <button onclick="openShiftSettlementModal()" class="menu-item text-amber-400">
+              <i class="fa-solid fa-calendar-check"></i> تقفيل الوردية واليومية
+            </button>
             <button onclick="openRecurringModal()" class="menu-item text-orange-400">
               <i class="fa-solid fa-repeat"></i> المصاريف المتكررة والثابتة
             </button>
-            <button onclick="openDrawerModal()" class="menu-item text-emerald-400">
+            <button onclick="openDrawerModal()" class="menu-item text-teal-400">
               <i class="fa-solid fa-cash-register"></i> مطابقة الدرج والخزينة الفعلي
             </button>
-            <button onclick="openKPIModal()" class="menu-item text-cyan-400">
+            <button onclick="openKPIModal()" class="menu-item text-blue-400">
               <i class="fa-solid fa-chart-line"></i> مؤشرات الأداء والتحليلات (KPIs)
             </button>
 
@@ -1429,5 +1438,157 @@
     </div>
   </div>
 
+
+
+  <!-- WALLET TRANSFER MODAL (تحويل بين الخزائن) -->
+  <div id="walletTransferModal" class="fixed inset-0 z-[125] hidden items-center justify-center p-3 bg-black/80 backdrop-blur-sm" onclick="closeWalletTransferModal()">
+    <div class="relative max-w-md w-full bg-slate-900 border border-emerald-500/40 rounded-3xl p-5 shadow-2xl modal-enter" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+        <div class="flex items-center gap-2 text-white font-black text-sm">
+          <i class="fa-solid fa-money-bill-transfer text-emerald-500"></i>
+          <span>تحويل مالي بين الخزائن</span>
+        </div>
+        <button onclick="closeWalletTransferModal()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <form onsubmit="handleWalletTransferSubmit(event)" class="space-y-3.5">
+        <div>
+          <label class="field-label">من الخزينة (المصدر) *</label>
+          <select id="transferFromWallet" required class="form-input text-xs">
+            <option value="كاش نقدي">كاش نقدي 💵</option>
+            <option value="إنستاباي (InstaPay)">إنستاباي ⚡</option>
+            <option value="فودافون كاش / محفظة">فودافون كاش / محفظة 📱</option>
+            <option value="فيزا / بطاقة بنكية">فيزا / بطاقة بنكية 💳</option>
+            <option value="تحويل بنكي">تحويل بنكي 🏦</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">إلى الخزينة (الهدف) *</label>
+          <select id="transferToWallet" required class="form-input text-xs">
+            <option value="إنستاباي (InstaPay)">إنستاباي ⚡</option>
+            <option value="كاش نقدي">كاش نقدي 💵</option>
+            <option value="فودافون كاش / محفظة">فودافون كاش / محفظة 📱</option>
+            <option value="فيزا / بطاقة بنكية">فيزا / بطاقة بنكية 💳</option>
+            <option value="تحويل بنكي">تحويل بنكي 🏦</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">المبلغ المحول (ج.م) *</label>
+            <input type="number" id="transferAmount" step="0.01" min="1" required placeholder="500" class="form-input text-xs font-black">
+          </div>
+          <div>
+            <label class="field-label">عمولة التحويل (إن وجدت)</label>
+            <input type="number" id="transferFee" step="0.01" min="0" placeholder="0.00" class="form-input text-xs">
+          </div>
+        </div>
+        <div>
+          <label class="field-label">البيان / سبب التحويل (اختياري)</label>
+          <input type="text" id="transferNotes" placeholder="مثال: توريد كاش أو سحب أرباح" class="form-input text-xs">
+        </div>
+        <button type="submit" class="w-full mt-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-black text-xs shadow hover:brightness-110 transition">
+          تنفيذ التحويل وتحديث الأرصدة
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- DEVICE TICKETS MODAL (إيصالات استلام الأجهزة والصيانة) -->
+  <div id="ticketsModal" class="fixed inset-0 z-[125] hidden items-center justify-center p-3 bg-black/85 backdrop-blur-md" onclick="closeTicketsModal()">
+    <div class="relative max-w-2xl w-full bg-slate-900 border border-cyan-500/40 rounded-3xl p-4 sm:p-5 shadow-2xl modal-enter max-h-[92vh] flex flex-col" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+        <div class="flex items-center gap-2 text-white font-black text-sm">
+          <i class="fa-solid fa-screwdriver-wrench text-cyan-400"></i>
+          <span>إدارة أجهزة الصيانة والاستلام</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="openNewTicketForm()" class="px-3 py-1.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-black hover:bg-cyan-500 hover:text-white transition flex items-center gap-1">
+            <i class="fa-solid fa-plus"></i> جهاز جديد
+          </button>
+          <button onclick="closeTicketsModal()" class="w-8 h-8 rounded-full bg-white/5 text-slate-400 hover:text-white flex items-center justify-center">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Ticket Create / Edit Form -->
+      <div id="ticketFormBox" class="hidden my-3 p-4 rounded-2xl bg-white/5 border border-cyan-500/30 space-y-3 shrink-0">
+        <h4 id="ticketFormTitle" class="text-xs font-black text-cyan-400">تسجيل استلام جهاز جديد</h4>
+        <form onsubmit="handleTicketSubmit(event)" class="space-y-2.5">
+          <input type="hidden" id="ticketEditId">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="field-label">اسم العميل *</label>
+              <input type="text" id="tktClient" required placeholder="محمد أحمد" class="form-input text-xs">
+            </div>
+            <div>
+              <label class="field-label">رقم الهاتف / واتساب *</label>
+              <input type="tel" id="tktPhone" required placeholder="01012345678" class="form-input text-xs">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="field-label">نوع الجهاز والموديل *</label>
+              <input type="text" id="tktModel" required placeholder="مثال: Samsung A54 5G" class="form-input text-xs">
+            </div>
+            <div>
+              <label class="field-label">رمز القفل / الباسورد (إن وجد)</label>
+              <input type="text" id="tktPasscode" placeholder="مثال: 1234 أو نمط Z" class="form-input text-xs">
+            </div>
+          </div>
+          <div>
+            <label class="field-label">وصف العطل والمطلوب صيانته *</label>
+            <input type="text" id="tktIssue" required placeholder="مثال: تغيير شاشة أصلية + صيانة سوكت شحن" class="form-input text-xs">
+          </div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="field-label">التكلفة المتفق عليها (ج.م) *</label>
+              <input type="number" id="tktCost" step="0.01" required placeholder="1200" class="form-input text-xs font-black">
+            </div>
+            <div>
+              <label class="field-label">العربون / المدفوع مقدماً</label>
+              <input type="number" id="tktDeposit" step="0.01" min="0" placeholder="200" class="form-input text-xs">
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="cancelTicketForm()" class="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400">إلغاء</button>
+            <button type="submit" class="px-4 py-2 rounded-xl bg-cyan-500 text-slate-950 font-black text-xs">حفظ الإيصال</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Tickets List -->
+      <div id="ticketsList" class="flex-1 overflow-y-auto space-y-2.5 py-3 pr-1"></div>
+      <div id="emptyTicketsState" class="hidden py-10 text-center text-xs text-slate-400 font-bold">
+        <i class="fa-solid fa-mobile-screen text-3xl mb-2 text-cyan-500 opacity-60"></i>
+        <p>لا توجد أجهزة قيد الصيانة حالياً</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHIFT SETTLEMENT MODAL (تقفيل الوردية واليومية) -->
+  <div id="shiftModal" class="fixed inset-0 z-[125] hidden items-center justify-center p-3 bg-black/85 backdrop-blur-sm" onclick="closeShiftSettlementModal()">
+    <div class="relative max-w-md w-full bg-slate-900 border border-amber-500/40 rounded-3xl p-5 shadow-2xl modal-enter" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+        <div class="flex items-center gap-2 text-white font-black text-sm">
+          <i class="fa-solid fa-calendar-check text-amber-500"></i>
+          <span>تقفيل الوردية والملخص اليومي</span>
+        </div>
+        <button onclick="closeShiftSettlementModal()" class="w-8 h-8 rounded-full bg-white/5 text-slate-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="shiftContent" class="space-y-3 text-xs"></div>
+      <div class="mt-4 pt-3 border-t border-white/10 flex gap-2">
+        <button onclick="shareShiftWhatsApp()" class="flex-1 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow">
+          <i class="fa-brands fa-whatsapp text-sm"></i> مشاركة التقفيل واتساب
+        </button>
+        <button onclick="closeShiftSettlementModal()" class="px-4 py-3 rounded-2xl bg-white/10 text-white font-black text-xs">
+          إغلاق
+        </button>
+      </div>
+    </div>
+  </div>
 
 </body>

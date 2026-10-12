@@ -224,7 +224,6 @@ function isAppStandalone() {
 }
 
 function checkForcedInstallDialog() {
-  // إذا كان التطبيق مثبت ومفتوح بالفعل كتطبيق، لا تظهر الرسالة
   if (isAppStandalone()) {
     document.body.classList.add('pwa-standalone');
     const hBtn = document.getElementById('headerInstallBtn');
@@ -232,21 +231,18 @@ function checkForcedInstallDialog() {
     return;
   }
 
-  // إظهار زر التثبيت في الهيدر والقائمة دائماً
   const hBtn = document.getElementById('headerInstallBtn');
   if (hBtn) {
     hBtn.classList.remove('hidden');
     hBtn.classList.add('flex');
   }
 
-  // إذا كنا في صفحة كشف حساب عميل أو تم إغلاق النافذة مؤخراً خلال 24 ساعة، لا نظهر النافذة إجبارياً
   if (window.isPortalModeActive || new URLSearchParams(window.location.search).has('client')) return;
   const lastDismissed = localStorage.getItem('ehsebli_install_dismissed');
   if (lastDismissed && Date.now() - Number(lastDismissed) < 24 * 60 * 60 * 1000) {
     return;
   }
 
-  // إظهار النافذة بعد نصف ثانية من فتح الموقع
   setTimeout(() => {
     showMobileInstallModal();
   }, 600);
@@ -4327,4 +4323,510 @@ function openKPIModal() {
 function closeKPIModal() {
   const modal = document.getElementById('kpiModal');
   if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+}
+
+
+/* =========================================================
+   WALLET TRANSFERS (التحويل بين الخزائن)
+   ========================================================= */
+function openWalletTransferModal() {
+  closeMenus();
+  const modal = document.getElementById('walletTransferModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.getElementById('transferAmount').value = '';
+    document.getElementById('transferFee').value = '';
+    document.getElementById('transferNotes').value = '';
+  }
+}
+
+function closeWalletTransferModal() {
+  const modal = document.getElementById('walletTransferModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+
+function handleWalletTransferSubmit(event) {
+  event.preventDefault();
+  if (!requireAuth()) return;
+
+  const fromWallet = document.getElementById('transferFromWallet').value;
+  const toWallet = document.getElementById('transferToWallet').value;
+  const amount = Number(document.getElementById('transferAmount').value) || 0;
+  const fee = Number(document.getElementById('transferFee').value) || 0;
+  const notes = sanitizeString(document.getElementById('transferNotes').value, 150);
+
+  if (fromWallet === toWallet) {
+    showToast('لا يمكن التحويل لنفس الخزينة!', 'error');
+    return;
+  }
+  if (amount <= 0) {
+    showToast('أدخل مبلغ تحويل صحيح', 'error');
+    return;
+  }
+
+  const now = Date.now();
+  const date = todayString();
+  const time = formatTimeTo12Hour(currentInputTimeString());
+
+  // 1. Expense from source wallet (Amount + Fee)
+  const expenseTx = normalizeTransaction({
+    id: 'tx-trf-out-' + now,
+    type: 'expense',
+    amount: amount + fee,
+    date, time,
+    client: 'تحويل داخلي',
+    category: 'تحويل بين الخزائن',
+    paymentMethod: fromWallet,
+    notes: `تحويل إلى ${toWallet}${fee > 0 ? ` (شامل عمولة ${fee} ج.م)` : ''}${notes ? ' - ' + notes : ''}`,
+    _updatedAt: now
+  });
+
+  // 2. Income into target wallet (Amount only)
+  const incomeTx = normalizeTransaction({
+    id: 'tx-trf-in-' + (now + 1),
+    type: 'income',
+    amount: amount,
+    date, time,
+    client: 'تحويل داخلي',
+    category: 'تحويل بين الخزائن',
+    paymentMethod: toWallet,
+    notes: `تحويل وارد من ${fromWallet}${notes ? ' - ' + notes : ''}`,
+    _updatedAt: now + 1
+  });
+
+  transactions.unshift(incomeTx);
+  transactions.unshift(expenseTx);
+
+  saveData();
+  refreshAll();
+  closeWalletTransferModal();
+
+  logAudit('تحويل خزائن', `تحويل ${money(amount)} ج.م من [${fromWallet}] إلى [${toWallet}]`);
+  showToast(`تم تحويل ${money(amount)} ج.م من ${fromWallet} إلى ${toWallet} بنجاح ✓`, 'success');
+}
+
+
+/* =========================================================
+   DEVICE MAINTENANCE TICKETS (إيصالات استلام الأجهزة)
+   ========================================================= */
+const TICKETS_KEY = 'ehsebli_tickets_v1';
+let maintenanceTickets = [];
+
+function loadTickets() {
+  try {
+    const saved = localStorage.getItem(TICKETS_KEY);
+    maintenanceTickets = saved ? JSON.parse(saved) : [];
+  } catch(e) {
+    maintenanceTickets = [];
+  }
+}
+
+function saveTickets() {
+  localStorage.setItem(TICKETS_KEY, JSON.stringify(maintenanceTickets));
+}
+
+function openTicketsModal() {
+  closeMenus();
+  loadTickets();
+  renderTickets();
+  cancelTicketForm();
+  const modal = document.getElementById('ticketsModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+}
+
+function closeTicketsModal() {
+  const modal = document.getElementById('ticketsModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+
+function openNewTicketForm(id = null) {
+  const box = document.getElementById('ticketFormBox');
+  const title = document.getElementById('ticketFormTitle');
+  box.classList.remove('hidden');
+  document.getElementById('ticketEditId').value = '';
+  document.getElementById('tktClient').value = '';
+  document.getElementById('tktPhone').value = '';
+  document.getElementById('tktModel').value = '';
+  document.getElementById('tktPasscode').value = '';
+  document.getElementById('tktIssue').value = '';
+  document.getElementById('tktCost').value = '';
+  document.getElementById('tktDeposit').value = '';
+
+  if (id) {
+    const t = maintenanceTickets.find(item => item.id === id);
+    if (t) {
+      title.textContent = 'تعديل إيصال جهاز';
+      document.getElementById('ticketEditId').value = t.id;
+      document.getElementById('tktClient').value = t.clientName || '';
+      document.getElementById('tktPhone').value = t.clientPhone || '';
+      document.getElementById('tktModel').value = t.deviceModel || '';
+      document.getElementById('tktPasscode').value = t.passcode || '';
+      document.getElementById('tktIssue').value = t.issue || '';
+      document.getElementById('tktCost').value = t.cost || '';
+      document.getElementById('tktDeposit').value = t.deposit || '';
+    }
+  } else {
+    title.textContent = 'تسجيل استلام جهاز جديد للصيانة';
+  }
+}
+
+function cancelTicketForm() {
+  const box = document.getElementById('ticketFormBox');
+  if (box) box.classList.add('hidden');
+}
+
+function handleTicketSubmit(event) {
+  event.preventDefault();
+  const editId = document.getElementById('ticketEditId').value;
+  const clientName = sanitizeString(document.getElementById('tktClient').value, 60);
+  const clientPhone = sanitizeString(document.getElementById('tktPhone').value, 30);
+  const deviceModel = sanitizeString(document.getElementById('tktModel').value, 80);
+  const passcode = sanitizeString(document.getElementById('tktPasscode').value, 40);
+  const issue = sanitizeString(document.getElementById('tktIssue').value, 150);
+  const cost = Number(document.getElementById('tktCost').value) || 0;
+  const deposit = Number(document.getElementById('tktDeposit').value) || 0;
+
+  if (!clientName || !deviceModel || !issue) {
+    showToast('يرجى ملء البيانات المطلوبة', 'error');
+    return;
+  }
+
+  if (editId) {
+    const t = maintenanceTickets.find(item => item.id === editId);
+    if (t) {
+      t.clientName = clientName;
+      t.clientPhone = clientPhone;
+      t.deviceModel = deviceModel;
+      t.passcode = passcode;
+      t.issue = issue;
+      t.cost = cost;
+      t.deposit = deposit;
+      t._updatedAt = Date.now();
+    }
+    showToast('تم تحديث بيانات الجهاز ✓', 'success');
+  } else {
+    const newTkt = {
+      id: 'tkt-' + Date.now(),
+      ticketNo: Math.floor(1000 + Math.random() * 9000),
+      clientName, clientPhone, deviceModel, passcode, issue, cost, deposit,
+      status: 'received', // received, in_progress, ready, delivered
+      date: todayString(),
+      time: formatTimeTo12Hour(currentInputTimeString()),
+      _updatedAt: Date.now()
+    };
+    maintenanceTickets.unshift(newTkt);
+    logAudit('استلام جهاز', `استلام ${deviceModel} للعميل ${clientName}`);
+    showToast('تم إصدار إيصال استلام الجهاز بنجاح 🎉', 'success');
+  }
+
+  saveTickets();
+  renderTickets();
+  cancelTicketForm();
+}
+
+function updateTicketStatus(id, newStatus) {
+  const t = maintenanceTickets.find(item => item.id === id);
+  if (!t) return;
+  t.status = newStatus;
+  t._updatedAt = Date.now();
+  saveTickets();
+  renderTickets();
+
+  const labels = {
+    received: 'قيد الفحص والاستلام',
+    in_progress: 'جاري الصيانة',
+    ready: 'جاهز للاستلام ✨',
+    delivered: 'تم التسليم للعميل ✓'
+  };
+  showToast(`تم تحديث حالة الجهاز: ${labels[newStatus]}`, 'success');
+
+  // If marked delivered, ask to record remaining amount in transactions
+  if (newStatus === 'delivered') {
+    const remaining = Math.max(0, (Number(t.cost) || 0) - (Number(t.deposit) || 0));
+    if (remaining > 0) {
+      openConfirm('تسجيل الإيراد في الحسابات؟', `تم تسليم الجهاز. هل تريد إضافة المتبقي (<strong>${money(remaining)} ج.م</strong>) كإيراد صيانة لخزينة الكاش؟`, () => {
+        const now = Date.now();
+        const tx = normalizeTransaction({
+          id: 'tx-tkt-' + now,
+          type: 'income',
+          amount: remaining,
+          date: todayString(),
+          time: formatTimeTo12Hour(currentInputTimeString()),
+          client: t.clientName,
+          category: 'خدمات سوفت وير وصيانة',
+          paymentMethod: 'كاش نقدي',
+          reference: `TKT-${t.ticketNo}`,
+          notes: `صيانة ${t.deviceModel} - ${t.issue}`,
+          _updatedAt: now
+        });
+        transactions.unshift(tx);
+        saveData();
+        refreshAll();
+        showToast(`تم تسجيل إيراد ${money(remaining)} ج.م بنجاح!`, 'success');
+      });
+    }
+  }
+}
+
+function deleteTicket(id) {
+  openConfirm('حذف إيصال الجهاز؟', 'سيتم إزالة هذا الإيصال نهائياً من سجل الصيانة.', () => {
+    maintenanceTickets = maintenanceTickets.filter(item => item.id !== id);
+    saveTickets();
+    renderTickets();
+    showToast('تم حذف الإيصال', 'info');
+  });
+}
+
+function shareTicketWhatsApp(id) {
+  const t = maintenanceTickets.find(item => item.id === id);
+  if (!t) return;
+  const rem = Math.max(0, (Number(t.cost) || 0) - (Number(t.deposit) || 0));
+  const statusArabic = {
+    received: 'قيد الفحص والمعاينة 🔍',
+    in_progress: 'جاري العمل والصيانة ⚙️',
+    ready: 'جاهز للاستلام والتسليم 🎉',
+    delivered: 'تم التسليم بنجاح ✓'
+  }[t.status] || 'قيد الصيانة';
+
+  const text = `🧾 *إيصال استلام جهاز صيانة | احسبلي*
+رقم الإيصال: *#TKT-${t.ticketNo}*
+----------------------------------------
+👤 *العميل:* ${t.clientName}
+📱 *الجهاز:* ${t.deviceModel}
+🔧 *العطل المطلوب:* ${t.issue}
+📅 *تاريخ الاستلام:* ${t.date}
+📊 *الحالة الحالية:* ${statusArabic}
+----------------------------------------
+💰 *التكلفة المتفق عليها:* ${money(t.cost)} ج.م
+💵 *العربون المدفوع:* ${money(t.deposit)} ج.م
+🔴 *المتبقي عند الاستلام:* ${money(rem)} ج.م
+----------------------------------------
+شكراً لثقتكم بنا ✨ — يسعدنا خدمتكم دائماً.`;
+
+  const phoneClean = (t.clientPhone || '').replace(/[^0-9]/g, '');
+  let waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  if (phoneClean.length >= 10) {
+    const formatted = phoneClean.startsWith('0') ? '2' + phoneClean : phoneClean;
+    waUrl = `https://wa.me/${formatted}?text=${encodeURIComponent(text)}`;
+  }
+  window.open(waUrl, '_blank');
+}
+
+function renderTickets() {
+  const container = document.getElementById('ticketsList');
+  const empty = document.getElementById('emptyTicketsState');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!maintenanceTickets.length) {
+    if (empty) empty.classList.remove('hidden');
+    return;
+  }
+  if (empty) empty.classList.add('hidden');
+
+  maintenanceTickets.forEach(t => {
+    const rem = Math.max(0, (Number(t.cost) || 0) - (Number(t.deposit) || 0));
+    const card = document.createElement('div');
+    const isReady = t.status === 'ready';
+    const isDelivered = t.status === 'delivered';
+
+    card.className = `p-3.5 rounded-2xl border ${
+      isDelivered ? 'bg-black/30 border-white/10 opacity-70' :
+      isReady ? 'bg-emerald-500/10 border-emerald-500/40' :
+      'bg-white/5 border-white/10'
+    } flex flex-col justify-between gap-3`;
+
+    card.innerHTML = `
+      <div>
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-400 font-mono text-[10px] font-black">#TKT-${t.ticketNo}</span>
+              <h4 class="font-black text-sm text-white">${escapeHTML(t.deviceModel)}</h4>
+            </div>
+            <div class="text-xs text-slate-300 font-bold mt-1">
+              <i class="fa-solid fa-user text-[10px] text-orange-400"></i> ${escapeHTML(t.clientName)} 
+              ${t.clientPhone ? `• <span class="text-slate-400 font-mono">${escapeHTML(t.clientPhone)}</span>` : ''}
+            </div>
+          </div>
+          <div class="text-left">
+            <div class="text-xs font-black text-emerald-400">${money(t.cost)} ج.م</div>
+            ${rem > 0 ? `<div class="text-[9px] text-rose-400 font-bold">باقي: ${money(rem)} ج.م</div>` : '<div class="text-[9px] text-emerald-400 font-bold">مدفوع كامل</div>'}
+          </div>
+        </div>
+
+        <div class="mt-2 text-xs text-slate-300 bg-white/5 p-2 rounded-xl">
+          <span class="text-slate-400 font-bold">المطلوب:</span> ${escapeHTML(t.issue)}
+          ${t.passcode ? `<span class="mr-2 text-amber-400 font-mono font-bold">• الرمز: ${escapeHTML(t.passcode)}</span>` : ''}
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
+        <select onchange="updateTicketStatus('${t.id}', this.value)" class="text-[11px] font-black rounded-lg px-2 py-1 bg-slate-800 text-slate-200 border border-white/10 focus:outline-none">
+          <option value="received" ${t.status === 'received' ? 'selected' : ''}>🔍 استلام وفحص</option>
+          <option value="in_progress" ${t.status === 'in_progress' ? 'selected' : ''}>⚙️ جاري الصيانة</option>
+          <option value="ready" ${t.status === 'ready' ? 'selected' : ''}>✨ جاهز للاستلام</option>
+          <option value="delivered" ${t.status === 'delivered' ? 'selected' : ''}>✓ تم التسليم</option>
+        </select>
+
+        <div class="flex items-center gap-1.5">
+          <button onclick="shareTicketWhatsApp('${t.id}')" title="مشاركة عبر الواتساب" class="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white transition text-xs">
+            <i class="fa-brands fa-whatsapp"></i>
+          </button>
+          <button onclick="openNewTicketForm('${t.id}')" title="تعديل" class="p-2 rounded-xl bg-white/5 text-slate-300 hover:text-orange-400 transition text-xs">
+            <i class="fa-solid fa-pen"></i>
+          </button>
+          <button onclick="deleteTicket('${t.id}')" title="حذف" class="p-2 rounded-xl bg-white/5 text-slate-400 hover:text-rose-500 transition text-xs">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+
+/* =========================================================
+   DAILY SHIFT SETTLEMENT (تقفيل الوردية واليومية)
+   ========================================================= */
+function openShiftSettlementModal() {
+  closeMenus();
+  renderShiftSettlement();
+  const modal = document.getElementById('shiftModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+}
+
+function closeShiftSettlementModal() {
+  const modal = document.getElementById('shiftModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+
+function renderShiftSettlement() {
+  const today = todayString();
+  const todayTxs = getActiveTransactions().filter(t => t.date === today);
+
+  let todayIncome = 0;
+  let todayExpense = 0;
+  let todayCharity = 0;
+  const wallets = {};
+
+  todayTxs.forEach(t => {
+    const amt = Number(t.amount) || 0;
+    const m = t.paymentMethod || 'كاش نقدي';
+    if (t.type === 'income') {
+      todayIncome += amt;
+      wallets[m] = (wallets[m] || 0) + amt;
+    } else if (t.type === 'expense') {
+      todayExpense += amt;
+      wallets[m] = (wallets[m] || 0) - amt;
+    } else if (t.type === 'charity') {
+      todayCharity += amt;
+      wallets[m] = (wallets[m] || 0) - amt;
+    }
+  });
+
+  const netToday = todayIncome - todayExpense - todayCharity;
+  const content = document.getElementById('shiftContent');
+  if (!content) return;
+
+  let walletsListHtml = '';
+  Object.keys(wallets).forEach(w => {
+    walletsListHtml += `<div class="flex justify-between py-1 border-b border-white/5">
+      <span class="text-slate-400 font-bold">${escapeHTML(w)}:</span>
+      <span class="font-black ${wallets[w] >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${money(wallets[w])} ج.م</span>
+    </div>`;
+  });
+
+  content.innerHTML = `
+    <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+      <div class="flex items-center justify-between text-slate-300 font-bold">
+        <span>تاريخ التقفيل:</span>
+        <span class="text-white font-black">${today} (${formatTimeTo12Hour(currentInputTimeString())})</span>
+      </div>
+      <div class="flex items-center justify-between text-slate-300 font-bold">
+        <span>إجمالي إيرادات اليوم:</span>
+        <span class="text-emerald-400 font-black">+${money(todayIncome)} ج.م</span>
+      </div>
+      <div class="flex items-center justify-between text-slate-300 font-bold">
+        <span>إجمالي مصاريف اليوم:</span>
+        <span class="text-rose-400 font-black">-${money(todayExpense)} ج.م</span>
+      </div>
+      <div class="flex items-center justify-between text-slate-300 font-bold">
+        <span>باب الخير والصدقات:</span>
+        <span class="text-orange-400 font-black">-${money(todayCharity)} ج.م</span>
+      </div>
+      <div class="pt-2 border-t border-white/10 flex items-center justify-between text-sm">
+        <span class="text-white font-black">صافي أرباح اليوم:</span>
+        <span class="font-black ${netToday >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${money(netToday)} ج.م</span>
+      </div>
+    </div>
+
+    <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
+      <div class="font-black text-xs text-amber-400 mb-2">صافي حركة الخزائن لليوم:</div>
+      ${walletsListHtml || '<div class="text-slate-400">لا توجد حركات مسجلة اليوم</div>'}
+    </div>
+  `;
+}
+
+function shareShiftWhatsApp() {
+  const today = todayString();
+  const todayTxs = getActiveTransactions().filter(t => t.date === today);
+
+  let todayIncome = 0;
+  let todayExpense = 0;
+  let todayCharity = 0;
+  const wallets = {};
+
+  todayTxs.forEach(t => {
+    const amt = Number(t.amount) || 0;
+    const m = t.paymentMethod || 'كاش نقدي';
+    if (t.type === 'income') {
+      todayIncome += amt;
+      wallets[m] = (wallets[m] || 0) + amt;
+    } else if (t.type === 'expense') {
+      todayExpense += amt;
+      wallets[m] = (wallets[m] || 0) - amt;
+    } else if (t.type === 'charity') {
+      todayCharity += amt;
+      wallets[m] = (wallets[m] || 0) - amt;
+    }
+  });
+
+  const netToday = todayIncome - todayExpense - todayCharity;
+  let walletsText = '';
+  Object.keys(wallets).forEach(w => {
+    walletsText += `• ${w}: ${money(wallets[w])} ج.م
+`;
+  });
+
+  const text = `📊 *تقرير تقفيل اليومية والوردية | احسبلي*
+📅 *التاريخ:* ${today} (${formatTimeTo12Hour(currentInputTimeString())})
+----------------------------------------
+📈 *إجمالي الإيرادات:* ${money(todayIncome)} ج.م
+📉 *إجمالي المصروفات:* ${money(todayExpense)} ج.م
+🤲 *باب الخير:* ${money(todayCharity)} ج.م
+💰 *الصافي المحقق:* ${money(netToday)} ج.م
+----------------------------------------
+💳 *حركة الخزائن اليوم:*
+${walletsText || 'لا توجد حركات مسجلة'}----------------------------------------
+تم الاعتماد والتقفيل بنجاح ✨`;
+
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }

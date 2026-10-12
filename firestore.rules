@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Roles and Global Configuration
+    match /config/roles {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (request.auth.token.email.matches('(?i)hondastore299@gmail.com') ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    // User Private Documents (Financial Data & Settings)
+    match /users/{userId} {
+      // Only the authenticated account owner or admin can read the full user document
+      allow read: if request.auth != null && 
+        (request.auth.uid == userId || 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      
+      // Allow creation upon new signup
+      allow create: if request.auth != null && request.auth.uid == userId;
+
+      // Allow updates while preventing privilege escalation (protecting 'role', 'isSuperAdmin')
+      allow update: if request.auth != null && (
+        request.auth.token.email.matches('(?i)hondastore299@gmail.com') ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        (request.auth.uid == userId && 
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isSuperAdmin', 'permissionsOverride']))
+      );
+
+      // Private user subcollections
+      match /{allSubcollections=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Dedicated Isolated Client Portals (Safe from exposing owner's full database)
+    match /client_portals/{portalId} {
+      // Anyone with the direct link can read only their specific ledger
+      allow read: if true;
+      // Only the shop owner can create or update this client ledger
+      allow write: if request.auth != null && request.auth.uid == request.resource.data.ownerUid;
+    }
+  }
+}
