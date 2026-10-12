@@ -40,6 +40,21 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
+/* =========================================================
+   PWA: SERVICE WORKER REGISTRATION
+   ========================================================= */
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then((reg) => {
+        console.log('Service Worker Registered ✓', reg.scope);
+      })
+      .catch((err) => {
+        console.warn('Service Worker Registration Failed:', err);
+      });
+  }
+}
+
 
 /* ---------- Constants ---------- */
 const STORAGE_KEY = 'ehsebli_honda_data_v2';
@@ -224,7 +239,14 @@ function checkForcedInstallDialog() {
     hBtn.classList.add('flex');
   }
 
-  // إظهار النافذة إجبارياً بعد نصف ثانية من فتح الموقع
+  // إذا كنا في صفحة كشف حساب عميل أو تم إغلاق النافذة مؤخراً خلال 24 ساعة، لا نظهر النافذة إجبارياً
+  if (window.isPortalModeActive || new URLSearchParams(window.location.search).has('client')) return;
+  const lastDismissed = localStorage.getItem('ehsebli_install_dismissed');
+  if (lastDismissed && Date.now() - Number(lastDismissed) < 24 * 60 * 60 * 1000) {
+    return;
+  }
+
+  // إظهار النافذة بعد نصف ثانية من فتح الموقع
   setTimeout(() => {
     showMobileInstallModal();
   }, 600);
@@ -268,6 +290,9 @@ function dismissMobileInstall() {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
   }
+  try {
+    localStorage.setItem('ehsebli_install_dismissed', Date.now());
+  } catch(e) {}
 }
 
 async function triggerMobileAppInstall() {
@@ -455,7 +480,7 @@ function showLocalNotification(title, body, url) {
       type: 'SHOW_LOCAL_NOTIFICATION', title, body, url
     });
   } else {
-    new Notification(title, { body, icon: './icon.svg', badge: './icon.svg' });
+    new Notification(title, { body, icon: './icon-192.png', badge: './icon-192.png' });
   }
 }
 
@@ -3783,7 +3808,6 @@ async function rejectClientRequest(reqId) {
   });
 }
 
-
 function updateGlobalPendingAlert(reqs) {
   const alertEl = document.getElementById('globalPendingAlert');
   const countEl = document.getElementById('globalPendingCount');
@@ -3799,358 +3823,6 @@ function updateGlobalPendingAlert(reqs) {
     alertEl.classList.remove('flex');
   }
 }
-
-
-/* =========================================================
-   FREE CLIENT REQUESTS APPROVAL MODAL (متاح لكل الحسابات)
-   ========================================================= */
-function openClientRequestsModal() {
-  if (!requireAuth()) return;
-  const modal = document.getElementById('clientRequestsModal');
-  if (!modal) return;
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
-  renderGlobalClientRequests();
-}
-
-function closeClientRequestsModal() {
-  const modal = document.getElementById('clientRequestsModal');
-  if (!modal) return;
-  modal.classList.add('hidden');
-  modal.classList.remove('flex');
-}
-
-function renderGlobalClientRequests() {
-  const container = document.getElementById('globalClientRequestsList');
-  if (!container) return;
-  container.innerHTML = '<div class="text-center py-6 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin text-orange-500 text-base"></i><p class="mt-2">جاري جلب الطلبات...</p></div>';
-
-  if (!currentUser) return;
-  db.collection('users').doc(currentUser.uid).get().then(doc => {
-    if (!doc.exists) { container.innerHTML = '<div class="text-center py-6 text-xs text-slate-400 font-bold">لا توجد طلبات</div>'; return; }
-    const data = doc.data();
-    const reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
-    pendingRequestsCache = reqs;
-
-    container.innerHTML = '';
-    if (!reqs.length) {
-      container.innerHTML = '<div class="text-center py-10 text-xs text-slate-400 font-bold"><i class="fa-solid fa-circle-check text-3xl mb-2 text-emerald-500 opacity-80"></i><p>لا توجد طلبات معلقة من العملاء حالياً</p></div>';
-      return;
-    }
-
-    reqs.forEach(req => {
-      const card = document.createElement('div');
-      card.className = 'p-3.5 rounded-2xl border border-amber-500/30 bg-black/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
-      card.innerHTML = `
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black">طلب جديد</span>
-            <span class="text-xs font-black text-white">${escapeHTML(req.client)}</span>
-          </div>
-          <div class="text-xs font-bold text-slate-200 mt-1">${escapeHTML(req.notes)}</div>
-          <div class="text-[10px] text-orange-400 mt-0.5 font-bold">${escapeHTML(typeName(req.type))} • ${money(req.amount)} ج.م • ${escapeHTML(req.date)}</div>
-        </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <button onclick="approveGlobalClientRequest('${req.id}')" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition flex items-center gap-1 shadow">
-            <i class="fa-solid fa-check"></i> موافق
-          </button>
-          <button onclick="rejectGlobalClientRequest('${req.id}')" class="px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500 text-rose-400 hover:text-white text-xs font-black transition flex items-center gap-1">
-            <i class="fa-solid fa-xmark"></i> رفض
-          </button>
-        </div>
-      `;
-      container.appendChild(card);
-    });
-  }).catch(err => {
-    container.innerHTML = '<div class="text-center py-6 text-xs text-rose-500 font-bold">خطأ في جلب الطلبات من السحابة</div>';
-  });
-}
-
-
-
-async function approveGlobalClientRequest(reqId) {
-  if (!currentUser) {
-    showToast('يجب تسجيل الدخول أولاً', 'error');
-    return;
-  }
-
-  closeClientRequestsModal();
-  openConfirm('قبول طلب العميل؟', 'سيتم اعتماد معاملة العميل وإضافتها لحساباتك وخزينتك رسمياً.', async () => {
-    showToast('جاري اعتماد الطلب...', 'info');
-    try {
-      const userRef = db.collection('users').doc(currentUser.uid);
-      const doc = await userRef.get();
-      if (!doc.exists) {
-        showToast('لم يتم العثور على بيانات الحساب', 'error');
-        return;
-      }
-
-      const data = doc.data();
-      let reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
-      let txs = Array.isArray(data.transactions) ? data.transactions : [];
-
-      // Find the request
-      const req = reqs.find(r => r.id === reqId);
-      if (!req) {
-        showToast('هذا الطلب غير موجود أو تم معالجته مسبقاً', 'error');
-        return;
-      }
-
-      // Remove from pending
-      reqs = reqs.filter(r => r.id !== reqId);
-
-      // Create verified transaction
-      const newTx = normalizeTransaction({
-        id: 'tx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-        type: req.type,
-        amount: Number(req.amount) || 0,
-        date: req.date || todayString(),
-        time: req.time || formatTimeTo12Hour(currentInputTimeString()),
-        client: req.client || 'عميل',
-        category: req.category || 'إيراد',
-        paymentMethod: 'مقبول من العميل',
-        notes: req.notes || 'طلب عميل',
-        status: isDebt(req.type) ? 'pending' : null,
-        _updatedAt: Date.now()
-      });
-      txs.unshift(newTx);
-
-      // Save to Firestore
-      await userRef.set({
-        pendingRequests: reqs,
-        transactions: txs,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-
-      showToast('تم قبول الطلب وإضافته للمعاملات بنجاح 🎉', 'success');
-      updateGlobalPendingAlert(reqs);
-      loadLocalData();
-  loadInventory();
-  loadRecurring();
-  loadAuditLog();
-  checkOverdueDebtsAlert();
-      refreshAll();
-    } catch (error) {
-      console.error("Approve error:", error);
-      showToast('فشل قبول الطلب: ' + (error.message || error.code), 'error');
-    }
-  });
-}
-
-async function rejectGlobalClientRequest(reqId) {
-  if (!currentUser) {
-    showToast('يجب تسجيل الدخول أولاً', 'error');
-    return;
-  }
-
-  closeClientRequestsModal();
-  openConfirm('رفض وحذف الطلب؟', 'سيتم تجاهل هذا الطلب وحذفه نهائياً.', async () => {
-    showToast('جاري رفض الطلب...', 'info');
-    try {
-      const userRef = db.collection('users').doc(currentUser.uid);
-      const doc = await userRef.get();
-      if (!doc.exists) {
-        showToast('لم يتم العثور على بيانات الحساب', 'error');
-        return;
-      }
-
-      const data = doc.data();
-      let reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
-      reqs = reqs.filter(r => r.id !== reqId);
-
-      await userRef.set({
-        pendingRequests: reqs,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-
-      showToast('تم رفض وحذف الطلب', 'info');
-      updateGlobalPendingAlert(reqs);
-    } catch (error) {
-      console.error("Reject error:", error);
-      showToast('فشل رفض الطلب: ' + (error.message || error.code), 'error');
-    }
-  });
-}
-
-
-function updateGlobalPendingAlert(reqs) {
-  const alertEl = document.getElementById('globalPendingAlert');
-  const countEl = document.getElementById('globalPendingCount');
-  if (!alertEl || !countEl) return;
-  
-  const count = Array.isArray(reqs) ? reqs.length : 0;
-  if (count > 0) {
-    alertEl.classList.remove('hidden');
-    alertEl.classList.add('flex');
-    countEl.textContent = count;
-  } else {
-    alertEl.classList.add('hidden');
-    alertEl.classList.remove('flex');
-  }
-}
-
-
-/* =========================================================
-   FREE CLIENT REQUESTS APPROVAL MODAL (متاح لكل الحسابات)
-   ========================================================= */
-function openClientRequestsModal() {
-  if (!requireAuth()) return;
-  const modal = document.getElementById('clientRequestsModal');
-  if (!modal) return;
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
-  renderGlobalClientRequests();
-}
-
-function closeClientRequestsModal() {
-  const modal = document.getElementById('clientRequestsModal');
-  if (!modal) return;
-  modal.classList.add('hidden');
-  modal.classList.remove('flex');
-}
-
-function renderGlobalClientRequests() {
-  const container = document.getElementById('globalClientRequestsList');
-  if (!container) return;
-  container.innerHTML = '<div class="text-center py-6 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin text-orange-500 text-base"></i><p class="mt-2">جاري جلب الطلبات...</p></div>';
-
-  if (!currentUser) return;
-  db.collection('users').doc(currentUser.uid).get().then(doc => {
-    if (!doc.exists) { container.innerHTML = '<div class="text-center py-6 text-xs text-slate-400 font-bold">لا توجد طلبات</div>'; return; }
-    const data = doc.data();
-    const reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
-    pendingRequestsCache = reqs;
-
-    container.innerHTML = '';
-    if (!reqs.length) {
-      container.innerHTML = '<div class="text-center py-10 text-xs text-slate-400 font-bold"><i class="fa-solid fa-circle-check text-3xl mb-2 text-emerald-500 opacity-80"></i><p>لا توجد طلبات معلقة من العملاء حالياً</p></div>';
-      return;
-    }
-
-    reqs.forEach(req => {
-      const card = document.createElement('div');
-      card.className = 'p-3.5 rounded-2xl border border-amber-500/30 bg-black/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
-      card.innerHTML = `
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black">طلب جديد</span>
-            <span class="text-xs font-black text-white">${escapeHTML(req.client)}</span>
-          </div>
-          <div class="text-xs font-bold text-slate-200 mt-1">${escapeHTML(req.notes)}</div>
-          <div class="text-[10px] text-orange-400 mt-0.5 font-bold">${escapeHTML(typeName(req.type))} • ${money(req.amount)} ج.م • ${escapeHTML(req.date)}</div>
-        </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <button onclick="approveGlobalClientRequest('${req.id}')" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition flex items-center gap-1 shadow">
-            <i class="fa-solid fa-check"></i> موافق
-          </button>
-          <button onclick="rejectGlobalClientRequest('${req.id}')" class="px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500 text-rose-400 hover:text-white text-xs font-black transition flex items-center gap-1">
-            <i class="fa-solid fa-xmark"></i> رفض
-          </button>
-        </div>
-      `;
-      container.appendChild(card);
-    });
-  }).catch(err => {
-    container.innerHTML = '<div class="text-center py-6 text-xs text-rose-500 font-bold">خطأ في جلب الطلبات من السحابة</div>';
-  });
-}
-
-
-async function approveGlobalClientRequest(reqId) {
-  if (!currentUser) return;
-  const req = pendingRequestsCache.find(r => r.id === reqId);
-  if (!req) return;
-
-  closeClientRequestsModal();
-  openConfirm('قبول طلب العميل؟', `سيتم اعتماد معاملة لـ <strong>${escapeHTML(req.client)}</strong> بمبلغ <strong>${money(req.amount)} ج.م</strong> وإضافتها لحساباتك رسمياً.`, async () => {
-    try {
-      const userRef = db.collection('users').doc(currentUser.uid);
-      let remainingReqs = [];
-      await db.runTransaction(async (transaction) => {
-        const doc = await transaction.get(userRef);
-        if (!doc.exists) return;
-        const data = doc.data();
-        let reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
-        let txs = Array.isArray(data.transactions) ? data.transactions : [];
-
-        remainingReqs = reqs.filter(r => r.id !== reqId);
-
-        const newTx = normalizeTransaction({
-          id: 'tx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-          type: req.type,
-          amount: req.amount,
-          date: req.date,
-          time: req.time,
-          client: req.client,
-          category: req.category,
-          paymentMethod: 'مقبول من العميل',
-          notes: req.notes,
-          status: isDebt(req.type) ? 'pending' : null,
-          _updatedAt: Date.now()
-        });
-        txs.unshift(newTx);
-
-        transaction.set(userRef, { pendingRequests: remainingReqs, transactions: txs }, { merge: true });
-      });
-
-      showToast('تم قبول الطلب وإضافته للمعاملات بنجاح 🎉', 'success');
-      updateGlobalPendingAlert(remainingReqs);
-      renderGlobalClientRequests();
-      loadLocalData();
-  loadInventory();
-  loadRecurring();
-  loadAuditLog();
-  checkOverdueDebtsAlert();
-      refreshAll();
-    } catch (error) {
-      console.error("Approve error:", error);
-      showToast('فشل قبول الطلب', 'error');
-    }
-  });
-}
-
-async function rejectGlobalClientRequest(reqId) {
-  if (!currentUser) return;
-  closeClientRequestsModal();
-  openConfirm('رفض وحذف الطلب؟', 'سيتم تجاهل هذا الطلب وحذفه نهائياً.', async () => {
-    try {
-      const userRef = db.collection('users').doc(currentUser.uid);
-      let remainingReqs = [];
-      await db.runTransaction(async (transaction) => {
-        const doc = await transaction.get(userRef);
-        if (!doc.exists) return;
-        let reqs = Array.isArray(doc.data().pendingRequests) ? doc.data().pendingRequests : [];
-        remainingReqs = reqs.filter(r => r.id !== reqId);
-        transaction.set(userRef, { pendingRequests: remainingReqs }, { merge: true });
-      });
-
-      showToast('تم رفض وحذف الطلب', 'info');
-      updateGlobalPendingAlert(remainingReqs);
-      renderGlobalClientRequests();
-    } catch (error) {
-      console.error("Reject error:", error);
-      showToast('فشل رفض الطلب', 'error');
-    }
-  });
-}
-
-
-function updateGlobalPendingAlert(reqs) {
-  const alertEl = document.getElementById('globalPendingAlert');
-  const countEl = document.getElementById('globalPendingCount');
-  if (!alertEl || !countEl) return;
-  
-  const count = Array.isArray(reqs) ? reqs.length : 0;
-  if (count > 0) {
-    alertEl.classList.remove('hidden');
-    alertEl.classList.add('flex');
-    countEl.textContent = count;
-  } else {
-    alertEl.classList.add('hidden');
-    alertEl.classList.remove('flex');
-  }
-}
-
 
 /* =========================================================
    FREE CLIENT REQUESTS APPROVAL MODAL (متاح لكل الحسابات)
@@ -4254,13 +3926,13 @@ async function approveGlobalClientRequest(reqId) {
       });
 
       showToast('تم قبول الطلب وإضافته للمعاملات بنجاح 🎉', 'success');
-      updateGlobalPendingAlert(reqs);
+      updateGlobalPendingAlert(pendingRequestsCache.filter(r => r.id !== reqId));
       renderGlobalClientRequests();
       loadLocalData();
-  loadInventory();
-  loadRecurring();
-  loadAuditLog();
-  checkOverdueDebtsAlert();
+      loadInventory();
+      loadRecurring();
+      loadAuditLog();
+      checkOverdueDebtsAlert();
       refreshAll();
     } catch (error) {
       showToast('فشل قبول الطلب', 'error');
@@ -4283,7 +3955,7 @@ async function rejectGlobalClientRequest(reqId) {
       });
 
       showToast('تم رفض وحذف الطلب', 'info');
-      updateGlobalPendingAlert(reqs);
+      updateGlobalPendingAlert(pendingRequestsCache.filter(r => r.id !== reqId));
       renderGlobalClientRequests();
     } catch (error) {
       showToast('فشل رفض الطلب', 'error');

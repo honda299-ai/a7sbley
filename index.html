@@ -167,6 +167,15 @@
             <button onclick="switchTab('audit')" class="menu-item text-purple-500">
               <i class="fa-solid fa-clock-rotate-left"></i> سجل العمليات والنشاطات
             </button>
+            <button onclick="openRecurringModal()" class="menu-item text-orange-400">
+              <i class="fa-solid fa-repeat"></i> المصاريف المتكررة والثابتة
+            </button>
+            <button onclick="openDrawerModal()" class="menu-item text-emerald-400">
+              <i class="fa-solid fa-cash-register"></i> مطابقة الدرج والخزينة الفعلي
+            </button>
+            <button onclick="openKPIModal()" class="menu-item text-cyan-400">
+              <i class="fa-solid fa-chart-line"></i> مؤشرات الأداء والتحليلات (KPIs)
+            </button>
 
             <button onclick="confirmClearData()" class="menu-item text-rose-600">
               <i class="fa-solid fa-trash-can"></i> تصفير البيانات
@@ -1034,7 +1043,6 @@
         <button id="adminTabUsers" onclick="switchAdminTab('users')" class="admin-tab active">
           <i class="fa-solid fa-users"></i> المستخدمين
         </button>
-        <button 
         <button id="adminTabRequests" onclick="switchAdminTab('requests')" class="admin-tab">
           <i class="fa-solid fa-clock-rotate-left text-amber-500"></i> طلبات العملاء <span id="pendingReqBadge" class="badge bg-amber-500/20 text-amber-500 ml-1">0</span>
         </button>
@@ -1050,7 +1058,6 @@
         <div id="usersList" class="space-y-2"></div>
       </div>
 
-      <div 
       <div id="adminPanelRequests" class="hidden p-4 overflow-y-auto space-y-3">
         <div class="text-xs font-bold text-slate-400 mb-2">الطلبات المرسلة من صفحة العملاء والتي تنتظر موافقتك:</div>
         <div id="adminRequestsList" class="space-y-2.5"></div>
@@ -1265,15 +1272,7 @@
 
 
   
-            <button onclick="openRecurringModal()" class="menu-item text-orange-400">
-              <i class="fa-solid fa-repeat"></i> المصاريف المتكررة والثابتة
-            </button>
-            <button onclick="openDrawerModal()" class="menu-item text-emerald-400">
-              <i class="fa-solid fa-cash-register"></i> مطابقة الدرج والخزينة الفعلي
-            </button>
-            <button onclick="openKPIModal()" class="menu-item text-cyan-400">
-              <i class="fa-solid fa-chart-line"></i> مؤشرات الأداء والتحليلات (KPIs)
-            </button>
+
 
   <!-- PROFIT MARGIN CALCULATOR MODAL -->
   <div id="profitModal" class="fixed inset-0 z-[125] hidden items-center justify-center p-3 bg-black/80 backdrop-blur-sm" onclick="closeProfitModal()">
