@@ -52,80 +52,78 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=10.5">
+  <link rel="stylesheet" href="styles.css?v=11.0">
 </head>
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans auth-pending">
 
-
-
   <!-- HEADER -->
-<header id="appHeader" class="sticky top-0 z-40 border-b border-slate-200 dark:border-dark-800 bg-white dark:bg-dark-900 shadow-sm no-print">
-  <div class="max-w-7xl mx-auto px-3 sm:px-6">
-    <div class="flex items-center justify-between min-h-16 py-2.5 gap-2">
-      
-      <!-- Logo & Brand -->
-      <div class="flex items-center gap-2.5 shrink-0">
-        <img src="logo.png" class="w-10 h-10 rounded-xl object-contain shadow-md border border-orange-500/20" alt="احسبلي">
-        <div>
-          <h1 class="text-lg sm:text-xl font-black text-slate-900 dark:text-white leading-tight">احسبلي</h1>
-          <div class="text-[9px] font-black text-orange-500 tracking-wider">a7sbley</div>
-        </div>
-      </div>
-
-            <!-- Right Actions -->
-      <div class="flex items-center gap-2">
-        <!-- زر تثبيت التطبيق السريع في الهيدر -->
-        <button id="headerInstallBtn" onclick="showMobileInstallModal()"
-          class="hidden sm:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-orange-500/15 border border-orange-500/40 text-orange-400 font-black text-xs">
-          <i class="fa-solid fa-download"></i>
-          <span>تثبيت</span>
-        </button>
+  <header id="appHeader" class="sticky top-0 z-40 border-b border-slate-200 dark:border-dark-800 bg-white dark:bg-dark-900 shadow-sm no-print">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6">
+      <div class="flex items-center justify-between min-h-16 py-2.5 gap-2">
         
-        <!-- تنبيه طلبات العملاء المعلقة (ينور أحمر ونابض) -->
-        <div id="globalPendingAlert" onclick="openClientRequestsModal()" 
-             class="hidden cursor-pointer flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/50 text-rose-400 font-black text-xs animate-pulse shadow-[0_0_15px_rgba(244,63,94,0.5)] transition hover:scale-105">
-          <i class="fa-solid fa-bell text-rose-500"></i>
-          <span class="hidden sm:inline">طلبات عملاء جديدة</span>
-          <span id="globalPendingCount" class="w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center font-black">0</span>
+        <!-- Logo & Brand -->
+        <div class="flex items-center gap-2.5 shrink-0">
+          <img src="logo.png" class="w-10 h-10 rounded-xl object-contain shadow-md border border-orange-500/20" alt="احسبلي">
+          <div>
+            <h1 class="text-lg sm:text-xl font-black text-slate-900 dark:text-white leading-tight">احسبلي</h1>
+            <div class="text-[9px] font-black text-orange-500 tracking-wider">a7sbley</div>
+          </div>
         </div>
 
-        <!-- زر إضافة عملية سريعة -->
-        <button onclick="openModal('expense')"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow hover:brightness-110 active:scale-95 transition">
-          <i class="fa-solid fa-circle-plus"></i>
-          <span class="hidden sm:inline">إضافة عملية</span>
-        </button>
+        <!-- Right Actions -->
+        <div class="flex items-center gap-2">
+          <!-- زر تثبيت التطبيق السريع في الهيدر -->
+          <button id="headerInstallBtn" onclick="showMobileInstallModal()"
+            class="hidden sm:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-orange-500/15 border border-orange-500/40 text-orange-400 font-black text-xs">
+            <i class="fa-solid fa-download"></i>
+            <span>تثبيت</span>
+          </button>
+          
+          <!-- تنبيه طلبات العملاء المعلقة (ينور أحمر ونابض) -->
+          <div id="globalPendingAlert" onclick="openClientRequestsModal()" 
+               class="hidden cursor-pointer flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/50 text-rose-400 font-black text-xs animate-pulse shadow-[0_0_15px_rgba(244,63,94,0.5)] transition hover:scale-105">
+            <i class="fa-solid fa-bell text-rose-500"></i>
+            <span class="hidden sm:inline">طلبات عملاء جديدة</span>
+            <span id="globalPendingCount" class="w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center font-black">0</span>
+          </div>
 
-        <!-- أزرار الوصول السريع: الخصوصية والوضع الليلي في الهيدر مباشرة -->
-        <button onclick="togglePrivacyMode()" title="وضع الخصوصية (إخفاء المبالغ)"
-          class="w-9 h-9 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-orange-500 hover:bg-orange-500/10 transition flex items-center justify-center">
-          <i id="privacyIcon" class="fa-solid fa-eye text-sm"></i>
-        </button>
+          <!-- زر إضافة عملية سريعة -->
+          <button onclick="openModal('expense')"
+            class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow hover:brightness-110 active:scale-95 transition">
+            <i class="fa-solid fa-circle-plus"></i>
+            <span class="hidden sm:inline">إضافة عملية</span>
+          </button>
 
-        <button onclick="toggleTheme()" title="تبديل الوضع الليلي / النهاري"
-          class="w-9 h-9 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-amber-500 hover:bg-amber-500/10 transition flex items-center justify-center">
-          <i id="themeIcon" class="fa-solid fa-sun text-sm"></i>
-        </button>
+          <!-- أزرار الوصول السريع: الخصوصية والوضع الليلي في الهيدر مباشرة -->
+          <button onclick="togglePrivacyMode()" title="وضع الخصوصية (إخفاء المبالغ)"
+            class="w-9 h-9 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-orange-500 hover:bg-orange-500/10 transition flex items-center justify-center">
+            <i id="privacyIcon" class="fa-solid fa-eye text-sm"></i>
+          </button>
 
-        <!-- بروفايل المستخدم وشارة الخطة -->
-        <div id="userProfile" class="flex items-center gap-1.5">
-          <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
-            <i class="fa-solid fa-user"></i> مجاني
-          </span>
-          <img id="userAvatar" src="" class="w-8 h-8 rounded-lg border border-orange-500/40 object-cover" alt="User">
+          <button onclick="toggleTheme()" title="تبديل الوضع الليلي / النهاري"
+            class="w-9 h-9 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-amber-500 hover:bg-amber-500/10 transition flex items-center justify-center">
+            <i id="themeIcon" class="fa-solid fa-sun text-sm"></i>
+          </button>
+
+          <!-- بروفايل المستخدم وشارة الخطة -->
+          <div id="userProfile" class="flex items-center gap-1.5">
+            <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
+              <i class="fa-solid fa-user"></i> مجاني
+            </span>
+            <img id="userAvatar" src="" class="w-8 h-8 rounded-lg border border-orange-500/40 object-cover" alt="User">
+          </div>
+
+          <!-- زر مركز التحكم (المنظم بديل القائمة القديمة) -->
+          <button onclick="openControlCenter()" id="controlCenterBtn" title="مركز التحكم والإعدادات"
+            class="flex px-2.5 sm:px-3.5 py-2 rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition items-center gap-1.5 font-black text-xs shadow-sm">
+            <i class="fa-solid fa-sliders text-sm"></i>
+            <span class="hidden sm:inline">مركز التحكم</span>
+          </button>
         </div>
-
-        <!-- زر مركز التحكم (المنظم بديل القائمة القديمة) -->
-        <button onclick="openControlCenter()" id="controlCenterBtn" title="مركز التحكم والإعدادات"
-          class="flex px-2.5 sm:px-3.5 py-2 rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition items-center gap-1.5 font-black text-xs shadow-sm">
-          <i class="fa-solid fa-sliders text-sm"></i>
-          <span class="hidden sm:inline">مركز التحكم</span>
-        </button>
       </div>
     </div>
-  </div>
-</header>
+  </header>
 
   <!-- CLIENT PORTAL -->
   <div id="clientPortalView" class="hidden max-w-4xl mx-auto px-4 py-6 w-full flex-1 space-y-5">
@@ -159,6 +157,8 @@
         <div class="text-[11px] font-bold text-slate-400 mb-1">مستحق لك</div>
         <div id="portalTotalPayable" class="text-xl font-black text-purple-500">0 ج.م</div>
       </div>
+    </div>
+
     <!-- طلب معاملة جديدة من العميل (معلق للمراجعة) -->
     <div class="bg-white dark:bg-dark-900 rounded-3xl border border-orange-500/30 p-5 shadow-xl">
       <div class="flex items-center gap-3 mb-3">
@@ -195,10 +195,6 @@
       </form>
     </div>
 
-
-
-    </div>
-
     <div class="bg-white dark:bg-dark-900 rounded-3xl border border-slate-200 dark:border-dark-800 overflow-hidden">
       <div class="p-4 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between">
         <h3 class="text-sm font-black"><i class="fa-solid fa-list-check text-orange-500"></i> سجل المعاملات</h3>
@@ -229,8 +225,6 @@
     <div id="toastBox" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] pointer-events-none opacity-0 transition-all duration-300 max-w-[92vw]">
       <div id="toastInner"></div>
     </div>
-
-    
 
     <!-- Hero -->
     <section class="hidden md:block relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 to-black text-white p-6 border border-dark-800 shadow-xl no-print">
@@ -1069,8 +1063,6 @@
 
   <div id="printReport" class="print-only"></div>
 
-  <script src="app.js?v=10.5"></script>
-
   <!-- MOBILE INSTALL DIALOG (إجباري عند الفتح) -->
   <div id="mobileInstallModal" class="hidden fixed inset-0 z-[500] items-center justify-center p-4 bg-black/85 backdrop-blur-md transition-all duration-300">
     <div class="relative w-full max-w-sm rounded-3xl bg-gradient-to-b from-[#161922] to-[#090a0f] border-2 border-orange-500/50 p-6 shadow-[0_20px_60px_-15px_rgba(249,115,22,0.4)] text-center modal-enter overflow-hidden">
@@ -1125,7 +1117,7 @@
         </button>
       </div>
 
-      <!-- Android manual guidance (if beforeinstallprompt didn't fire) -->
+      <!-- Android manual guidance -->
       <div id="androidInstallHelper" class="hidden mt-3 p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-[11px] text-orange-300 text-center leading-relaxed font-bold">
         إذا لم تظهر نافذة التثبيت تلقائياً: اضغط على قائمة المتصفح <strong class="text-white">(⋮)</strong> بالأعلى واختر <strong class="text-white">"تثبيت التطبيق"</strong>.
       </div>
@@ -1184,7 +1176,6 @@
     </div>
   </div>
 
-
   <!-- CLIENT REQUESTS MODAL (متاح لكل الحسابات مجاناً) -->
   <div id="clientRequestsModal" class="fixed inset-0 z-[130] hidden items-center justify-center p-3 bg-black/80 backdrop-blur-sm" onclick="closeClientRequestsModal()">
     <div class="relative max-w-lg w-full bg-slate-900 border border-amber-500/40 rounded-3xl p-4 sm:p-5 shadow-2xl modal-enter overflow-hidden flex flex-col" onclick="event.stopPropagation()">
@@ -1206,18 +1197,6 @@
       </button>
     </div>
   </div>
-
-
-  
-            <button onclick="openRecurringModal()" class="menu-item text-orange-400">
-              <i class="fa-solid fa-repeat"></i> المصاريف المتكررة والثابتة
-            </button>
-            <button onclick="openDrawerModal()" class="menu-item text-emerald-400">
-              <i class="fa-solid fa-cash-register"></i> مطابقة الدرج والخزينة الفعلي
-            </button>
-            <button onclick="openKPIModal()" class="menu-item text-cyan-400">
-              <i class="fa-solid fa-chart-line"></i> مؤشرات الأداء والتحليلات (KPIs)
-            </button>
 
   <!-- PROFIT MARGIN CALCULATOR MODAL -->
   <div id="profitModal" class="fixed inset-0 z-[125] hidden items-center justify-center p-3 bg-black/80 backdrop-blur-sm" onclick="closeProfitModal()">
@@ -1293,8 +1272,6 @@
       </form>
     </div>
   </div>
-
-
 
   <!-- RECURRING EXPENSES MODAL -->
   <div id="recurringModal" class="fixed inset-0 z-[125] hidden items-center justify-center p-3 bg-black/80 backdrop-blur-sm" onclick="closeRecurringModal()">
@@ -1374,13 +1351,11 @@
     </div>
   </div>
 
-
-
-  <!-- REPORT PRINT & PDF PREVIEW MODAL (معاينة وطباعة التقرير المالي المباشر) -->
+  <!-- REPORT PRINT & PDF PREVIEW MODAL -->
   <div id="reportPrintModal" class="fixed inset-0 z-[150] hidden items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md" onclick="closeReportModal()">
     <div class="relative max-w-4xl w-full bg-slate-900 border border-orange-500/40 rounded-3xl p-4 sm:p-5 shadow-2xl modal-enter max-h-[95vh] flex flex-col overflow-hidden" onclick="event.stopPropagation()">
       
-      <!-- Modal Header (Hidden on print) -->
+      <!-- Modal Header -->
       <div id="reportModalHeader" class="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
         <div class="flex items-center gap-2.5">
           <div class="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-lg font-black">
@@ -1408,14 +1383,13 @@
       <!-- Live Printable A4 Paper Container -->
       <div class="flex-1 overflow-y-auto py-3 px-1 sm:px-3 flex justify-center bg-slate-950/60 rounded-2xl my-2 border border-white/5">
         <div id="reportA4Paper" class="w-full max-w-[800px] bg-white text-slate-900 rounded-xl shadow-2xl p-6 sm:p-8" style="min-height: 1000px; font-family: 'Cairo', Arial, sans-serif; direction: rtl;">
-          <!-- Content dynamically rendered by renderReportPreview() -->
           <div class="text-center py-12 text-slate-400 font-bold text-xs">جاري تجهيز التقرير...</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- CONTROL CENTER MODAL (مركز التحكم الشامل والمنظم - بديل الثلاث نقط) -->
+  <!-- CONTROL CENTER MODAL -->
   <div id="controlCenterModal" class="fixed inset-0 z-[120] hidden items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md" onclick="closeControlCenter()">
     <div class="relative max-w-2xl w-full bg-slate-900 border border-orange-500/30 rounded-3xl p-5 shadow-2xl modal-enter max-h-[92vh] flex flex-col overflow-hidden" onclick="event.stopPropagation()">
       
@@ -1645,4 +1619,6 @@
     </div>
   </div>
 
+  <script src="app.js?v=11.0"></script>
 </body>
+</html>

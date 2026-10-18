@@ -807,6 +807,8 @@ function applyRoleUI() {
   const showAdmin = (userRole === 'admin');
   if (adminBtn) adminBtn.style.display = showAdmin ? '' : 'none';
   if (adminDivider) adminDivider.style.display = showAdmin ? '' : 'none';
+  const adminCtrlBtn = document.getElementById('adminPanelControlBtn');
+  if (adminCtrlBtn) adminCtrlBtn.style.display = showAdmin ? '' : 'none';
 
   const badge = document.getElementById('roleBadge');
   if (badge) {
@@ -4421,4 +4423,67 @@ function openKPIModal() {
 function closeKPIModal() {
   const modal = document.getElementById('kpiModal');
   if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+}
+
+
+/* =========================================================
+   SERVICE WORKER REGISTRATION
+   ========================================================= */
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js').catch(err => {
+        console.warn('ServiceWorker registration failed:', err);
+      });
+    });
+  }
+}
+
+/* =========================================================
+   CONTROL CENTER MODAL (مركز التحكم الشامل)
+   ========================================================= */
+function openControlCenter() {
+  if (!requireAuth()) return;
+  const modal = document.getElementById('controlCenterModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+}
+
+function closeControlCenter() {
+  const modal = document.getElementById('controlCenterModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+
+/* =========================================================
+   EXTRA MODULES PLACEHOLDERS (وردية، تحويل خزائن، أجهزة صيانة)
+   ========================================================= */
+function openShiftSettlementModal() {
+  const metrics = calculateMetrics();
+  const summary = `📊 *ملخص تقفيل وردية اليوم | احسبلي*
+📅 التاريخ: ${todayString()}
+💵 إجمالي الإيرادات: ${money(metrics.income)} ج.م
+💸 إجمالي المصروفات: ${money(metrics.expense)} ج.م
+🤲 رصيد الخير: ${money(metrics.charity)} ج.م
+💰 صافي النقدية المتاحة: ${money(metrics.available)} ج.م
+— تم التقفيل بنجاح`;
+  
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(summary);
+    showToast('تم نسخ تقرير الوردية للحافظة 📋 جاهز للإرسال على واتساب', 'success');
+  } else {
+    showToast(`صافي اليومية: ${money(metrics.available)} ج.م`, 'info');
+  }
+}
+
+function openWalletTransferModal() {
+  showToast('ميزة تحويل السيولة بين الخزائن قيد التحديث في الإصدار القادم', 'info');
+}
+
+function openTicketsModal() {
+  showToast('ميزة تذاكر وإيصالات أجهزة الصيانة قيد التجهيز', 'info');
 }
