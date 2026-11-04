@@ -706,7 +706,13 @@ function renderPublicPortal(clientName, sourceTransactions) {
           ${t.type === 'income' ? '+' : '-'}${money(t.amount)} ج.م
         </td>
         <td class="py-3 px-4 text-center">
-          ${t.receipt ? `<button onclick="viewReceiptImage('${t.receipt}')" class="text-orange-500 hover:underline font-bold"><i class="fa-solid fa-paperclip"></i> معاينة</button>` : '-'}
+          ${t.receipt ? `
+            <img src="${t.receipt}" 
+                 onclick="viewReceiptImage('${t.receipt}')" 
+                 title="معاينة" 
+                 class="w-7 h-7 rounded-lg object-cover border border-orange-500/40 inline-block cursor-pointer hover:scale-110 transition shadow-sm" 
+                 alt="صورة">
+          ` : '<span class="text-slate-400">-</span>'}
         </td>
       `;
       tbody.appendChild(tr);
@@ -1902,12 +1908,20 @@ function renderTransactions() {
       <td class="py-3 px-4">
         <div class="flex items-center gap-2.5">
           ${badge}
-          <div>
-            <div class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-              <span>${escapeHTML(item.notes || 'بدون بيان')}</span>
-              ${item.receipt ? `<button onclick="viewReceiptImage('${item.receipt}')" title="عرض الفاتورة" class="text-orange-500 hover:text-orange-400"><i class="fa-solid fa-paperclip text-xs"></i></button>` : ''}
+          <div class="flex items-center gap-2">
+            ${item.receipt ? `
+              <img src="${item.receipt}" 
+                   onclick="viewReceiptImage('${item.receipt}')" 
+                   title="اضغط لتكبير الصورة"
+                   class="w-9 h-9 rounded-xl object-cover border border-orange-500/40 cursor-pointer hover:scale-110 hover:border-orange-500 transition shadow-sm shrink-0" 
+                   alt="صورة العملية">
+            ` : ''}
+            <div>
+              <div class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                <span>${escapeHTML(item.notes || 'بدون بيان')}</span>
+              </div>
+              ${item.reference ? `<div class="text-[9px] text-slate-400 mt-0.5">مرجع: ${escapeHTML(item.reference)}</div>` : ''}
             </div>
-            ${item.reference ? `<div class="text-[9px] text-slate-400 mt-0.5">مرجع: ${escapeHTML(item.reference)}</div>` : ''}
           </div>
         </div>
       </td>
@@ -1968,9 +1982,15 @@ function renderDebts() {
             <i class="fa-solid ${isReceivable ? 'fa-user-plus' : 'fa-user-minus'}"></i>
           </div>
           <div class="min-w-0">
-            <h4 class="text-sm font-black truncate flex items-center gap-1.5">
+            <h4 class="text-sm font-black truncate flex items-center gap-2">
+              ${d.receipt ? `
+                <img src="${d.receipt}" 
+                     onclick="viewReceiptImage('${d.receipt}')" 
+                     title="معاينة الفاتورة / صورة الجهاز" 
+                     class="w-7 h-7 rounded-lg object-cover border border-orange-500/50 cursor-pointer hover:scale-105 transition shrink-0" 
+                     alt="مرفق">
+              ` : ''}
               <span>${escapeHTML(d.notes || 'دين بدون بيان')}</span>
-              ${d.receipt ? `<button onclick="viewReceiptImage('${d.receipt}')" class="text-orange-500"><i class="fa-solid fa-paperclip text-xs"></i></button>` : ''}
             </h4>
             <p class="text-[10px] text-slate-400 font-semibold mt-0.5">
               ${d.client ? `<span class="text-orange-500 font-black cursor-pointer" onclick="openClientLedger('${escapeHTML(d.client)}')"><i class="fa-solid fa-user"></i> ${escapeHTML(d.client)} • </span>` : ''}
@@ -2148,7 +2168,13 @@ function openClientLedger(clientName) {
           ${t.type === 'income' ? '+' : '-'}${money(t.amount)} ج.م
         </td>
         <td class="py-2.5 px-3 text-center">
-          ${t.receipt ? `<button onclick="viewReceiptImage('${t.receipt}')" class="text-orange-500 hover:underline text-[10px] font-bold"><i class="fa-solid fa-image"></i> الفاتورة</button>` : '-'}
+          ${t.receipt ? `
+            <img src="${t.receipt}" 
+                 onclick="viewReceiptImage('${t.receipt}')" 
+                 title="معاينة" 
+                 class="w-7 h-7 rounded-lg object-cover border border-orange-500/40 inline-block cursor-pointer hover:scale-110 transition shadow-sm" 
+                 alt="صورة">
+          ` : '<span class="text-slate-400">-</span>'}
         </td>
       `;
       tbody.appendChild(tr);
@@ -2974,6 +3000,7 @@ function refreshAll() {
   applyPrivacyModeUI();
   applyRoleUI();
   updateQuickInsights();
+  checkMoneyNotifications();
 }
 
 document.addEventListener('keydown', event => {
@@ -4486,4 +4513,61 @@ function openWalletTransferModal() {
 
 function openTicketsModal() {
   showToast('ميزة تذاكر وإيصالات أجهزة الصيانة قيد التجهيز', 'info');
+}
+
+/* =========================================================
+   MONEY & PENDING ALERTS (نظام تنبيهات الفلوس والديون)
+   ========================================================= */
+function checkMoneyNotifications() {
+  const alertEl = document.getElementById('globalPendingAlert');
+  const countEl = document.getElementById('globalPendingCount');
+  const textEl = document.getElementById('globalPendingText');
+  if (!alertEl || !countEl) return;
+
+  const today = todayString();
+  
+  // 1. الديون المتأخرة أو المستحقة حتى اليوم ولم تسدد
+  const overdueDebts = getActiveTransactions().filter(t => 
+    isDebt(t.type) && 
+    t.status !== 'paid' && 
+    t.dueDate && 
+    t.dueDate <= today
+  );
+
+  // 2. طلبات العملاء المعلقة الواردة من السحابة
+  const clientReqsCount = pendingRequestsCache ? pendingRequestsCache.length : 0;
+  const totalAlerts = overdueDebts.length + clientReqsCount;
+
+  if (totalAlerts > 0) {
+    alertEl.classList.remove('hidden');
+    alertEl.classList.add('flex');
+    countEl.textContent = totalAlerts;
+
+    if (textEl) {
+      if (overdueDebts.length > 0 && clientReqsCount > 0) {
+        textEl.textContent = 'تنبيه ديون وطلبات';
+      } else if (overdueDebts.length > 0) {
+        textEl.textContent = 'ديون مستحقة السداد';
+      } else {
+        textEl.textContent = 'طلبات عملاء معلقة';
+      }
+    }
+  } else {
+    alertEl.classList.add('hidden');
+    alertEl.classList.remove('flex');
+  }
+}
+
+function handleMoneyAlertClick() {
+  const today = todayString();
+  const overdueDebts = getActiveTransactions().filter(t => 
+    isDebt(t.type) && t.status !== 'paid' && t.dueDate && t.dueDate <= today
+  );
+
+  if (pendingRequestsCache && pendingRequestsCache.length > 0) {
+    openClientRequestsModal();
+  } else if (overdueDebts.length > 0) {
+    switchTab('debts', true);
+    showToast(`لديك (${overdueDebts.length}) ديون مستحقة الموعد تتطلب المتابعة ⚠️`, 'error');
+  }
 }
