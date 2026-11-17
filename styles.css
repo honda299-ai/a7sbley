@@ -585,3 +585,80 @@ html:not(.dark) .quick-panel { background: #fff; color: #0f172a; }
 html:not(.dark) .quick-btn { background: #f8fafc; border-color: #e2e8f0; }
 @media (prefers-reduced-motion: reduce) { .quick-panel, .quick-backdrop { transition: none; } }
 @media (min-width: 768px) { .quick-sheet { display: none !important; } }
+
+
+/* =========================================================
+   MODE SWITCHER & MOBILE TABS UX (V11.7)
+   ========================================================= */
+
+/* إخفاء العناصر تلقائياً حسب الوضع المختار */
+body[data-mode="personal"] .business-only { display: none !important; }
+body[data-mode="business"] .personal-only { display: none !important; }
+
+/* زر تبديل الوضع في الهيدر */
+.mode-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 900;
+  background: rgba(249, 115, 22, 0.14);
+  border: 1px solid rgba(249, 115, 22, 0.4);
+  color: #f97316;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+body[data-mode="personal"] .mode-pill-btn {
+  background: rgba(6, 182, 212, 0.14);
+  border-color: rgba(6, 182, 212, 0.4);
+  color: #06b6d4;
+}
+
+/* شريط تنبيه البيانات التجريبية */
+.demo-banner-bar {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.18), rgba(249, 115, 22, 0.18));
+  border: 1px solid rgba(249, 115, 22, 0.45);
+  border-radius: 16px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* نظام التبويبات على الموبايل لمنع التمرير الطويل */
+@media (max-width: 767px) {
+  .mob-view-section {
+    display: none !important;
+  }
+  .mob-view-section.mob-view-active {
+    display: block !important;
+    animation: modalIn 0.18s ease forwards;
+  }
+  /* الكروت الشبكية في الرئيسية */
+  .mob-view-grid.mob-view-active {
+    display: grid !important;
+  }
+}
+
+/* تحسين شاشة اختيار الوضع لأول مرة */
+.mode-choice-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: right;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.mode-choice-card:hover, .mode-choice-card:active {
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.08);
+  transform: translateY(-2px);
+}

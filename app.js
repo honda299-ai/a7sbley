@@ -4643,3 +4643,122 @@ function quickAdd(kind) {
   setTimeout(() => openModal(kind), 210);
 }
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeQuickAdd(); });
+
+
+/* =========================================================
+   APP MODE (BUSINESS / PERSONAL) & MOBILE TABS ENGINE
+   ========================================================= */
+const APP_MODE_KEY = 'a7sbley_app_mode_v1';
+const DEMO_FLAG_KEY = 'a7sbley_is_demo_v1';
+let currentMobileView = 'home';
+
+function initAppModeAndTabs() {
+  const savedMode = localStorage.getItem(APP_MODE_KEY);
+  if (!savedMode) {
+    applyAppMode('business');
+    if (currentUser && !isPortalModeActive) {
+      const modal = document.getElementById('modeOnboardingModal');
+      if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+    }
+  } else {
+    applyAppMode(savedMode);
+  }
+  updateDemoBanner();
+  switchMobileView('home');
+}
+
+function selectInitialMode(mode) {
+  applyAppMode(mode);
+  const modal = document.getElementById('modeOnboardingModal');
+  if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+  showToast(mode === 'business' ? 'تم تفعيل وضع المحل والتجارة 🏪' : 'تم تفعيل الوضع الشخصي 👤', 'success');
+}
+
+function applyAppMode(mode) {
+  document.body.setAttribute('data-mode', mode);
+  localStorage.setItem(APP_MODE_KEY, mode);
+
+  const icon = document.getElementById('modeSwitchIcon');
+  const label = document.getElementById('modeSwitchLabel');
+  const ledgerLbl = document.getElementById('mobLedgerLabel');
+  const manageLbl = document.getElementById('mobManageLabel');
+
+  if (mode === 'personal') {
+    if (icon) icon.className = 'fa-solid fa-user';
+    if (label) label.textContent = 'شخصي';
+    if (ledgerLbl) ledgerLbl.textContent = 'الديون';
+    if (manageLbl) manageLbl.textContent = 'الإدارة';
+  } else {
+    if (icon) icon.className = 'fa-solid fa-store';
+    if (label) label.textContent = 'وضع المحل';
+    if (ledgerLbl) ledgerLbl.textContent = 'العملاء والديون';
+    if (manageLbl) manageLbl.textContent = 'المخزن والإدارة';
+  }
+}
+
+function toggleAppMode() {
+  const current = document.body.getAttribute('data-mode') || 'business';
+  const next = current === 'business' ? 'personal' : 'business';
+  applyAppMode(next);
+  showToast(next === 'business' ? 'تم التحويل إلى وضع المحل 🏪' : 'تم التحويل إلى الوضع الشخصي 👤', 'info');
+}
+
+function switchMobileView(viewName) {
+  currentMobileView = viewName;
+
+  document.querySelectorAll('.mob-view-section').forEach(sec => {
+    const views = (sec.getAttribute('data-mob-view') || '').split(' ');
+    sec.classList.toggle('mob-view-active', views.includes(viewName));
+  });
+
+  document.querySelectorAll('.mob-nav-btn[data-mob-tab]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mobTab === viewName);
+  });
+
+  if (viewName === 'transactions') renderTransactions();
+  if (viewName === 'ledger') { renderDebts(); renderClients(); }
+  if (viewName === 'manage') { renderInventory(); renderAuditLog(); }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+const _originalSwitchTab = switchTab;
+switchTab = function(tab, shouldScroll = false) {
+  _originalSwitchTab(tab, false);
+  if (tab === 'transactions') switchMobileView('transactions');
+  else if (tab === 'debts' || tab === 'clients') switchMobileView('ledger');
+  else if (tab === 'inventory' || tab === 'audit') switchMobileView('manage');
+};
+
+function startWithDemoMode() {
+  selectInitialMode('business');
+  const now = Date.now();
+  transactions = JSON.parse(JSON.stringify(DEMO_ITEMS)).map((t, i) => normalizeTransaction({ ...t, _updatedAt: now + i }));
+  localStorage.setItem(DEMO_FLAG_KEY, 'true');
+  saveLocalData();
+  refreshAll();
+  updateDemoBanner();
+  showToast('تم تحميل البيانات التجريبية للاستكشاف ✨', 'success');
+}
+
+function exitDemoData() {
+  openConfirm('مسح البيانات التجريبية؟', 'سيتم تصفير البيانات التجريبية لتبدأ تسجيل حساباتك الحقيقية.', () => {
+    transactions = [];
+    localStorage.removeItem(DEMO_FLAG_KEY);
+    saveData({ force: true });
+    refreshAll();
+    updateDemoBanner();
+    showToast('تم تصفير البيانات بنجاح، ابدأ الآن! 🚀', 'success');
+  });
+}
+
+function updateDemoBanner() {
+  const banner = document.getElementById('demoModeBanner');
+  if (!banner) return;
+  const isDemo = localStorage.getItem(DEMO_FLAG_KEY) === 'true';
+  banner.classList.toggle('hidden', !isDemo);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initAppModeAndTabs, 250);
+});
