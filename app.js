@@ -4762,3 +4762,102 @@ function updateDemoBanner() {
 window.addEventListener('DOMContentLoaded', () => {
   setTimeout(initAppModeAndTabs, 250);
 });
+
+
+/* =========================================================
+   USER PROFILE DETAILS MODAL (V11.8)
+   ========================================================= */
+function formatArabicDateTime(dateInput) {
+  if (!dateInput) return 'غير متوفر';
+  try {
+    const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    if (isNaN(d.getTime())) return 'غير متوفر';
+    return d.toLocaleDateString('ar-EG', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }) + ' • ' + d.toLocaleTimeString('ar-EG', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (e) {
+    return 'غير متوفر';
+  }
+}
+
+function openUserProfileModal() {
+  if (!requireAuth()) return;
+  const modal = document.getElementById('userProfileModal');
+  if (!modal) return;
+
+  const avatarEl = document.getElementById('profileModalAvatar');
+  const headerAvatar = document.getElementById('userAvatar');
+  if (avatarEl && headerAvatar) avatarEl.src = headerAvatar.src;
+
+  const isGuest = currentUser.isAnonymous || String(currentUser.uid || '').startsWith('guest-');
+  const nameEl = document.getElementById('profileModalName');
+  const emailEl = document.getElementById('profileModalEmail');
+  const methodBadge = document.getElementById('profileModalMethodBadge');
+  const rolePill = document.getElementById('profileModalRolePill');
+  const createdEl = document.getElementById('profileModalCreated');
+  const lastLoginEl = document.getElementById('profileModalLastLogin');
+  const modeEl = document.getElementById('profileModalMode');
+  const txCountEl = document.getElementById('profileModalTxCount');
+
+  if (nameEl) nameEl.textContent = currentUser.displayName || (isGuest ? 'زائر (Guest)' : 'مستخدم احسبلي');
+  if (emailEl) emailEl.textContent = isGuest ? 'حساب محلي بدون بريد إلكتروني' : (currentUser.email || currentUser.phoneNumber || '-');
+
+  const method = isGuest ? 'guest' : getLoginMethod();
+  if (methodBadge) {
+    if (method === 'google') methodBadge.innerHTML = '<i class="fa-brands fa-google text-red-400"></i> Google';
+    else if (method === 'guest') methodBadge.innerHTML = '<i class="fa-solid fa-user-secret text-orange-400"></i> زائر';
+    else methodBadge.innerHTML = '<i class="fa-solid fa-envelope text-cyan-400"></i> حساب';
+  }
+
+  if (rolePill) {
+    if (isSuperAdmin) {
+      rolePill.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black border border-amber-500/40 bg-amber-500/20 text-amber-400';
+      rolePill.innerHTML = '<i class="fa-solid fa-crown"></i> Super Admin (مدير النظام)';
+    } else {
+      const meta = ROLES_META[userRole] || ROLES_META.free;
+      rolePill.className = `mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black border ${meta.badgeClasses}`;
+      rolePill.innerHTML = `<i class="fa-solid ${meta.icon}"></i> باقة: ${meta.name}`;
+    }
+  }
+
+  if (createdEl) {
+    if (isGuest) {
+      createdEl.textContent = 'جلسة مؤقتة على الجهاز';
+    } else {
+      createdEl.textContent = formatArabicDateTime(currentUser.metadata?.creationTime);
+    }
+  }
+
+  if (lastLoginEl) {
+    if (isGuest) {
+      lastLoginEl.textContent = 'الآن (نشط)';
+    } else {
+      lastLoginEl.textContent = formatArabicDateTime(currentUser.metadata?.lastSignInTime);
+    }
+  }
+
+  if (modeEl) {
+    const curMode = document.body.getAttribute('data-mode') || 'business';
+    modeEl.textContent = curMode === 'business' ? 'وضع التجارة والمحلات 🏪' : 'الوضع الشخصي 👤';
+  }
+
+  if (txCountEl) {
+    txCountEl.textContent = `${getActiveTransactions().length} عملية`;
+  }
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function closeUserProfileModal() {
+  const modal = document.getElementById('userProfileModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
