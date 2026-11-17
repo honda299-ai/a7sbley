@@ -53,8 +53,12 @@ service cloud.firestore {
 
       allow delete: if isSuperAdmin();
 
-      // Private data: transactions, inventory, audit log, portal index, ...
-      match /{path=**} {
+      // Private subcollections (explicit on purpose: a recursive wildcard here would
+      // also match the user document itself and bypass the protected-keys rule above)
+      match /transactions/{txId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /portal_index/{hashId} {
         allow read, write: if isOwner(userId);
       }
 
@@ -78,7 +82,8 @@ service cloud.firestore {
               && exists(/databases/$(database)/documents/client_portals/$(request.resource.data.portalId))
               && get(/databases/$(database)/documents/client_portals/$(request.resource.data.portalId)).data.ownerUid == userId
             );
-        // read/update/delete are covered by the owner wildcard above
+        allow read, update, delete: if isOwner(userId);
+        allow create: if isOwner(userId);
       }
     }
 

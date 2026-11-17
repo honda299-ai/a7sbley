@@ -635,7 +635,7 @@ function getAllClientNames() {
 async function checkPublicPortalMode() {
   const params = new URLSearchParams(window.location.search);
   const clientParam = params.get('client');
-  const uidParam = params.get('uid');
+  const portalId = params.get('p');
   if (!clientParam) return false;
 
   isPortalModeActive = true;
@@ -643,21 +643,18 @@ async function checkPublicPortalMode() {
   hideAuthLoading();
 
   let clientTransactions = [];
-  if (uidParam) {
+  window.portalMeta = null;
+  if (portalId && /^[a-f0-9]{16,64}$/.test(portalId)) {
     try {
-      const doc = await db.collection('users').doc(uidParam).get();
-      if (doc.exists && doc.data().transactions) {
-        clientTransactions = (doc.data().transactions || []).filter(validateTransaction);
+      const doc = await db.collection('client_portals').doc(portalId).get();
+      if (doc.exists) {
+        const d = doc.data();
+        window.portalMeta = { portalId, ownerUid: d.ownerUid };
+        clientTransactions = (d.transactions || []).filter(validateTransaction);
       }
-    } catch(e) { console.warn("Cloud load failed:", e); }
-  }
-  if (!clientTransactions.length) {
-    loadLocalData();
-  loadInventory();
-  loadRecurring();
-  loadAuditLog();
-  checkOverdueDebtsAlert();
-    clientTransactions = transactions;
+    } catch (e) { console.warn('Portal load failed:', e); }
+  } else {
+    showToast('رابط قديم أو غير صالح، اطلب من المتجر رابطًا جديدًا', 'error');
   }
   renderPublicPortal(clientParam, clientTransactions);
   return true;
@@ -724,24 +721,104 @@ function renderPublicPortal(clientName, sourceTransactions) {
   document.getElementById('portalTotalPayable').textContent = money(debtPay) + ' ج.م';
 }
 
-function getClientPortalLink(clientName) {
+/* ---------- Shared client portals (client_portals/{randomId}) ---------- */
+const portalIndex = new Map();      // lower(clientName) -> portalId
+const portalPayloadCache = new Map(); // portalId -> last written JSON
+
+function portalKey(name) { return String(name || '').trim().toLowerCase(); }
+function portalHash(name) {
+  let h = 5381; const k = portalKey(name);
+  for (let i = 0; i < k.length; i++) h = ((h << 5) + h + k.charCodeAt(i)) >>> 0;
+  return 'c' + h.toString(16);
+}
+function randomPortalId() {
+  const a = new Uint8Array(20); crypto.getRandomValues(a);
+  return Array.from(a, b => b.toString(16).padStart(2, '0')).join('');
+}
+function buildPortalPayload(clientName) {
+  const key = portalKey(clientName);
+  const list = transactions
+    .filter(t => t && !t._deleted && t.client && portalKey(t.client) === key)
+    .map(t => {
+      const o = {
+        id: t.id, type: t.type, amount: Number(t.amount) || 0, paidAmount: Number(t.paidAmount) || 0,
+        date: t.date, time: t.time || '', client: t.client, category: t.category || '',
+        notes: t.notes || '', status: t.status || null, paymentMethod: t.paymentMethod || '',
+        _updatedAt: t._updatedAt || 0
+      };
+      if (typeof t.receipt === 'string' && t.receipt.startsWith('https://') && t.receipt.length < 800) o.receipt = t.receipt;
+      return o;
+    });
+  return { ownerUid: currentUser.uid, clientName, transactions: list };
+}
+async function loadPortalIndex(uid) {
+  try {
+    const snap = await db.collection('users').doc(uid).collection('portal_index').get();
+    portalIndex.clear();
+    snap.forEach(d => { const v = d.data(); if (v && v.portalId && v.name) portalIndex.set(portalKey(v.name), v.portalId); });
+  } catch (e) { console.warn('portal index load failed', e); }
+}
+async function ensurePortal(clientName) {
+  if (!currentUser) throw new Error('auth');
+  const key = portalKey(clientName);
+  let id = portalIndex.get(key);
+  const payload = buildPortalPayload(clientName);
+  if (!id) {
+    id = randomPortalId();
+    await db.collection('client_portals').doc(id).set({ ...payload, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    await db.collection('users').doc(currentUser.uid).collection('portal_index').doc(portalHash(clientName)).set({ portalId: id, name: clientName });
+    portalIndex.set(key, id);
+    portalPayloadCache.set(id, JSON.stringify(payload));
+  } else {
+    await writePortalIfChanged(id, payload);
+  }
+  return id;
+}
+async function writePortalIfChanged(id, payload) {
+  const j = JSON.stringify(payload);
+  if (portalPayloadCache.get(id) === j) return;
+  await db.collection('client_portals').doc(id).set({ ...payload, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  portalPayloadCache.set(id, j);
+}
+let portalRefreshTimer = null;
+function refreshSharedPortals() {
+  if (!currentUser || !portalIndex.size) return;
+  clearTimeout(portalRefreshTimer);
+  portalRefreshTimer = setTimeout(async () => {
+    for (const [key, id] of portalIndex) {
+      const name = (transactions.find(t => t && t.client && portalKey(t.client) === key) || {}).client;
+      if (!name) continue;
+      try { await writePortalIfChanged(id, buildPortalPayload(name)); } catch (e) { console.warn('portal refresh failed', e); }
+    }
+  }, 1500);
+}
+async function getClientPortalLink(clientName) {
+  const id = await ensurePortal(clientName);
   const url = new URL(window.location.href);
+  url.search = '';
+  url.hash = '';
   url.searchParams.set('client', clientName);
-  if (currentUser) url.searchParams.set('uid', currentUser.uid);
+  url.searchParams.set('p', id);
   return url.toString();
 }
 
-function copyClientPortalLink() {
+async function copyClientPortalLink() {
   if (!activeClientName) return;
-  const link = getClientPortalLink(activeClientName);
+  if (!currentUser) { showToast('سجّل الدخول لمشاركة صفحة العميل', 'error'); return; }
+  let link;
+  try { link = await getClientPortalLink(activeClientName); }
+  catch (e) { showToast('تعذر إنشاء رابط العميل', 'error'); return; }
   navigator.clipboard.writeText(link).then(() => {
     showToast('تم نسخ رابط صفحة العميل بنجاح ✓', 'success');
   }).catch(() => prompt('انسخ هذا الرابط وأرسله للعميل:', link));
 }
 
-function shareClientPortalWhatsApp() {
+async function shareClientPortalWhatsApp() {
   if (!activeClientName) return;
-  const link = getClientPortalLink(activeClientName);
+  if (!currentUser) { showToast('سجّل الدخول لمشاركة صفحة العميل', 'error'); return; }
+  let link;
+  try { link = await getClientPortalLink(activeClientName); }
+  catch (e) { showToast('تعذر إنشاء رابط العميل', 'error'); return; }
   const text = `مرحباً يا ${activeClientName}، تفضل رابط صفحة كشف حسابك المباشر لمتابعة كافة المعاملات المشتركة بيننا أولاً بأول:\n${link}\n\n— Honda Store`;
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
@@ -1165,7 +1242,6 @@ function subscribeToUserDoc(uid) {
     const data = doc.data();
     if (!isSuperAdmin && data.role && ROLES_META[data.role]) userRole = data.role;
     currentUserPermissionsOverride = data.permissionsOverride || null;
-    updateGlobalPendingAlert(data.pendingRequests || []);
     applyRoleUI();
     refreshAll();
   });
@@ -1549,11 +1625,7 @@ auth.onAuthStateChanged(async user => {
     await loadUserRole(user.uid);
     await loadRolePermissions();
 
-    loadLocalData();
-  loadInventory();
-  loadRecurring();
-  loadAuditLog();
-  checkOverdueDebtsAlert();
+    loadAllLocal();
     refreshAll();
     switchTab('transactions');
 
@@ -1577,14 +1649,12 @@ auth.onAuthStateChanged(async user => {
     rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
     if (userDocUnsubscribe) { try { userDocUnsubscribe(); } catch(e) {} userDocUnsubscribe = null; }
     if (transactionsUnsubscribe) { try { transactionsUnsubscribe(); } catch(e) {} transactionsUnsubscribe = null; }
+    if (requestsUnsubscribe) { try { requestsUnsubscribe(); } catch(e) {} requestsUnsubscribe = null; }
+    cloudSnapshot.clear(); portalIndex.clear(); portalPayloadCache.clear();
     hidePinLock();
     showLoginWall();
     footerSync.innerHTML = `<i class="fa-solid fa-database text-amber-500"></i> سجّل الدخول للمزامنة`;
-    loadLocalData();
-  loadInventory();
-  loadRecurring();
-  loadAuditLog();
-  checkOverdueDebtsAlert();
+    loadAllLocal();
     applyRoleUI();
   }
 });
@@ -1598,20 +1668,36 @@ function logoutFromLock() { auth.signOut(); }
 /* =========================================================
    REALTIME LISTENER
    ========================================================= */
+const cloudSnapshot = new Map(); // id -> JSON last known in cloud
+let syncChain = Promise.resolve();
+const txJSON = t => JSON.stringify(normalizeTransaction(t), (k, v) => (v === undefined ? null : v));
+const txCol = uid => db.collection('users').doc(uid).collection('transactions');
+
 function subscribeToCloudTransactions(uid) {
   if (transactionsUnsubscribe) { try { transactionsUnsubscribe(); } catch(e) {} transactionsUnsubscribe = null; }
-  transactionsUnsubscribe = db.collection('users').doc(uid)
-    .onSnapshot({ includeMetadataChanges: false }, doc => {
-      if (!doc.exists) return;
-      if (doc.metadata && doc.metadata.hasPendingWrites) return;
-      const data = doc.data();
-      if (Array.isArray(data.transactions)) {
-        transactions = data.transactions.map(normalizeTransaction);
-        if (data.budget !== undefined) localStorage.setItem(BUDGET_KEY, data.budget);
-        saveLocalData();
-        refreshAll();
+  transactionsUnsubscribe = txCol(uid).onSnapshot({ includeMetadataChanges: false }, snap => {
+    if (snap.metadata.hasPendingWrites) return;
+    let changed = false;
+    snap.docChanges().forEach(ch => {
+      const id = ch.doc.id;
+      if (ch.type === 'removed') {
+        cloudSnapshot.delete(id);
+        const i = transactions.findIndex(t => t.id === id);
+        if (i >= 0) { transactions.splice(i, 1); changed = true; }
+        return;
       }
-    }, err => console.warn("Realtime sync warning:", err));
+      const data = ch.doc.data();
+      if (!validateTransaction(data)) return;
+      const remote = normalizeTransaction(data);
+      cloudSnapshot.set(id, txJSON(remote));
+      const i = transactions.findIndex(t => t.id === id);
+      if (i < 0) { transactions.push(remote); changed = true; }
+      else if ((Number(remote._updatedAt) || 0) >= (Number(transactions[i]._updatedAt) || 0) && txJSON(transactions[i]) !== txJSON(remote)) {
+        transactions[i] = remote; changed = true;
+      }
+    });
+    if (changed) { saveLocalData(); refreshAll(); refreshSharedPortals(); }
+  }, err => console.warn('Realtime sync warning:', err));
 }
 
 /* =========================================================
@@ -1631,59 +1717,86 @@ function mergeTransactions(local, cloud) {
   return Array.from(map.values());
 }
 
-async function syncToCloud() {
+function syncToCloud() {
+  syncChain = syncChain.then(doSyncToCloud).catch(() => {});
+  return syncChain;
+}
+
+async function doSyncToCloud() {
   if (!currentUser) return;
+  const uid = currentUser.uid;
   try {
-    const docRef = db.collection('users').doc(currentUser.uid);
-    const cleanTransactions = JSON.parse(
-      JSON.stringify(transactions.map(normalizeTransaction), (k, v) => (v === undefined ? null : v))
-    );
-    await docRef.set({
-      transactions: cleanTransactions,
+    const ops = [];
+    const localIds = new Set();
+    transactions.forEach(t => {
+      if (!t || !t.id || !validateTransaction(t)) return;
+      localIds.add(t.id);
+      const j = txJSON(t);
+      if (cloudSnapshot.get(t.id) !== j) ops.push({ kind: 'set', id: t.id, json: j });
+    });
+    cloudSnapshot.forEach((_, id) => { if (!localIds.has(id)) ops.push({ kind: 'del', id }); });
+
+    for (let i = 0; i < ops.length; i += 400) {
+      const batch = db.batch();
+      ops.slice(i, i + 400).forEach(op => {
+        const ref = txCol(uid).doc(op.id);
+        if (op.kind === 'set') batch.set(ref, JSON.parse(op.json));
+        else batch.delete(ref);
+      });
+      await batch.commit();
+      ops.slice(i, i + 400).forEach(op => { if (op.kind === 'set') cloudSnapshot.set(op.id, op.json); else cloudSnapshot.delete(op.id); });
+    }
+
+    await db.collection('users').doc(uid).set({
       budget: getBudget() || 0,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
+    refreshSharedPortals();
   } catch (error) {
-    console.error("Cloud sync error:", error);
+    console.error('Cloud sync error:', error);
     showToast('فشل المزامنة للسحابة: ' + (error.code || error.message), 'error');
   }
 }
 
-async function forceSyncToCloud() {
-  if (!currentUser) return;
-  try {
-    const cleanTransactions = JSON.parse(
-      JSON.stringify(transactions.map(normalizeTransaction), (k, v) => (v === undefined ? null : v))
-    );
-    await db.collection('users').doc(currentUser.uid).set({
-      transactions: cleanTransactions,
-      budget: getBudget() || 0,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-  } catch (error) { console.error("Force sync error:", error); }
-}
+async function forceSyncToCloud() { return syncToCloud(); }
 
 async function loadCloudData(uid) {
   try {
-    const doc = await db.collection('users').doc(uid).get();
-    if (doc.exists) {
-      const data = doc.data();
-      const cloudTx = Array.isArray(data.transactions) ? data.transactions : [];
-      transactions = mergeTransactions(transactions, cloudTx);
+    const userRef = db.collection('users').doc(uid);
+    const [userDoc, txSnap] = await Promise.all([userRef.get(), txCol(uid).get()]);
+    const cloudTx = [];
+    cloudSnapshot.clear();
+    txSnap.forEach(d => { const v = d.data(); if (validateTransaction(v)) { cloudTx.push(v); cloudSnapshot.set(d.id, txJSON(v)); } });
+
+    let legacyTx = [], legacyReqs = [];
+    if (userDoc.exists) {
+      const data = userDoc.data();
+      if (Array.isArray(data.transactions)) legacyTx = data.transactions;          // old single-document format
+      if (Array.isArray(data.pendingRequests)) legacyReqs = data.pendingRequests;
       if (data.budget !== undefined) localStorage.setItem(BUDGET_KEY, data.budget);
-      saveLocalData();
-      refreshAll();
-      await syncToCloud();
-      showToast('تمت مزامنة بياناتك من السحابة ✓', 'success');
-    } else {
-      if (transactions.length > 0) await forceSyncToCloud();
     }
+
+    transactions = mergeTransactions(mergeTransactions(transactions, cloudTx), legacyTx);
+    saveLocalData();
+    refreshAll();
+    await doSyncToCloud();
+
+    // One-time migration cleanup: move legacy arrays out of the user document (1MB limit)
+    if (legacyTx.length || legacyReqs.length) {
+      const b = db.batch();
+      legacyReqs.forEach(r => { if (r && r.id) b.set(userRef.collection('requests').doc(r.id), r); });
+      b.update(userRef, {
+        transactions: firebase.firestore.FieldValue.delete(),
+        pendingRequests: firebase.firestore.FieldValue.delete()
+      });
+      await b.commit();
+    }
+    await loadPortalIndex(uid);
+    subscribeToRequests(uid);
+    showToast('تمت مزامنة بياناتك من السحابة ✓', 'success');
   } catch (error) {
-    loadLocalData();
-  loadInventory();
-  loadRecurring();
-  loadAuditLog();
-  checkOverdueDebtsAlert();
+    console.error('loadCloudData failed:', error);
+    loadAllLocal();
     refreshAll();
   }
 }
@@ -1718,6 +1831,14 @@ function toggleTheme() {
 /* =========================================================
    LOCAL DATA
    ========================================================= */
+function loadAllLocal() {
+  loadLocalData();
+  loadInventory();
+  loadRecurring();
+  loadAuditLog();
+  checkOverdueDebtsAlert();
+}
+
 function loadLocalData() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -1813,6 +1934,9 @@ function updateMetrics() {
   document.getElementById('statIncome').textContent = money(metrics.income);
   document.getElementById('statExpense').textContent = money(metrics.expense);
   document.getElementById('statCharity').textContent = money(metrics.charity);
+  const heroSet = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  heroSet('heroNet', money(metrics.available)); heroSet('heroIncome', money(metrics.income));
+  heroSet('heroExpense', money(metrics.expense)); heroSet('heroDebt', money(metrics.debtRec));
   const net = document.getElementById('statNet');
   net.textContent = money(metrics.available);
   net.className = 'money-val text-lg sm:text-3xl font-black ' + (metrics.available >= 0 ? 'text-emerald-500' : 'text-rose-500');
@@ -3034,11 +3158,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (isPortal) return;
 
   initPrivacyMode();
-  loadLocalData();
-  loadInventory();
-  loadRecurring();
-  loadAuditLog();
-  checkOverdueDebtsAlert();
+  loadAllLocal();
   refreshAll();
   switchTab('transactions');
   document.getElementById('formDate').value = todayString();
@@ -3766,49 +3886,74 @@ let pendingRequestsCache = [];
 async function submitClientPendingRequest(event) {
   event.preventDefault();
   const params = new URLSearchParams(window.location.search);
-  const clientName = params.get('client') || document.getElementById('portalClientName')?.textContent || 'عميل';
-  const uidParam = params.get('uid');
-  if (!uidParam) { showToast('معرّف المتجر غير صالح', 'error'); return; }
+  const clientName = (params.get('client') || document.getElementById('portalClientName')?.textContent || 'عميل').slice(0, 100);
+  const meta = window.portalMeta;
+  if (!meta || !meta.ownerUid || !meta.portalId) { showToast('رابط غير صالح، اطلب رابطًا جديدًا من المتجر', 'error'); return; }
 
   const type = document.getElementById('portalReqType').value;
   const amount = Number(document.getElementById('portalReqAmount').value);
   const notes = sanitizeString(document.getElementById('portalReqNotes').value, 200);
 
-  if (!amount || amount <= 0) { showToast('أدخل مبلغ صحيح', 'error'); return; }
+  if (!['income', 'debt_receivable', 'expense'].includes(type)) { showToast('نوع غير صالح', 'error'); return; }
+  if (!amount || amount <= 0 || amount >= 100000000) { showToast('أدخل مبلغ صحيح', 'error'); return; }
   if (!notes) { showToast('اكتب بيان الخدمة أو السبب', 'error'); return; }
 
+  const id = 'req-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
   const newReq = {
-    id: 'req-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-    client: clientName,
-    type,
-    amount,
+    id, portalId: meta.portalId, client: clientName, type, amount,
     category: type === 'debt_receivable' ? 'دين مستحق' : type === 'income' ? 'إيراد / دفعة' : 'مصروف',
-    notes,
-    date: todayString(),
-    time: formatTimeTo12Hour(currentInputTimeString()),
-    paymentMethod: 'معلق / طلب عميل',
-    status: 'pending_approval',
-    createdAt: Date.now()
+    notes, date: todayString(), time: formatTimeTo12Hour(currentInputTimeString()),
+    paymentMethod: 'معلق / طلب عميل', status: 'pending_approval', createdAt: Date.now()
   };
 
   try {
-    const userRef = db.collection('users').doc(uidParam);
-    await db.runTransaction(async (transaction) => {
-      const doc = await transaction.get(userRef);
-      let currentReqs = [];
-      if (doc.exists && Array.isArray(doc.data().pendingRequests)) {
-        currentReqs = doc.data().pendingRequests;
-      }
-      currentReqs.unshift(newReq);
-      transaction.set(userRef, { pendingRequests: currentReqs }, { merge: true });
-    });
-
+    await db.collection('users').doc(meta.ownerUid).collection('requests').doc(id).set(newReq);
     showToast('تم إرسال طلبك بنجاح، في انتظار مراجعة وقبول المتجر ✓', 'success');
     event.target.reset();
   } catch (error) {
-    console.error("Failed to submit client request:", error);
+    console.error('Failed to submit client request:', error);
     showToast('فشل إرسال الطلب للسحابة', 'error');
   }
+}
+
+async function fetchPendingRequests() {
+  if (!currentUser) return [];
+  const snap = await db.collection('users').doc(currentUser.uid).collection('requests').get();
+  const reqs = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  pendingRequestsCache = reqs;
+  return reqs;
+}
+
+let requestsUnsubscribe = null;
+function subscribeToRequests(uid) {
+  if (requestsUnsubscribe) { try { requestsUnsubscribe(); } catch (e) {} requestsUnsubscribe = null; }
+  requestsUnsubscribe = db.collection('users').doc(uid).collection('requests').onSnapshot(snap => {
+    pendingRequestsCache = snap.docs.map(d => d.data());
+    updateGlobalPendingAlert(pendingRequestsCache);
+    const badge = document.getElementById('pendingReqBadge');
+    if (badge) badge.textContent = pendingRequestsCache.length;
+  }, err => console.warn('requests listener:', err));
+}
+
+async function approveRequestCore(req) {
+  const uid = currentUser.uid;
+  const newTx = normalizeTransaction({
+    id: 'tx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+    type: req.type, amount: req.amount, date: req.date, time: req.time,
+    client: req.client, category: req.category, paymentMethod: 'مقبول من العميل',
+    notes: req.notes, status: isDebt(req.type) ? 'pending' : null, _updatedAt: Date.now()
+  });
+  const batch = db.batch();
+  batch.set(txCol(uid).doc(newTx.id), JSON.parse(txJSON(newTx)));
+  batch.delete(db.collection('users').doc(uid).collection('requests').doc(req.id));
+  await batch.commit();
+  cloudSnapshot.set(newTx.id, txJSON(newTx));
+  transactions.unshift(newTx);
+  saveLocalData();
+  refreshSharedPortals();
+}
+async function rejectRequestCore(reqId) {
+  await db.collection('users').doc(currentUser.uid).collection('requests').doc(reqId).delete();
 }
 
 function renderAdminRequests() {
@@ -3818,11 +3963,7 @@ function renderAdminRequests() {
   container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> جاري التحميل...</div>';
 
   if (!currentUser) return;
-  db.collection('users').doc(currentUser.uid).get().then(doc => {
-    if (!doc.exists) { container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400">لا توجد طلبات</div>'; return; }
-    const data = doc.data();
-    const reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
-    pendingRequestsCache = reqs;
+  fetchPendingRequests().then(reqs => {
     if (badge) badge.textContent = reqs.length;
 
     container.innerHTML = '';
@@ -3863,46 +4004,11 @@ async function approveClientRequest(reqId) {
   if (!currentUser) return;
   const req = pendingRequestsCache.find(r => r.id === reqId);
   if (!req) return;
-
   openConfirm('قبول طلب العميل؟', `سيتم اعتماد معاملة لـ <strong>${escapeHTML(req.client)}</strong> بمبلغ <strong>${money(req.amount)} ج.م</strong> وإضافتها لحساباتك رسمياً.`, async () => {
     try {
-      const userRef = db.collection('users').doc(currentUser.uid);
-      await db.runTransaction(async (transaction) => {
-        const doc = await transaction.get(userRef);
-        if (!doc.exists) return;
-        const data = doc.data();
-        let reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
-        let txs = Array.isArray(data.transactions) ? data.transactions : [];
-
-        // Remove from pending
-        reqs = reqs.filter(r => r.id !== reqId);
-
-        // Add to verified transactions
-        const newTx = normalizeTransaction({
-          id: 'tx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-          type: req.type,
-          amount: req.amount,
-          date: req.date,
-          time: req.time,
-          client: req.client,
-          category: req.category,
-          paymentMethod: 'مقبول من العميل',
-          notes: req.notes,
-          status: isDebt(req.type) ? 'pending' : null,
-          _updatedAt: Date.now()
-        });
-        txs.unshift(newTx);
-
-        transaction.set(userRef, { pendingRequests: reqs, transactions: txs }, { merge: true });
-      });
-
+      await approveRequestCore(req);
       showToast('تم قبول الطلب وإضافته للمعاملات بنجاح 🎉', 'success');
       renderAdminRequests();
-      loadLocalData();
-  loadInventory();
-  loadRecurring();
-  loadAuditLog();
-  checkOverdueDebtsAlert();
       refreshAll();
     } catch (error) {
       showToast('فشل قبول الطلب', 'error');
@@ -3914,15 +4020,7 @@ async function rejectClientRequest(reqId) {
   if (!currentUser) return;
   openConfirm('رفض وحذف الطلب؟', 'سيتم تجاهل هذا الطلب وحذفه نهائياً.', async () => {
     try {
-      const userRef = db.collection('users').doc(currentUser.uid);
-      await db.runTransaction(async (transaction) => {
-        const doc = await transaction.get(userRef);
-        if (!doc.exists) return;
-        let reqs = Array.isArray(doc.data().pendingRequests) ? doc.data().pendingRequests : [];
-        reqs = reqs.filter(r => r.id !== reqId);
-        transaction.set(userRef, { pendingRequests: reqs }, { merge: true });
-      });
-
+      await rejectRequestCore(reqId);
       showToast('تم رفض وحذف الطلب', 'info');
       renderAdminRequests();
     } catch (error) {
@@ -3972,11 +4070,7 @@ function renderGlobalClientRequests() {
   container.innerHTML = '<div class="text-center py-6 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin text-orange-500 text-base"></i><p class="mt-2">جاري جلب الطلبات...</p></div>';
 
   if (!currentUser) return;
-  db.collection('users').doc(currentUser.uid).get().then(doc => {
-    if (!doc.exists) { container.innerHTML = '<div class="text-center py-6 text-xs text-slate-400 font-bold">لا توجد طلبات</div>'; return; }
-    const data = doc.data();
-    const reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
-    pendingRequestsCache = reqs;
+  fetchPendingRequests().then(reqs => {
 
     container.innerHTML = '';
     if (!reqs.length) {
@@ -4016,46 +4110,12 @@ async function approveGlobalClientRequest(reqId) {
   if (!currentUser) return;
   const req = pendingRequestsCache.find(r => r.id === reqId);
   if (!req) return;
-
   closeClientRequestsModal();
   openConfirm('قبول طلب العميل؟', `سيتم اعتماد معاملة لـ <strong>${escapeHTML(req.client)}</strong> بمبلغ <strong>${money(req.amount)} ج.م</strong> وإضافتها لحساباتك رسمياً.`, async () => {
     try {
-      const userRef = db.collection('users').doc(currentUser.uid);
-      await db.runTransaction(async (transaction) => {
-        const doc = await transaction.get(userRef);
-        if (!doc.exists) return;
-        const data = doc.data();
-        let reqs = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
-        let txs = Array.isArray(data.transactions) ? data.transactions : [];
-
-        reqs = reqs.filter(r => r.id !== reqId);
-
-        const newTx = normalizeTransaction({
-          id: 'tx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-          type: req.type,
-          amount: req.amount,
-          date: req.date,
-          time: req.time,
-          client: req.client,
-          category: req.category,
-          paymentMethod: 'مقبول من العميل',
-          notes: req.notes,
-          status: isDebt(req.type) ? 'pending' : null,
-          _updatedAt: Date.now()
-        });
-        txs.unshift(newTx);
-
-        transaction.set(userRef, { pendingRequests: reqs, transactions: txs }, { merge: true });
-      });
-
+      await approveRequestCore(req);
       showToast('تم قبول الطلب وإضافته للمعاملات بنجاح 🎉', 'success');
-      updateGlobalPendingAlert(pendingRequestsCache.filter(r => r.id !== reqId));
       renderGlobalClientRequests();
-      loadLocalData();
-      loadInventory();
-      loadRecurring();
-      loadAuditLog();
-      checkOverdueDebtsAlert();
       refreshAll();
     } catch (error) {
       showToast('فشل قبول الطلب', 'error');
@@ -4068,17 +4128,8 @@ async function rejectGlobalClientRequest(reqId) {
   closeClientRequestsModal();
   openConfirm('رفض وحذف الطلب؟', 'سيتم تجاهل هذا الطلب وحذفه نهائياً.', async () => {
     try {
-      const userRef = db.collection('users').doc(currentUser.uid);
-      await db.runTransaction(async (transaction) => {
-        const doc = await transaction.get(userRef);
-        if (!doc.exists) return;
-        let reqs = Array.isArray(doc.data().pendingRequests) ? doc.data().pendingRequests : [];
-        reqs = reqs.filter(r => r.id !== reqId);
-        transaction.set(userRef, { pendingRequests: reqs }, { merge: true });
-      });
-
+      await rejectRequestCore(reqId);
       showToast('تم رفض وحذف الطلب', 'info');
-      updateGlobalPendingAlert(pendingRequestsCache.filter(r => r.id !== reqId));
       renderGlobalClientRequests();
     } catch (error) {
       showToast('فشل رفض الطلب', 'error');
@@ -4571,3 +4622,24 @@ function handleMoneyAlertClick() {
     showToast(`لديك (${overdueDebts.length}) ديون مستحقة الموعد تتطلب المتابعة ⚠️`, 'error');
   }
 }
+
+
+
+/* ---------- Quick add sheet (mobile FAB) ---------- */
+function openQuickAdd() {
+  const s = document.getElementById('quickAddSheet');
+  if (!s) return;
+  s.classList.remove('hidden');
+  requestAnimationFrame(() => s.classList.add('open'));
+}
+function closeQuickAdd() {
+  const s = document.getElementById('quickAddSheet');
+  if (!s) return;
+  s.classList.remove('open');
+  setTimeout(() => s.classList.add('hidden'), 200);
+}
+function quickAdd(kind) {
+  closeQuickAdd();
+  setTimeout(() => openModal(kind), 210);
+}
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeQuickAdd(); });
