@@ -2,44 +2,99 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Roles and Global Configuration
-    match /config/roles {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-        (request.auth.token.email.matches('(?i)hondastore299@gmail.com') ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    // ---------- Helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+    // Super admin: verified email only (prevents unverified email/password impersonation)
+    function isSuperAdmin() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() == 'hondastore299@gmail.com';
+    }
+    function isAdmin() {
+      return isSuperAdmin()
+        || (signedIn()
+            && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'free') == 'admin');
+    }
+    function protectedKeys() {
+      return ['role', 'isSuperAdmin', 'permissionsOverride', 'roleUpdatedAt', 'roleUpdatedBy'];
+    }
+    function isStr(v, maxLen) {
+      return v is string && v.size() <= maxLen;
     }
 
-    // User Private Documents (Financial Data & Settings)
-    match /users/{userId} {
-      // Only the authenticated account owner or admin can read the full user document
-      allow read: if request.auth != null && 
-        (request.auth.uid == userId || 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
-      
-      // Allow creation upon new signup
-      allow create: if request.auth != null && request.auth.uid == userId;
+    // ---------- Roles & global config ----------
+    match /config/roles {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
 
-      // Allow updates while preventing privilege escalation (protecting 'role', 'isSuperAdmin')
-      allow update: if request.auth != null && (
-        request.auth.token.email.matches('(?i)hondastore299@gmail.com') ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-        (request.auth.uid == userId && 
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isSuperAdmin', 'permissionsOverride']))
+    // ---------- Users ----------
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      // New accounts can only start as 'free' (no self-granted admin / overrides)
+      allow create: if isSuperAdmin() || (
+        isOwner(userId)
+        && request.resource.data.get('role', 'free') == 'free'
+        && request.resource.data.get('isSuperAdmin', false) == false
+        && !('permissionsOverride' in request.resource.data)
       );
 
-      // Private user subcollections
-      match /{allSubcollections=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow update: if isAdmin() || (
+        isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedKeys())
+      );
+
+      allow delete: if isSuperAdmin();
+
+      // Private data: transactions, inventory, audit log, portal index, ...
+      match /{path=**} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Client requests submitted from a public portal link.
+      // The portalId acts as an unguessable capability and must belong to this user.
+      match /requests/{reqId} {
+        allow create: if (
+              request.resource.data.keys().hasOnly(
+                ['id','portalId','client','type','amount','category','notes','date','time',
+                 'paymentMethod','status','createdAt'])
+              && request.resource.data.keys().hasAll(['id','portalId','client','type','amount','notes'])
+              && request.resource.data.id == reqId
+              && request.resource.data.status == 'pending_approval'
+              && request.resource.data.type in ['income', 'debt_receivable', 'expense']
+              && request.resource.data.amount is number
+              && request.resource.data.amount > 0
+              && request.resource.data.amount < 100000000
+              && isStr(request.resource.data.client, 100)
+              && isStr(request.resource.data.notes, 300)
+              && isStr(request.resource.data.portalId, 64)
+              && exists(/databases/$(database)/documents/client_portals/$(request.resource.data.portalId))
+              && get(/databases/$(database)/documents/client_portals/$(request.resource.data.portalId)).data.ownerUid == userId
+            );
+        // read/update/delete are covered by the owner wildcard above
       }
     }
 
-    // Dedicated Isolated Client Portals (Safe from exposing owner's full database)
+    // ---------- Client portals (public read-by-link, owner-managed) ----------
     match /client_portals/{portalId} {
-      // Anyone with the direct link can read only their specific ledger
-      allow read: if true;
-      // Only the shop owner can create or update this client ledger
-      allow write: if request.auth != null && request.auth.uid == request.resource.data.ownerUid;
+      // 'get' needs the unguessable id; 'list' is blocked so portals can't be enumerated
+      allow get: if true;
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && isStr(request.resource.data.clientName, 100);
+      allow update: if signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
     }
   }
 }

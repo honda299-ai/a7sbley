@@ -1,65 +1,120 @@
 /* =========================================================
-   A7SBLEY / EHSEBLI — Service Worker V10.5
+   A7SBLEY / EHSEBLI — Service Worker V11.5
    PWA Engine + Offline Precache + Push Notifications
    ========================================================= */
 
-const CACHE_VERSION = 'a7sbley-v11.4';
-const RUNTIME_CACHE = 'a7sbley-runtime-v10.5';
+const VERSION = '11.5';
+const CACHE_VERSION = `a7sbley-v${VERSION}`;
+const RUNTIME_CACHE = `a7sbley-runtime-v${VERSION}`;
 
-const PRECACHE_ASSETS = [
+// Must all succeed, otherwise install fails and is retried (no silent half-cache)
+const CORE_ASSETS = [
   './',
   './index.html',
   './styles.css',
-  './app.js',
+  './tailwind.css',
   './manifest.json',
+  './js/core.js',
+  './js/auth-permissions.js',
+  './js/data-sync.js',
+  './js/ui-features.js',
+  './js/extras.js',
   './logo.png',
   './icon-192.png',
   './icon-512.png',
+  './icon.svg'
+];
+// Nice to have; a failure here does not block install
+const OPTIONAL_ASSETS = [
   './apple-touch-icon.png',
-  './favicon.png'
+  './favicon.png',
+  './icon-maskable-192.png',
+  './icon-maskable-512.png'
+];
+
+// Third-party static libraries that are safe to cache for offline use
+const CACHEABLE_CDN = [
+  'cdn.jsdelivr.net',
+  'cdnjs.cloudflare.com',
+  'www.gstatic.com',
+  'fonts.googleapis.com',
+  'fonts.gstatic.com'
 ];
 
 /* ---------- Install ---------- */
+// No automatic skipWaiting(): the page shows an "update available" banner and
+// sends SKIP_WAITING, so users never get new JS mixed with an old open page.
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(PRECACHE_ASSETS).catch((err) => console.warn('Cache error:', err)))
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_VERSION);
+    await cache.addAll(CORE_ASSETS);
+    await Promise.allSettled(OPTIONAL_ASSETS.map((u) => cache.add(u)));
+  })());
 });
 
 /* ---------- Activate ---------- */
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_VERSION && k !== RUNTIME_CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.filter((k) => k.startsWith('a7sbley-') && k !== CACHE_VERSION && k !== RUNTIME_CACHE)
+          .map((k) => caches.delete(k))
+    );
+    await self.clients.claim();
+  })());
 });
 
-/* ---------- Fetch (Network First, Cache Fallback) ---------- */
+/* ---------- Fetch ---------- */
+async function networkFirst(request, cacheName, fallbackUrl) {
+  const cache = await caches.open(cacheName);
+  try {
+    const res = await fetch(request);
+    if (res && res.ok) cache.put(request, res.clone());
+    return res;
+  } catch (err) {
+    const cached = await cache.match(request, { ignoreSearch: true });
+    if (cached) return cached;
+    if (fallbackUrl) {
+      const fb = await caches.match(fallbackUrl);
+      if (fb) return fb;
+    }
+    throw err;
+  }
+}
+
+async function staleWhileRevalidate(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request, { ignoreSearch: request.url.startsWith(self.location.origin) });
+  const network = fetch(request).then((res) => {
+    if (res && (res.ok || res.type === 'opaque')) cache.put(request, res.clone());
+    return res;
+  }).catch(() => null);
+  return cached || (await network) || Response.error();
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (request.method !== 'GET') return;
+  if (request.method !== 'GET' || request.headers.has('range')) return;
 
   const url = new URL(request.url);
-  const skipHosts = [
-    'firebase', 'googleapis', 'gstatic', 'tailwindcss',
-    'jsdelivr', 'cloudflare', 'wa.me', 'firebaseio',
-    'firebaseinstallations', 'google-analytics', 'firebasestorage'
-  ];
-  if (skipHosts.some((h) => url.hostname.includes(h))) return;
+  const sameOrigin = url.origin === self.location.origin;
 
-  event.respondWith(
-    fetch(request)
-      .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put(request, responseToCache));
-        }
-        return networkResponse;
-      })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match('./index.html')))
-  );
+  // Firestore / Auth / Storage API traffic is never touched by the SW
+  if (!sameOrigin && !CACHEABLE_CDN.includes(url.hostname)) return;
+
+  if (!sameOrigin) {
+    event.respondWith(staleWhileRevalidate(request, RUNTIME_CACHE));
+    return;
+  }
+
+  // HTML pages: network first, offline fallback to the app shell
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirst(request, CACHE_VERSION, './index.html'));
+    return;
+  }
+
+  // Own static assets: serve fast from cache, refresh in background
+  event.respondWith(staleWhileRevalidate(request, CACHE_VERSION));
 });
 
 /* ---------- Push Notifications ---------- */
@@ -73,10 +128,7 @@ self.addEventListener('push', (event) => {
   };
 
   try {
-    if (event.data) {
-      const parsed = event.data.json();
-      data = { ...data, ...parsed };
-    }
+    if (event.data) data = { ...data, ...event.data.json() };
   } catch (e) {
     if (event.data) data.body = event.data.text();
   }
@@ -94,18 +146,20 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || './';
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => {
-        for (const client of clientList) {
-          if (client.url.includes(self.location.origin) && 'focus' in client) {
-            return client.focus().then((c) => c.navigate(targetUrl));
-          }
-        }
-        if (clients.openWindow) return clients.openWindow(targetUrl);
-      })
-  );
+  const targetUrl = new URL(event.notification.data?.url || './', self.location.origin).href;
+  // Only ever navigate inside our own origin
+  const safeUrl = targetUrl.startsWith(self.location.origin) ? targetUrl : self.location.origin + '/';
+  event.waitUntil((async () => {
+    const list = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of list) {
+      if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+        await client.focus();
+        try { await client.navigate(safeUrl); } catch (e) { /* ignore */ }
+        return;
+      }
+    }
+    if (clients.openWindow) await clients.openWindow(safeUrl);
+  })());
 });
 
 self.addEventListener('message', (event) => {

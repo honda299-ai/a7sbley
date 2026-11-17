@@ -25,32 +25,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Cairo', 'sans-serif'] },
-          colors: {
-            orange: { 450: '#ff6600', 500: '#f97316', 600: '#ea580c', 700: '#c2410c' },
-            dark: { 950: '#090a0f', 900: '#0f1117', 850: '#161922', 800: '#1e222d', 750: '#262b38', 700: '#32394a' }
-          }
-        }
-      }
-    };
-  </script>
+  <link rel="stylesheet" href="tailwind.css?v=11.6">
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js" integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.js" integrity="sha384-qmDHVszK26iWDlfhGzXz71t2qRopa/FvIuOkCTJJT4QRkIZf9h+OiJZzco9XtgPX" crossorigin="anonymous"></script>
 
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
 
   <link rel="stylesheet" href="styles.css?v=11.0">
 </head>
@@ -242,6 +228,22 @@
           <button onclick="openModal('income')" class="px-4 py-2.5 rounded-xl bg-dark-800 text-emerald-400 border border-emerald-500/30 font-black text-sm">
             <i class="fa-solid fa-arrow-down-left"></i> دخل
           </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Mobile balance hero -->
+    <section id="mobileHero" class="md:hidden mobile-hero relative overflow-hidden rounded-3xl p-4 text-white no-print">
+      <div class="relative z-10">
+        <div class="text-[11px] font-bold text-orange-300/90">المتاح الآن</div>
+        <div class="flex items-baseline gap-1 mt-0.5">
+          <span id="heroNet" class="money-val text-4xl font-black tracking-tight">0</span>
+          <span class="text-xs font-black text-slate-400">ج.م</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-4">
+          <div class="hero-chip"><span class="text-[10px] text-emerald-300 font-bold">دخل</span><b id="heroIncome" class="money-val text-sm">0</b></div>
+          <div class="hero-chip"><span class="text-[10px] text-rose-300 font-bold">مصروف</span><b id="heroExpense" class="money-val text-sm">0</b></div>
+          <div class="hero-chip"><span class="text-[10px] text-orange-300 font-bold">ليّ عند الناس</span><b id="heroDebt" class="money-val text-sm">0</b></div>
         </div>
       </div>
     </section>
@@ -581,7 +583,7 @@
       <i class="fa-solid fa-handshake"></i>
       <span>الديون</span>
     </button>
-    <button onclick="openModal('expense')" class="mob-nav-fab" aria-label="إضافة">
+    <button onclick="openQuickAdd()" class="mob-nav-fab" aria-label="إضافة" aria-haspopup="dialog">
       <i class="fa-solid fa-plus"></i>
     </button>
     <button onclick="switchTab('inventory', true)" class="mob-nav-btn" data-tab="inventory">
@@ -593,6 +595,21 @@
       <span>العملاء</span>
     </button>
   </nav>
+
+  <!-- Quick add sheet -->
+  <div id="quickAddSheet" class="quick-sheet hidden no-print" role="dialog" aria-modal="true" aria-label="إضافة سريعة">
+    <div class="quick-backdrop" onclick="closeQuickAdd()"></div>
+    <div class="quick-panel">
+      <div class="quick-handle"></div>
+      <div class="text-sm font-black mb-3">إضافة سريعة</div>
+      <div class="grid grid-cols-2 gap-2.5">
+        <button onclick="quickAdd('income')" class="quick-btn text-emerald-400"><i class="fa-solid fa-arrow-down-left"></i><span>دخل</span></button>
+        <button onclick="quickAdd('expense')" class="quick-btn text-rose-400"><i class="fa-solid fa-receipt"></i><span>مصروف</span></button>
+        <button onclick="quickAdd('debt_receivable')" class="quick-btn text-orange-400"><i class="fa-solid fa-handshake"></i><span>دين ليّ</span></button>
+        <button onclick="quickAdd('charity')" class="quick-btn text-amber-400"><i class="fa-solid fa-hand-holding-heart"></i><span>خير</span></button>
+      </div>
+    </div>
+  </div>
 
   <!-- AUTH LOADING -->
   <div id="authLoading" class="fixed inset-0 z-[400] bg-dark-950 items-center justify-center flex">
@@ -1619,6 +1636,10 @@
     </div>
   </div>
 
-  <script src="app.js?v=11.0"></script>
+  <script src="js/core.js?v=11.6"></script>
+<script src="js/auth-permissions.js?v=11.6"></script>
+<script src="js/data-sync.js?v=11.6"></script>
+<script src="js/ui-features.js?v=11.6"></script>
+<script src="js/extras.js?v=11.6"></script>
 </body>
 </html>
