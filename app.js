@@ -3167,28 +3167,186 @@ function switchTab(tab, shouldScroll = false) {
 }
 
 let toastTimer = null;
+let toastRemainingMs = 3500;
+let toastStartTs = 0;
+
+function dismissToast(direction = 'up') {
+  const box = document.getElementById('toastBox');
+  if (!box) return;
+  clearTimeout(toastTimer);
+  box.classList.remove('toast-dragging');
+  if (direction === 'left') {
+    box.style.transform = 'translateX(-160%) translateY(0)';
+    box.style.opacity = '0';
+  } else if (direction === 'right') {
+    box.style.transform = 'translateX(60%) translateY(0)';
+    box.style.opacity = '0';
+  } else {
+    box.style.transform = '';
+    box.style.opacity = '';
+    box.classList.remove('toast-visible');
+  }
+  setTimeout(() => {
+    box.classList.remove('toast-visible');
+    box.style.transform = '';
+    box.style.opacity = '';
+  }, 300);
+}
+
 function showToast(message, type = 'success', allowUndo = false) {
   const box = document.getElementById('toastBox');
   const inner = document.getElementById('toastInner');
+  if (!box || !inner) return;
+
+  const duration = allowUndo ? 6000 : 3600;
+  toastRemainingMs = duration;
+
   let icon = 'fa-solid fa-circle-check';
-  let classes = 'bg-dark-900 text-white border-orange-500/40';
-  if (type === 'error') { icon = 'fa-solid fa-circle-exclamation'; classes = 'bg-rose-950 text-white border-rose-500/50'; }
-  else if (type === 'info') { icon = 'fa-solid fa-circle-info'; classes = 'bg-dark-850 text-slate-100 border-slate-700'; }
-  inner.className = `flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl text-xs font-black border ${classes}`;
+  let titleText = 'تم بنجاح';
+  let typeCls = 'success';
+  if (type === 'error') {
+    icon = 'fa-solid fa-circle-exclamation';
+    titleText = 'تنبيه هام';
+    typeCls = 'error';
+  } else if (type === 'info') {
+    icon = 'fa-solid fa-bell';
+    titleText = 'إشعار النظام';
+    typeCls = 'info';
+  }
+
+  inner.className = `native-toast-card type-${typeCls}`;
   inner.innerHTML = `
-    <i class="${icon} ${type === 'error' ? 'text-rose-400' : type === 'info' ? 'text-blue-400' : 'text-orange-500'}"></i>
-    <span id="toastMsgSpan"></span>
-    ${allowUndo ? '<button onclick="undoDelete()" class="mr-2 px-2.5 py-1 rounded-lg bg-orange-500 text-white text-[10px] font-black pointer-events-auto">تراجع</button>' : ''}
+    <div class="native-toast-icon ${typeCls}">
+      <i class="${icon}"></i>
+    </div>
+    <div class="native-toast-body">
+      <div class="native-toast-title">
+        <span>احسبلي • ${titleText}</span>
+        <span>الآن</span>
+      </div>
+      <div id="toastMsgSpan" class="native-toast-msg"></div>
+      <div class="native-toast-swipe-hint"></div>
+    </div>
+    ${allowUndo
+      ? '<button onclick="undoDelete(); dismissToast(\'up\');" class="px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black shrink-0 shadow">تراجع</button>'
+      : '<button onclick="dismissToast(\'up\')" aria-label="إغلاق" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs opacity-70 shrink-0"><i class="fa-solid fa-xmark"></i></button>'
+    }
+    <div id="toastProgressBar" class="native-toast-progress"></div>
   `;
   document.getElementById('toastMsgSpan').textContent = message;
-  box.classList.remove('opacity-0', '-translate-y-5');
-  box.classList.add('opacity-100', 'translate-y-0');
+
+  // Reset position & show
+  box.classList.remove('toast-dragging');
+  box.style.transform = '';
+  box.style.opacity = '';
+  void box.offsetWidth;
+  box.classList.add('toast-visible');
+
+  // Animate progress bar
+  const bar = document.getElementById('toastProgressBar');
+  if (bar) {
+    bar.style.transition = 'none';
+    bar.style.transform = 'scaleX(1)';
+    requestAnimationFrame(() => {
+      bar.style.transition = `transform ${duration}ms linear`;
+      bar.style.transform = 'scaleX(0)';
+    });
+  }
+
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    box.classList.remove('opacity-100', 'translate-y-0');
-    box.classList.add('opacity-0', '-translate-y-5');
-  }, allowUndo ? 6000 : 3500);
+  toastStartTs = Date.now();
+  toastTimer = setTimeout(() => dismissToast('up'), duration);
 }
+
+// Initialize Touch & Mouse Swipe-to-Dismiss on Toast
+(function initSwipeableToast() {
+  window.addEventListener('DOMContentLoaded', () => {
+    const box = document.getElementById('toastBox');
+    if (!box) return;
+
+    let startX = 0, startY = 0, dx = 0, dy = 0, isDragging = false;
+
+    const onStart = (x, y) => {
+      if (!box.classList.contains('toast-visible')) return;
+      isDragging = true;
+      startX = x;
+      startY = y;
+      dx = 0;
+      dy = 0;
+      box.classList.add('toast-dragging');
+      clearTimeout(toastTimer);
+      const elapsed = Date.now() - toastStartTs;
+      toastRemainingMs = Math.max(1200, toastRemainingMs - elapsed);
+      const bar = document.getElementById('toastProgressBar');
+      if (bar) {
+        const computed = getComputedStyle(bar).transform;
+        bar.style.transition = 'none';
+        bar.style.transform = computed;
+      }
+    };
+
+    const onMove = (x, y) => {
+      if (!isDragging) return;
+      dx = x - startX;
+      dy = y - startY;
+      // Allow upward swipe or horizontal swipe
+      const effectiveY = dy < 0 ? dy : dy * 0.25;
+      const dist = Math.max(Math.abs(dx), Math.abs(dy < 0 ? dy : 0));
+      const opacity = Math.max(0.2, 1 - dist / 180);
+      box.style.transform = `translateX(calc(-50% + ${dx}px)) translateY(${effectiveY}px)`;
+      box.style.opacity = String(opacity);
+    };
+
+    const onEnd = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      box.classList.remove('toast-dragging');
+
+      if (dy < -32) {
+        dismissToast('up');
+        return;
+      }
+      if (dx < -65) {
+        dismissToast('left');
+        return;
+      }
+      if (dx > 65) {
+        dismissToast('right');
+        return;
+      }
+
+      // Snap back & resume timer
+      box.style.transform = '';
+      box.style.opacity = '';
+      toastStartTs = Date.now();
+      const bar = document.getElementById('toastProgressBar');
+      if (bar) {
+        bar.style.transition = `transform ${toastRemainingMs}ms linear`;
+        bar.style.transform = 'scaleX(0)';
+      }
+      toastTimer = setTimeout(() => dismissToast('up'), toastRemainingMs);
+    };
+
+    box.addEventListener('touchstart', e => {
+      if (e.touches.length === 1) onStart(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+    box.addEventListener('touchmove', e => {
+      if (isDragging && e.touches.length === 1) {
+        e.preventDefault();
+        onMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: false });
+    box.addEventListener('touchend', onEnd);
+    box.addEventListener('touchcancel', onEnd);
+
+    box.addEventListener('mousedown', e => {
+      if (e.target.closest('button')) return;
+      onStart(e.clientX, e.clientY);
+    });
+    window.addEventListener('mousemove', e => { if (isDragging) onMove(e.clientX, e.clientY); });
+    window.addEventListener('mouseup', () => { if (isDragging) onEnd(); });
+  });
+})();
 
 function toggleMenu(event) {
   if (event && event.stopPropagation) event.stopPropagation();

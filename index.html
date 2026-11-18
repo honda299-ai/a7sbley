@@ -38,7 +38,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="styles.css?v=19.0">
+  <link rel="stylesheet" href="styles.css?v=20.0">
 </head>
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans auth-pending">
@@ -193,8 +193,8 @@
   <!-- MAIN -->
   <main id="appMain" class="max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-4 flex-1 w-full">
 
-    <div id="toastBox" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] pointer-events-none opacity-0 transition-all duration-300 max-w-[92vw]">
-      <div id="toastInner"></div>
+    <div id="toastBox" class="native-toast-wrapper no-print" aria-live="polite">
+      <div id="toastInner" class="native-toast-card"></div>
     </div>
 
     <!-- تنبيه وضع الزائر (عدم المزامنة بين الأجهزة) -->
@@ -1909,6 +1909,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=19.0"></script>
+  <script src="app.js?v=20.0"></script>
 </body>
 </html>
