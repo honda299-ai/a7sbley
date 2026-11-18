@@ -588,7 +588,7 @@ html:not(.dark) .quick-btn { background: #f8fafc; border-color: #e2e8f0; }
 
 
 /* =========================================================
-   ULTRA-MINIMAL BANKING UI (V14.0 - TELDA / REVOLUT FEEL)
+   ULTRA-MINIMAL BANKING UI & SEGMENTED BAR (V15.0)
    ========================================================= */
 
 html, body {
@@ -609,13 +609,13 @@ body[data-mode="business"] .personal-only { display: none !important; }
 
 /* Ultra-Clean Header */
 #appHeader {
-  background: rgba(7, 8, 12, 0.78) !important;
+  background: rgba(7, 8, 12, 0.82) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
 html:not(.dark) #appHeader {
-  background: rgba(255, 255, 255, 0.88) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
 }
 
 .mode-pill-btn {
@@ -718,6 +718,98 @@ html:not(.dark) .ft-action-label { color: #334155; }
 html:not(.dark) .ft-wallet-chip {
   background: #ffffff;
   border-color: #e2e8f0;
+}
+
+/* =========================================================
+   MODERN SEGMENTED NAVIGATION PILL BAR (شريط التنقل العصري)
+   ========================================================= */
+.modern-segmented-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.modern-segmented-bar::-webkit-scrollbar { display: none; }
+html:not(.dark) .modern-segmented-bar {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.seg-pill-btn {
+  flex: 1;
+  min-width: max-content;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border-radius: 15px;
+  font-size: 12px;
+  font-weight: 900;
+  color: #94a3b8;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+html:not(.dark) .seg-pill-btn {
+  color: #64748b;
+}
+.seg-pill-btn.active {
+  background: linear-gradient(135deg, #ff6b00, #f97316);
+  color: #ffffff !important;
+  box-shadow: 0 6px 18px -4px rgba(255, 107, 0, 0.55);
+}
+body[data-mode="personal"] .seg-pill-btn.active {
+  background: linear-gradient(135deg, #0284c7, #00a8ff);
+  box-shadow: 0 6px 18px -4px rgba(0, 168, 255, 0.5);
+}
+.seg-pill-badge {
+  font-size: 10px;
+  font-weight: 900;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+}
+.seg-pill-btn.active .seg-pill-badge {
+  background: rgba(0, 0, 0, 0.25);
+  color: #ffffff;
+}
+
+/* Show More / Less Button */
+.show-more-tx-btn {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: rgba(255, 107, 0, 0.1);
+  border: 1px dashed rgba(255, 107, 0, 0.45);
+  color: #fb923c;
+  font-size: 12px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.show-more-tx-btn:hover, .show-more-tx-btn:active {
+  background: rgba(255, 107, 0, 0.2);
+  color: #ffffff;
+}
+body[data-mode="personal"] .show-more-tx-btn {
+  background: rgba(0, 168, 255, 0.1);
+  border-color: rgba(0, 168, 255, 0.45);
+  color: #38bdf8;
 }
 
 /* Glass Panel */

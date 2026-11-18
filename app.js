@@ -4646,13 +4646,16 @@ document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeQui
 
 
 /* =========================================================
-   ULTRA-MINIMAL BANKING UI ENGINE (V14.0)
+   MODERN SEGMENTED NAV + LAST 8 TRANSACTIONS + SHOW MORE (V15.0)
    ========================================================= */
 const APP_MODE_KEY = 'a7sbley_app_mode_v1';
 const DEMO_FLAG_KEY = 'a7sbley_is_demo_v1';
-let currentMobileView = 'home';
+const TX_INITIAL_LIMIT = 8;
+let showAllTransactions = false;
+let homeRecentExpanded = false;
+let currentActiveView = 'home';
 
-// Extend updateMetrics to sync 3D card charity, 50/50 debt cards, swipeable wallets, and greeting
+// Extend updateMetrics to sync badges in the modern segmented bar & home cards
 const _origUpdateMetrics = updateMetrics;
 updateMetrics = function() {
   _origUpdateMetrics();
@@ -4662,14 +4665,21 @@ updateMetrics = function() {
   setTxt('mobCardDebtRec', money(metrics.debtRec) + ' ج.م');
   setTxt('mobCardDebtPay', money(metrics.debtPay) + ' ج.م');
 
-  // Update header greeting name
+  // Update Segmented Bar Badges
+  const dailyCount = getPeriodTransactions().filter(t => !isDebt(t.type)).length;
+  const debtCount = getActiveTransactions().filter(t => isDebt(t.type) && t.status !== 'paid').length;
+  const clientCount = getAllClientNames().length;
+  setTxt('segTxBadge', dailyCount);
+  setTxt('segDebtBadge', debtCount);
+  setTxt('segClientBadge', clientCount);
+
   if (currentUser) {
     const rawName = currentUser.displayName || '';
     const firstName = rawName ? rawName.split(' ')[0] : 'هوندا';
     setTxt('headerUserGreeting', firstName);
   }
 
-  // Render horizontal swipeable wallets
+  // Horizontal swipeable wallets
   const strip = document.getElementById('mobileWalletsStrip');
   if (strip) {
     strip.innerHTML = '';
@@ -4697,13 +4707,6 @@ updateMetrics = function() {
       strip.appendChild(chip);
     });
   }
-};
-
-// Extend renderTransactions to update both full mobile feed and home recent 4 feed
-const _origRenderTransactions = renderTransactions;
-renderTransactions = function() {
-  _origRenderTransactions();
-  renderMobileTransactionsFeed();
 };
 
 function buildFeedCardHTML(item) {
@@ -4737,23 +4740,58 @@ function buildFeedCardHTML(item) {
   `;
 }
 
-function renderMobileTransactionsFeed() {
+// Override renderTransactions to limit to last 8 items by default + Show More button
+renderTransactions = function() {
+  const tbody = document.getElementById('transactionsTbody');
   const feed = document.getElementById('mobileTransactionsFeed');
-  const recentFeed = document.getElementById('mobileRecentFeed');
+  const empty = document.getElementById('emptyTransactionsState');
+  const showMoreWrap = document.getElementById('txShowMoreContainer');
+  const showMoreBtn = document.getElementById('txShowMoreBtn');
   const search = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
 
-  let list = getPeriodTransactions().filter(t => {
+  if (tbody) tbody.innerHTML = '';
+  if (feed) feed.innerHTML = '';
+
+  let fullList = getPeriodTransactions().filter(t => {
     if (isDebt(t.type)) return false;
     if (activeFilter !== 'all' && t.type !== activeFilter) return false;
     if (!search) return true;
     const text = [t.category, t.notes, t.client, t.paymentMethod, t.reference, t.time, typeName(t.type)].join(' ').toLowerCase();
     return text.includes(search);
   });
-  list.sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
+  fullList.sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
 
+  // Also update Home Recent Transactions (last 8 or expanded)
+  renderHomeRecentFeed();
+
+  if (!fullList.length) {
+    if (empty) empty.classList.remove('hidden');
+    if (showMoreWrap) showMoreWrap.classList.add('hidden');
+    return;
+  }
+  if (empty) empty.classList.add('hidden');
+
+  const isSearching = search.length > 0;
+  const visibleList = (showAllTransactions || isSearching) ? fullList : fullList.slice(0, TX_INITIAL_LIMIT);
+  const remainingCount = fullList.length - visibleList.length;
+
+  // Show More / Show Less Button Control
+  if (showMoreWrap && showMoreBtn) {
+    if (fullList.length > TX_INITIAL_LIMIT && !isSearching) {
+      showMoreWrap.classList.remove('hidden');
+      if (showAllTransactions) {
+        showMoreBtn.innerHTML = `<i class="fa-solid fa-chevron-up"></i> <span>عرض أقل (آخر ${TX_INITIAL_LIMIT} معاملات فقط)</span>`;
+      } else {
+        showMoreBtn.innerHTML = `<i class="fa-solid fa-chevron-down"></i> <span>عرض المزيد (+${remainingCount} معاملة أخرى)</span>`;
+      }
+    } else {
+      showMoreWrap.classList.add('hidden');
+    }
+  }
+
+  // Render Mobile Card Feed
   if (feed) {
-    feed.innerHTML = '';
-    list.forEach(item => {
+    visibleList.forEach(item => {
       const card = document.createElement('div');
       card.className = 'ft-tx-feed-item';
       card.innerHTML = buildFeedCardHTML(item) + `
@@ -4764,22 +4802,168 @@ function renderMobileTransactionsFeed() {
     });
   }
 
-  if (recentFeed) {
-    const allSorted = getActiveTransactions().filter(t => !isDebt(t.type))
-      .sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`)).slice(0, 4);
-    recentFeed.innerHTML = '';
-    if (!allSorted.length) {
-      recentFeed.innerHTML = '<div class="text-center py-6 text-xs text-slate-500 font-bold">لا توجد حركات مسجلة بعد</div>';
+  // Render Desktop Table
+  if (tbody) {
+    visibleList.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 dark:hover:bg-dark-850/60 transition group';
+      let badge = '', amount = '';
+      if (item.type === 'income') {
+        badge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"><i class="fa-solid fa-arrow-trend-up"></i> دخل</span>`;
+        amount = `<span class="money-val font-black text-emerald-500">+${money(item.amount)} ج.م</span>`;
+      } else if (item.type === 'charity') {
+        badge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-orange-500/10 text-orange-500 border border-orange-500/20"><i class="fa-solid fa-heart"></i> خير</span>`;
+        amount = `<span class="money-val font-black text-orange-500">-${money(item.amount)} ج.م</span>`;
+      } else {
+        badge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-500/10 text-rose-500 border border-rose-500/20"><i class="fa-solid fa-arrow-trend-down"></i> مصروف</span>`;
+        amount = `<span class="money-val font-black text-rose-500">-${money(item.amount)} ج.م</span>`;
+      }
+      const timeFormatted = item.time ? formatTimeTo12Hour(item.time) : '';
+      tr.innerHTML = `
+        <td class="py-3 px-4">
+          <div class="flex items-center gap-2.5">
+            ${badge}
+            <div class="flex items-center gap-2">
+              ${item.receipt ? `<img src="${item.receipt}" onclick="viewReceiptImage('${item.receipt}')" class="w-9 h-9 rounded-xl object-cover border border-orange-500/40 cursor-pointer shrink-0" alt="صورة">` : ''}
+              <div>
+                <div class="font-bold text-slate-800 dark:text-slate-100">${escapeHTML(item.notes || 'بدون بيان')}</div>
+                ${item.reference ? `<div class="text-[9px] text-slate-400 mt-0.5">مرجع: ${escapeHTML(item.reference)}</div>` : ''}
+              </div>
+            </div>
+          </div>
+        </td>
+        <td class="py-3 px-4">
+          ${item.client ? `<button onclick="openClientLedger('${escapeHTML(item.client)}')" class="inline-flex items-center gap-1 text-xs font-black text-orange-500 hover:underline"><i class="fa-solid fa-user-circle"></i> ${escapeHTML(item.client)}</button>` : '<span class="text-slate-400 text-[10px]">-</span>'}
+        </td>
+        <td class="py-3 px-4"><span class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-slate-300 font-bold text-[10px]">${escapeHTML(item.category)}</span></td>
+        <td class="py-3 px-4 text-slate-500 dark:text-slate-400 font-semibold">${escapeHTML(item.paymentMethod || 'كاش نقدي')}</td>
+        <td class="py-3 px-4">
+          <div class="font-bold text-slate-600 dark:text-slate-300 text-xs">${escapeHTML(item.date)}</div>
+          <div class="text-[10px] text-orange-500 font-bold mt-0.5">${escapeHTML(timeFormatted)}</div>
+        </td>
+        <td class="py-3 px-4">${amount}</td>
+        <td class="py-3 px-4 text-center">
+          <div class="flex items-center justify-center gap-1">
+            <button onclick="shareViaWhatsApp('${item.id}')" class="p-2 rounded-xl text-emerald-500 hover:bg-emerald-500/10"><i class="fa-brands fa-whatsapp text-sm"></i></button>
+            <button onclick="editTransaction('${item.id}')" class="p-2 rounded-xl text-slate-400 hover:text-orange-500"><i class="fa-solid fa-pen text-xs"></i></button>
+            <button onclick="requestDelete('${item.id}')" class="p-2 rounded-xl text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash-can text-xs"></i></button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+};
+
+function toggleTransactionsLimit() {
+  showAllTransactions = !showAllTransactions;
+  renderTransactions();
+}
+
+function renderHomeRecentFeed() {
+  const recentFeed = document.getElementById('mobileRecentFeed');
+  const homeMoreWrap = document.getElementById('homeShowMoreWrap');
+  const homeMoreBtn = document.getElementById('homeShowMoreBtn');
+  if (!recentFeed) return;
+
+  const allSorted = getActiveTransactions().filter(t => !isDebt(t.type))
+    .sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
+
+  recentFeed.innerHTML = '';
+  if (!allSorted.length) {
+    recentFeed.innerHTML = '<div class="text-center py-6 text-xs text-slate-500 font-bold">لا توجد حركات مسجلة بعد</div>';
+    if (homeMoreWrap) homeMoreWrap.classList.add('hidden');
+    return;
+  }
+
+  const visible = homeRecentExpanded ? allSorted : allSorted.slice(0, TX_INITIAL_LIMIT);
+  const rem = allSorted.length - visible.length;
+
+  if (homeMoreWrap && homeMoreBtn) {
+    if (allSorted.length > TX_INITIAL_LIMIT) {
+      homeMoreWrap.classList.remove('hidden');
+      if (homeRecentExpanded) {
+        homeMoreBtn.innerHTML = `<i class="fa-solid fa-chevron-up"></i> <span>عرض أقل (آخر ${TX_INITIAL_LIMIT} معاملات)</span>`;
+      } else {
+        homeMoreBtn.innerHTML = `<i class="fa-solid fa-chevron-down"></i> <span>عرض المزيد (+${rem} معاملة)</span>`;
+      }
     } else {
-      allSorted.forEach(item => {
-        const card = document.createElement('div');
-        card.className = 'ft-tx-feed-item';
-        card.innerHTML = buildFeedCardHTML(item);
-        recentFeed.appendChild(card);
-      });
+      homeMoreWrap.classList.add('hidden');
     }
   }
+
+  visible.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'ft-tx-feed-item';
+    card.innerHTML = buildFeedCardHTML(item);
+    recentFeed.appendChild(card);
+  });
 }
+
+function toggleHomeRecentExpand() {
+  homeRecentExpanded = !homeRecentExpanded;
+  renderHomeRecentFeed();
+}
+
+// Unified Modern Segmented Navigation (Works seamlessly on Mobile & Desktop!)
+function navigateSegmented(target) {
+  currentActiveView = target;
+
+  // 1. Highlight active pill in the Segmented Bar
+  document.querySelectorAll('.seg-pill-btn[data-seg]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.seg === target);
+  });
+
+  // 2. Highlight active pill in Mobile Bottom Nav
+  document.querySelectorAll('.mob-nav-btn[data-mob-tab]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mobTab === target);
+  });
+
+  // 3. Mobile Section Visibility
+  document.querySelectorAll('[data-mob-view]').forEach(sec => {
+    const views = (sec.getAttribute('data-mob-view') || '').split(' ');
+    const displayType = sec.getAttribute('data-mob-display') || 'block';
+    const isActive = views.includes(target);
+
+    sec.classList.remove('mob-active-block', 'mob-active-grid');
+    if (isActive) {
+      sec.classList.add(displayType === 'grid' ? 'mob-active-grid' : 'mob-active-block');
+    }
+  });
+
+  // 4. Desktop Panel Switching & Smooth Scroll
+  if (target === 'transactions' || target === 'home') {
+    _originalSwitchTab('transactions', false);
+  } else if (target === 'debts') {
+    _originalSwitchTab('debts', false);
+  } else if (target === 'clients') {
+    _originalSwitchTab('clients', false);
+  } else if (target === 'manage') {
+    renderInventory();
+    renderAuditLog();
+  }
+
+  // On Desktop, if clicking Transactions / Debts / Clients, scroll smoothly to the active panel
+  if (window.innerWidth >= 768 && target !== 'home') {
+    const panelMap = { transactions: 'panelTransactions', debts: 'panelDebts', clients: 'panelClients' };
+    const el = document.getElementById(panelMap[target]);
+    if (el) {
+      const topPos = el.getBoundingClientRect().top + window.pageYOffset - 80;
+      window.scrollTo({ top: Math.max(0, topPos), behavior: 'smooth' });
+    }
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+const _originalSwitchTab = switchTab;
+switchTab = function(tab, shouldScroll = false) {
+  _originalSwitchTab(tab, false);
+  if (tab === 'transactions') navigateSegmented('transactions');
+  else if (tab === 'debts') navigateSegmented('debts');
+  else if (tab === 'clients') navigateSegmented('clients');
+  else if (tab === 'inventory' || tab === 'audit') navigateSegmented('manage');
+};
 
 function initAppModeAndTabs() {
   const savedMode = localStorage.getItem(APP_MODE_KEY);
@@ -4793,9 +4977,9 @@ function initAppModeAndTabs() {
     applyAppMode(savedMode);
   }
   updateDemoBanner();
-  switchMobileView('home');
+  navigateSegmented('home');
   updateMetrics();
-  renderMobileTransactionsFeed();
+  renderTransactions();
 }
 
 function selectInitialMode(mode) {
@@ -4811,18 +4995,15 @@ function applyAppMode(mode) {
 
   const icon = document.getElementById('modeSwitchIcon');
   const label = document.getElementById('modeSwitchLabel');
-  const ledgerLbl = document.getElementById('mobLedgerLabel');
   const manageLbl = document.getElementById('mobManageLabel');
 
   if (mode === 'personal') {
     if (icon) icon.className = 'fa-solid fa-user';
     if (label) label.textContent = 'شخصي';
-    if (ledgerLbl) ledgerLbl.textContent = 'الديون';
     if (manageLbl) manageLbl.textContent = 'الإدارة';
   } else {
     if (icon) icon.className = 'fa-solid fa-store';
     if (label) label.textContent = 'المحل';
-    if (ledgerLbl) ledgerLbl.textContent = 'العملاء';
     if (manageLbl) manageLbl.textContent = 'المخزن';
   }
 }
@@ -4833,39 +5014,6 @@ function toggleAppMode() {
   applyAppMode(next);
   showToast(next === 'business' ? 'تم التحويل إلى وضع المحل 🏪' : 'تم التحويل إلى الوضع الشخصي 👤', 'info');
 }
-
-function switchMobileView(viewName) {
-  currentMobileView = viewName;
-
-  document.querySelectorAll('[data-mob-view]').forEach(sec => {
-    const views = (sec.getAttribute('data-mob-view') || '').split(' ');
-    const displayType = sec.getAttribute('data-mob-display') || 'block';
-    const isActive = views.includes(viewName);
-
-    sec.classList.remove('mob-active-block', 'mob-active-grid');
-    if (isActive) {
-      sec.classList.add(displayType === 'grid' ? 'mob-active-grid' : 'mob-active-block');
-    }
-  });
-
-  document.querySelectorAll('.mob-nav-btn[data-mob-tab]').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.mobTab === viewName);
-  });
-
-  if (viewName === 'transactions') renderTransactions();
-  if (viewName === 'ledger') { renderDebts(); renderClients(); }
-  if (viewName === 'manage') { renderInventory(); renderAuditLog(); }
-
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-const _originalSwitchTab = switchTab;
-switchTab = function(tab, shouldScroll = false) {
-  _originalSwitchTab(tab, false);
-  if (tab === 'transactions') switchMobileView('transactions');
-  else if (tab === 'debts' || tab === 'clients') switchMobileView('ledger');
-  else if (tab === 'inventory' || tab === 'audit') switchMobileView('manage');
-};
 
 function startWithDemoMode() {
   selectInitialMode('business');
