@@ -5256,3 +5256,73 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 
+
+
+/* =========================================================
+   V19.0: PERSONAL VS BUSINESS CATEGORIES, PROMPT & PROFILE SYNC
+   ========================================================= */
+const PERSONAL_CATEGORIES = {
+  expense: ['أكل ومشروبات', 'مواصلات وبنزين', 'فواتير وإنترنت', 'إيجار وسكن', 'ملابس ومشتريات', 'صحة وعلاج', 'ترفيه وخروجات', 'أخرى'],
+  income: ['الراتب الشهري', 'مكافأة / حافز', 'عمل حر (Freelance)', 'هدية / تحويل', 'أخرى'],
+  charity: ['صدقة جارية', 'مساعدة محتاج', 'إطعام طعام', 'زكاة مال', 'أخرى'],
+  debt_receivable: ['سلف لصديق / قريب', 'مستحق شخصي', 'أخرى'],
+  debt_payable: ['سلف مستحق عليّ', 'قسط شهري', 'فاتورة مؤجلة', 'أخرى']
+};
+
+const BUSINESS_CATEGORIES = JSON.parse(JSON.stringify(CATEGORIES));
+
+// Override onTypeChange to load Personal vs Business categories automatically
+const _origOnTypeChange = onTypeChange;
+onTypeChange = function() {
+  const mode = document.body.getAttribute('data-mode') || 'business';
+  const sourceCats = mode === 'personal' ? PERSONAL_CATEGORIES : BUSINESS_CATEGORIES;
+  Object.keys(sourceCats).forEach(k => { CATEGORIES[k] = sourceCats[k]; });
+  _origOnTypeChange();
+};
+
+// Update Profile Modal live labels when toggled
+function updateProfileModalLabels() {
+  const isDark = document.documentElement.classList.contains('dark');
+  const curMode = document.body.getAttribute('data-mode') || 'business';
+  const themeSub = document.getElementById('profileThemeSubtitle');
+  const modeSub = document.getElementById('profileModeSubtitle');
+  const modeEl = document.getElementById('profileModalMode');
+  const avatarImg = document.getElementById('profileModalAvatar');
+
+  if (themeSub) themeSub.textContent = isDark ? 'الوضع الليلي الداكن 🌙' : 'الوضع النهاري الهادئ ☀️';
+  if (modeSub) modeSub.textContent = curMode === 'business' ? 'وضع التجارة والمحل 🏪' : 'الوضع الشخصي البسيط 👤';
+  if (modeEl) modeEl.textContent = curMode === 'business' ? 'وضع المحل 🏪' : 'الوضع الشخصي 👤';
+  if (avatarImg) {
+    avatarImg.style.borderColor = isDark ? '#11131a' : '#ffffff';
+  }
+}
+
+const _origOpenUserProfileModal = openUserProfileModal;
+openUserProfileModal = function() {
+  _origOpenUserProfileModal();
+  updateProfileModalLabels();
+};
+
+// Trigger Mode Selection Prompt on first login if not chosen yet
+const _origApplyAppMode = applyAppMode;
+applyAppMode = function(mode) {
+  _origApplyAppMode(mode);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  const isDark = document.documentElement.classList.contains('dark');
+  if (meta) {
+    meta.setAttribute('content', isDark ? '#07080c' : (mode === 'personal' ? '#f2f6fa' : '#f4f6f9'));
+  }
+};
+
+// Check on auth resolved if mode onboarding should pop up
+auth.onAuthStateChanged(user => {
+  if (user && !isPortalModeActive && !localStorage.getItem(APP_MODE_KEY)) {
+    setTimeout(() => {
+      const modal = document.getElementById('modeOnboardingModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    }, 650);
+  }
+});

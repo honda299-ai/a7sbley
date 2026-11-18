@@ -38,7 +38,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="styles.css?v=18.0">
+  <link rel="stylesheet" href="styles.css?v=19.0">
 </head>
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans auth-pending">
@@ -230,7 +230,7 @@
         <span>المعاملات</span>
         <span id="segTxBadge" class="seg-pill-badge">0</span>
       </button>
-      <button onclick="navigateSegmented('debts')" class="seg-pill-btn" data-seg="debts" data-feature="debts">
+      <button onclick="navigateSegmented('debts')" class="business-only seg-pill-btn" data-seg="debts" data-feature="debts">
         <i class="fa-solid fa-handshake"></i>
         <span>الديون</span>
         <span id="segDebtBadge" class="seg-pill-badge">0</span>
@@ -269,50 +269,58 @@
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span class="text-[11px] font-bold text-slate-300">الرصيد المتاح الآن</span>
+            <span class="card-sub-text text-[11px] font-bold text-slate-300">الرصيد المتاح الآن</span>
           </div>
-          <button onclick="togglePrivacyMode()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 flex items-center justify-center transition">
+          <button onclick="togglePrivacyMode()" class="card-privacy-btn w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 flex items-center justify-center transition">
             <i id="privacyIcon" class="fa-solid fa-eye text-xs"></i>
           </button>
         </div>
 
         <div class="flex items-baseline gap-1.5 mt-2">
-          <span id="heroNet" class="money-val text-4xl font-black tracking-tight text-white">0</span>
-          <span class="text-xs font-black text-orange-400">ج.م</span>
+          <span id="heroNet" class="card-main-val money-val text-4xl font-black tracking-tight text-white">0</span>
+          <span class="text-xs font-black text-orange-500">ج.م</span>
         </div>
 
-        <div class="grid grid-cols-3 gap-2 mt-5 pt-4 border-t border-white/10">
+        <div class="card-divider grid grid-cols-3 gap-2 mt-5 pt-4 border-t border-white/10">
           <div>
-            <div class="text-[10px] text-emerald-400 font-bold flex items-center gap-1"><i class="fa-solid fa-arrow-down-left text-[9px]"></i> دخل</div>
-            <div id="heroIncome" class="money-val text-sm font-black text-white mt-0.5">0</div>
+            <div class="text-[10px] text-emerald-500 font-bold flex items-center gap-1"><i class="fa-solid fa-arrow-down-left text-[9px]"></i> دخل</div>
+            <div id="heroIncome" class="card-main-val money-val text-sm font-black text-white mt-0.5">0</div>
           </div>
           <div>
-            <div class="text-[10px] text-rose-400 font-bold flex items-center gap-1"><i class="fa-solid fa-arrow-up-right text-[9px]"></i> مصروف</div>
-            <div id="heroExpense" class="money-val text-sm font-black text-white mt-0.5">0</div>
+            <div class="text-[10px] text-rose-500 font-bold flex items-center gap-1"><i class="fa-solid fa-arrow-up-right text-[9px]"></i> مصروف</div>
+            <div id="heroExpense" class="card-main-val money-val text-sm font-black text-white mt-0.5">0</div>
           </div>
           <div>
-            <div class="text-[10px] text-amber-400 font-bold flex items-center gap-1"><i class="fa-solid fa-hand-holding-heart text-[9px]"></i> الخير</div>
-            <div id="heroCharityVal" class="money-val text-sm font-black text-white mt-0.5">0</div>
+            <div class="text-[10px] text-amber-500 font-bold flex items-center gap-1"><i class="fa-solid fa-hand-holding-heart text-[9px]"></i> الخير</div>
+            <div id="heroCharityVal" class="card-main-val money-val text-sm font-black text-white mt-0.5">0</div>
           </div>
         </div>
       </div>
 
-      <!-- 2. Circular Quick Actions -->
+      <!-- 2. Circular Quick Actions (Adapts to Business vs Personal) -->
       <div class="ft-action-grid">
         <button onclick="openModal('income')" class="ft-action-btn">
-          <div class="ft-action-circle text-emerald-400"><i class="fa-solid fa-arrow-down-left"></i></div>
+          <div class="ft-action-circle text-emerald-500"><i class="fa-solid fa-arrow-down-left"></i></div>
           <span class="ft-action-label">إضافة دخل</span>
         </button>
         <button onclick="openModal('expense')" class="ft-action-btn">
-          <div class="ft-action-circle text-rose-400"><i class="fa-solid fa-receipt"></i></div>
+          <div class="ft-action-circle text-rose-500"><i class="fa-solid fa-receipt"></i></div>
           <span class="ft-action-label">مصروف</span>
         </button>
-        <button onclick="openModal('debt_receivable')" class="ft-action-btn">
-          <div class="ft-action-circle text-cyan-400"><i class="fa-solid fa-user-plus"></i></div>
+        <button onclick="openModal('charity')" class="personal-only ft-action-btn">
+          <div class="ft-action-circle text-amber-500"><i class="fa-solid fa-hand-holding-heart"></i></div>
+          <span class="ft-action-label">باب الخير</span>
+        </button>
+        <button onclick="openBudgetModal()" class="personal-only ft-action-btn">
+          <div class="ft-action-circle text-cyan-500"><i class="fa-solid fa-chart-pie"></i></div>
+          <span class="ft-action-label">الميزانية</span>
+        </button>
+        <button onclick="openModal('debt_receivable')" class="business-only ft-action-btn">
+          <div class="ft-action-circle text-cyan-500"><i class="fa-solid fa-user-plus"></i></div>
           <span class="ft-action-label">دين جديد</span>
         </button>
-        <button onclick="openShiftSettlementModal()" class="ft-action-btn">
-          <div class="ft-action-circle text-orange-400"><i class="fa-solid fa-calendar-check"></i></div>
+        <button onclick="openShiftSettlementModal()" class="business-only ft-action-btn">
+          <div class="ft-action-circle text-orange-500"><i class="fa-solid fa-calendar-check"></i></div>
           <span class="ft-action-label">تقفيل اليوم</span>
         </button>
       </div>
@@ -320,35 +328,35 @@
       <!-- 3. Horizontal Swipeable Wallets -->
       <div>
         <div class="flex items-center justify-between px-1 mb-2">
-          <span class="text-xs font-black text-slate-300">الخزائن والمحافظ</span>
-          <span class="text-[10px] font-bold text-slate-500">اسحب لليسار ←</span>
+          <span class="text-xs font-black text-slate-700 dark:text-slate-300">الخزائن والمحافظ</span>
+          <span class="text-[10px] font-bold text-slate-400">اسحب لليسار ←</span>
         </div>
         <div id="mobileWalletsStrip" class="ft-wallets-strip"></div>
       </div>
 
-      <!-- 4. Debts 50/50 Cards -->
-      <div class="grid grid-cols-2 gap-2.5">
-        <div onclick="navigateSegmented('debts')" class="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 cursor-pointer active:scale-95 transition">
-          <div class="text-[10px] font-bold text-emerald-400 flex items-center justify-between">
+      <!-- 4. Debts 50/50 Cards (Business Mode Focus) -->
+      <div class="business-only grid grid-cols-2 gap-2.5">
+        <div onclick="navigateSegmented('debts')" class="mob-debt-card-rec p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 cursor-pointer active:scale-95 transition">
+          <div class="text-[10px] font-bold text-emerald-500 flex items-center justify-between">
             <span>ليّ عند الناس</span>
             <i class="fa-solid fa-arrow-left text-[9px]"></i>
           </div>
-          <div id="mobCardDebtRec" class="money-val text-base font-black text-white mt-1.5">0 ج.م</div>
+          <div id="mobCardDebtRec" class="mob-debt-card-val money-val text-base font-black text-white mt-1.5">0 ج.م</div>
         </div>
-        <div onclick="navigateSegmented('debts')" class="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 cursor-pointer active:scale-95 transition">
-          <div class="text-[10px] font-bold text-rose-400 flex items-center justify-between">
+        <div onclick="navigateSegmented('debts')" class="mob-debt-card-pay p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 cursor-pointer active:scale-95 transition">
+          <div class="text-[10px] font-bold text-rose-500 flex items-center justify-between">
             <span>عليّ للناس</span>
             <i class="fa-solid fa-arrow-left text-[9px]"></i>
           </div>
-          <div id="mobCardDebtPay" class="money-val text-base font-black text-white mt-1.5">0 ج.م</div>
+          <div id="mobCardDebtPay" class="mob-debt-card-val money-val text-base font-black text-white mt-1.5">0 ج.م</div>
         </div>
       </div>
 
       <!-- 5. Recent Activity Feed (Last 8 with Show More) -->
       <div class="ft-glass-panel p-3.5">
         <div class="flex items-center justify-between mb-3">
-          <span class="text-xs font-black text-white">أحدث المعاملات</span>
-          <button onclick="navigateSegmented('transactions')" class="text-[11px] font-black text-orange-400">السجل الكامل ←</button>
+          <span class="text-xs font-black text-slate-900 dark:text-white">أحدث المعاملات</span>
+          <button onclick="navigateSegmented('transactions')" class="text-[11px] font-black text-orange-500">السجل الكامل ←</button>
         </div>
         <div id="mobileRecentFeed" class="space-y-2"></div>
         <div id="homeShowMoreWrap" class="mt-3 hidden">
@@ -821,13 +829,13 @@
                 <i class="fa-solid fa-hand-holding-heart"></i><span>خير</span>
               </div>
             </label>
-            <label class="cursor-pointer">
+            <label class="business-only cursor-pointer">
               <input type="radio" name="txType" value="debt_receivable" class="peer sr-only" onchange="onTypeChange()">
               <div class="type-tile peer-checked:border-cyan-500 peer-checked:bg-cyan-500/10 peer-checked:text-cyan-500">
                 <i class="fa-solid fa-user-plus"></i><span>دين ليا</span>
               </div>
             </label>
-            <label class="cursor-pointer">
+            <label class="business-only cursor-pointer">
               <input type="radio" name="txType" value="debt_payable" class="peer sr-only" onchange="onTypeChange()">
               <div class="type-tile peer-checked:border-purple-500 peer-checked:bg-purple-500/10 peer-checked:text-purple-500">
                 <i class="fa-solid fa-user-minus"></i><span>دين عليا</span>
@@ -859,7 +867,7 @@
           <input type="date" id="formDueDate" class="form-input border-orange-500/40">
         </div>
 
-        <div>
+        <div class="business-only">
           <label class="field-label">اسم العميل (اختياري)</label>
           <input type="text" id="formClient" list="clientsDatalist" maxlength="60" placeholder="مثال: أحمد" class="form-input">
           <datalist id="clientsDatalist"></datalist>
@@ -883,7 +891,7 @@
           </div>
         </div>
 
-        <div>
+        <div class="business-only">
           <label class="field-label">المرجع (اختياري)</label>
           <input type="text" id="formReference" maxlength="50" placeholder="INV-1025" class="form-input">
         </div>
@@ -1763,64 +1771,104 @@
     </div>
   </div>
 
-  <!-- USER PROFILE DETAILS MODAL -->
-  <div id="userProfileModal" class="fixed inset-0 z-[135] hidden items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md" onclick="closeUserProfileModal()">
-    <div class="relative w-full max-w-md rounded-3xl bg-[#11131a] border border-orange-500/40 p-5 shadow-2xl modal-enter text-white overflow-hidden" onclick="event.stopPropagation()">
-      <div class="flex items-center justify-between pb-3 border-b border-white/10">
-        <div class="flex items-center gap-2 text-xs font-black text-orange-400">
-          <i class="fa-solid fa-id-card"></i>
-          <span>حسابي والملف الشخصي</span>
-        </div>
-        <button onclick="closeUserProfileModal()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center">
+  <!-- CLEAN & SOOTHING USER PROFILE MODAL (V19.0) -->
+  <div id="userProfileModal" class="fixed inset-0 z-[135] hidden items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md" onclick="closeUserProfileModal()">
+    <div class="adaptive-modal-card relative w-full max-w-md rounded-3xl bg-[#11131a] border border-white/10 shadow-2xl modal-enter text-white overflow-hidden" onclick="event.stopPropagation()">
+      
+      <!-- Soft Gradient Cover Banner -->
+      <div class="relative h-24 bg-gradient-to-l from-orange-500/30 via-amber-500/15 to-cyan-500/20 px-5 pt-4 flex items-start justify-between">
+        <span class="px-3 py-1 rounded-full bg-black/30 backdrop-blur-md text-[10px] font-black text-white/90 border border-white/10">
+          الملف الشخصي
+        </span>
+        <button onclick="closeUserProfileModal()" class="w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center transition">
           <i class="fa-solid fa-xmark text-sm"></i>
         </button>
       </div>
 
-      <div class="flex flex-col items-center text-center mt-4 mb-4">
-        <div class="relative">
-          <img id="profileModalAvatar" src="" class="w-20 h-20 rounded-full border-2 border-orange-500 object-cover shadow-xl" alt="User">
-          <span id="profileModalMethodBadge" class="absolute -bottom-1 -left-1 px-2.5 py-0.5 rounded-full bg-slate-800 border border-white/15 text-[10px] font-black text-slate-200">
-            Google
-          </span>
+      <!-- Overlapping Avatar & Identity -->
+      <div class="px-5 pb-5">
+        <div class="flex flex-col items-center text-center -mt-12">
+          <div class="relative">
+            <img id="profileModalAvatar" src="" class="w-24 h-24 rounded-full border-4 border-[#11131a] dark:border-[#11131a] object-cover shadow-xl bg-slate-800" alt="User">
+            <span id="profileModalMethodBadge" class="absolute bottom-0 left-0 px-2.5 py-0.5 rounded-full bg-slate-900 border border-white/15 text-[10px] font-black text-slate-200 shadow">
+              Google
+            </span>
+          </div>
+          <h3 id="profileModalName" class="adaptive-modal-text text-xl font-black text-white mt-3">-</h3>
+          <p id="profileModalEmail" class="adaptive-modal-muted text-xs font-bold text-slate-400 mt-0.5">-</p>
+          <div id="profileModalRolePill" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black border border-orange-500/30 bg-orange-500/15 text-orange-500">
+            مجاني
+          </div>
         </div>
-        <h3 id="profileModalName" class="text-lg font-black text-white mt-3">-</h3>
-        <p id="profileModalEmail" class="text-xs font-bold text-slate-400 mt-0.5">-</p>
-        <div id="profileModalRolePill" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black border border-orange-500/30 bg-orange-500/15 text-orange-400">
-          مجاني
-        </div>
-      </div>
 
-      <div class="space-y-2.5 text-xs bg-white/5 border border-white/10 rounded-2xl p-3.5">
-        <div class="flex items-center justify-between py-1 border-b border-white/5">
-          <span class="text-slate-400 font-bold"><i class="fa-regular fa-calendar-plus text-orange-400 ml-1"></i> إنشاء الحساب:</span>
-          <span id="profileModalCreated" class="font-black text-slate-100">-</span>
-        </div>
-        <div class="flex items-center justify-between py-1 border-b border-white/5">
-          <span class="text-slate-400 font-bold"><i class="fa-solid fa-clock-rotate-left text-emerald-400 ml-1"></i> آخر دخول:</span>
-          <span id="profileModalLastLogin" class="font-black text-slate-100">-</span>
-        </div>
-        <div class="flex items-center justify-between py-1 border-b border-white/5">
-          <span class="text-slate-400 font-bold"><i class="fa-solid fa-layer-group text-cyan-400 ml-1"></i> الوضع الحالي:</span>
-          <span id="profileModalMode" class="font-black text-cyan-400">وضع المحل</span>
-        </div>
-        <div class="flex items-center justify-between py-1">
-          <span class="text-slate-400 font-bold"><i class="fa-solid fa-receipt text-amber-400 ml-1"></i> عدد العمليات:</span>
-          <span id="profileModalTxCount" class="font-black text-amber-400">0 عملية</span>
-        </div>
-      </div>
+        <!-- Clean 2x2 Summary Grid -->
+        <div class="grid grid-cols-2 gap-2.5 mt-5">
+          <div class="adaptive-modal-subcard p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]">
+            <div class="adaptive-modal-muted text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-layer-group text-cyan-500"></i> وضع الاستخدام
+            </div>
+            <div id="profileModalMode" class="adaptive-modal-text text-xs font-black text-white mt-1">وضع المحل 🏪</div>
+          </div>
 
-      <div class="grid grid-cols-3 gap-2 mt-4">
-        <button onclick="toggleTheme()" class="py-3 px-2 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-black text-[11px] flex items-center justify-center gap-1">
-          <i id="themeIcon" class="fa-solid fa-sun text-amber-400"></i>
-          <span>المظهر</span>
-        </button>
-        <button onclick="closeUserProfileModal(); toggleAppMode();" class="py-3 px-2 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-black text-[11px] flex items-center justify-center gap-1">
-          <i class="fa-solid fa-repeat text-orange-400"></i>
-          <span>الوضع</span>
-        </button>
-        <button onclick="closeUserProfileModal(); logout();" class="py-3 px-2 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-[11px] flex items-center justify-center gap-1 shadow">
+          <div class="adaptive-modal-subcard p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]">
+            <div class="adaptive-modal-muted text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-receipt text-orange-500"></i> إجمالي العمليات
+            </div>
+            <div id="profileModalTxCount" class="adaptive-modal-text text-xs font-black text-white mt-1">0 عملية</div>
+          </div>
+
+          <div class="adaptive-modal-subcard p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]">
+            <div class="adaptive-modal-muted text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
+              <i class="fa-regular fa-calendar-plus text-emerald-500"></i> تاريخ الإنشاء
+            </div>
+            <div id="profileModalCreated" class="adaptive-modal-text text-[11px] font-black text-white mt-1 truncate">-</div>
+          </div>
+
+          <div class="adaptive-modal-subcard p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]">
+            <div class="adaptive-modal-muted text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-clock-rotate-left text-amber-500"></i> آخر تسجيل دخول
+            </div>
+            <div id="profileModalLastLogin" class="adaptive-modal-text text-[11px] font-black text-white mt-1 truncate">-</div>
+          </div>
+        </div>
+
+        <!-- Clean Quick Toggles (Theme & Mode) -->
+        <div class="mt-4 space-y-2">
+          <div class="adaptive-modal-subcard flex items-center justify-between p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center text-xs">
+                <i id="themeIcon" class="fa-solid fa-sun"></i>
+              </div>
+              <div>
+                <div class="adaptive-modal-text text-xs font-black text-white">مظهر التطبيق</div>
+                <div id="profileThemeSubtitle" class="adaptive-modal-muted text-[10px] font-bold text-slate-400">الوضع الليلي الداكن</div>
+              </div>
+            </div>
+            <button onclick="toggleTheme(); updateProfileModalLabels();" class="adaptive-modal-btn px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-black text-white transition">
+              تبديل المظهر
+            </button>
+          </div>
+
+          <div class="adaptive-modal-subcard flex items-center justify-between p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl bg-cyan-500/15 text-cyan-500 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-sliders"></i>
+              </div>
+              <div>
+                <div class="adaptive-modal-text text-xs font-black text-white">نوع الحساب والواجهة</div>
+                <div id="profileModeSubtitle" class="adaptive-modal-muted text-[10px] font-bold text-slate-400">التجارة والمحل / الشخصي</div>
+              </div>
+            </div>
+            <button onclick="toggleAppMode(); updateProfileModalLabels();" class="adaptive-modal-btn px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-black text-white transition">
+              تغيير الوضع
+            </button>
+          </div>
+        </div>
+
+        <!-- Logout Button -->
+        <button onclick="closeUserProfileModal(); logout();" class="w-full mt-4 py-3 rounded-2xl bg-rose-500/15 hover:bg-rose-600 text-rose-500 hover:text-white border border-rose-500/30 font-black text-xs transition flex items-center justify-center gap-2">
           <i class="fa-solid fa-right-from-bracket"></i>
-          <span>خروج</span>
+          <span>تسجيل الخروج من الحساب</span>
         </button>
       </div>
     </div>
@@ -1828,7 +1876,7 @@
 
   <!-- MODE ONBOARDING MODAL -->
   <div id="modeOnboardingModal" class="fixed inset-0 z-[450] hidden items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-    <div class="relative w-full max-w-md rounded-3xl bg-[#11131a] border border-orange-500/40 p-6 text-center text-white shadow-2xl modal-enter">
+    <div class="adaptive-modal-card relative w-full max-w-md rounded-3xl bg-[#11131a] border border-orange-500/40 p-6 text-center text-white shadow-2xl modal-enter">
       <img src="logo.png" class="w-16 h-16 rounded-2xl mx-auto mb-3 border border-orange-500/30 object-contain" alt="احسبلي">
       <h2 class="text-xl font-black">كيف ستستخدم احسبلي؟</h2>
       <p class="text-xs text-slate-400 mt-1 mb-5">اختر الوضع المناسب لتخصيص الواجهة (يمكنك التبديل في أي وقت من الأعلى)</p>
@@ -1861,6 +1909,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=18.0"></script>
+  <script src="app.js?v=19.0"></script>
 </body>
 </html>

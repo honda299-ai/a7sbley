@@ -910,3 +910,148 @@ html:not(.dark) .ft-tx-feed-item {
   border-color: #ff6b00;
   background: rgba(255, 107, 0, 0.09);
 }
+
+
+/* =========================================================
+   SOFT SOOTHING LIGHT THEME + PERSONAL/BUSINESS ISOLATION (V19.0)
+   ========================================================= */
+
+/* 1. Soft Light Mode (ألوان نهارية هادئة ومريحة للعين بدون بياض فاقع أو سواد متداخل) */
+html:not(.dark) body {
+  background-color: #f4f6f9 !important;
+  background-image:
+    radial-gradient(circle at 90% 4%, rgba(249, 115, 22, 0.06) 0%, transparent 42%),
+    radial-gradient(circle at 10% 25%, rgba(14, 165, 233, 0.05) 0%, transparent 45%) !important;
+  color: #1e293b !important;
+}
+html:not(.dark) body[data-mode="personal"] {
+  background-color: #f2f6fa !important;
+  background-image:
+    radial-gradient(circle at 88% 4%, rgba(2, 132, 199, 0.07) 0%, transparent 45%),
+    radial-gradient(circle at 10% 30%, rgba(99, 102, 241, 0.04) 0%, transparent 45%) !important;
+}
+
+html:not(.dark) #appHeader {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-bottom: 1px solid #e5e9f0 !important;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.03) !important;
+}
+html:not(.dark) #controlCenterBtn {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #334155 !important;
+}
+html:not(.dark) #controlCenterBtn:hover {
+  background: #f97316 !important;
+  color: #ffffff !important;
+}
+
+/* Soft Light Glass Panels & Cards */
+html:not(.dark) .ft-glass-panel {
+  background: #ffffff !important;
+  border: 1px solid #e5e9f0 !important;
+  box-shadow: 0 6px 20px -6px rgba(15, 23, 42, 0.06) !important;
+}
+html:not(.dark) .ft-tx-feed-item {
+  background: #f8fafc !important;
+  border: 1px solid #edf2f7 !important;
+}
+html:not(.dark) .ft-tx-feed-item:hover {
+  background: #f1f5f9 !important;
+}
+html:not(.dark) .ft-wallet-chip {
+  background: #ffffff !important;
+  border: 1px solid #e5e9f0 !important;
+  box-shadow: 0 4px 12px -4px rgba(15, 23, 42, 0.05) !important;
+}
+html:not(.dark) .ft-action-circle {
+  background: #ffffff !important;
+  border: 1px solid #e5e9f0 !important;
+  box-shadow: 0 6px 15px -4px rgba(15, 23, 42, 0.06) !important;
+}
+html:not(.dark) .modern-segmented-bar {
+  background: #e9eef5 !important;
+  border: 1px solid #dde4ee !important;
+}
+html:not(.dark) .seg-pill-btn {
+  color: #475569 !important;
+}
+html:not(.dark) .seg-pill-btn.active {
+  color: #ffffff !important;
+}
+
+/* Soft Light Virtual Bank Card */
+html:not(.dark) .fintech-bank-card {
+  background:
+    radial-gradient(130% 130% at 0% 0%, rgba(249, 115, 22, 0.16) 0%, rgba(255, 255, 255, 0) 60%),
+    linear-gradient(145deg, #ffffff 0%, #f8fafc 100%) !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 16px 35px -12px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(249, 115, 22, 0.08) !important;
+  color: #0f172a !important;
+}
+html:not(.dark) body[data-mode="personal"] .fintech-bank-card {
+  background:
+    radial-gradient(130% 130% at 0% 0%, rgba(2, 132, 199, 0.16) 0%, rgba(255, 255, 255, 0) 60%),
+    linear-gradient(145deg, #ffffff 0%, #f4f8fc 100%) !important;
+  box-shadow: 0 16px 35px -12px rgba(2, 132, 199, 0.12) !important;
+}
+html:not(.dark) .fintech-bank-card .card-sub-text {
+  color: #64748b !important;
+}
+html:not(.dark) .fintech-bank-card .card-main-val {
+  color: #0f172a !important;
+}
+html:not(.dark) .fintech-bank-card .card-divider {
+  border-color: #e2e8f0 !important;
+}
+html:not(.dark) .fintech-bank-card .card-privacy-btn {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+}
+
+/* Light Mode Debt Cards on Mobile Home */
+html:not(.dark) .mob-debt-card-rec {
+  background: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+}
+html:not(.dark) .mob-debt-card-pay {
+  background: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+}
+html:not(.dark) .mob-debt-card-val {
+  color: #0f172a !important;
+}
+
+/* Light Mode Modals (Profile, Control Center, Onboarding) */
+html:not(.dark) .adaptive-modal-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.18) !important;
+}
+html:not(.dark) .adaptive-modal-subcard {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+html:not(.dark) .adaptive-modal-text {
+  color: #0f172a !important;
+}
+html:not(.dark) .adaptive-modal-muted {
+  color: #64748b !important;
+}
+html:not(.dark) .adaptive-modal-btn {
+  background: #f1f5f9 !important;
+  color: #1e293b !important;
+  border-color: #e2e8f0 !important;
+}
+html:not(.dark) .adaptive-modal-btn:hover {
+  background: #e2e8f0 !important;
+}
+
+/* 2. Strict Personal vs Business Mode UI Rules */
+body[data-mode="personal"] .business-only {
+  display: none !important;
+}
+body[data-mode="business"] .personal-only {
+  display: none !important;
+}
