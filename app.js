@@ -1809,7 +1809,13 @@ async function loadCloudData(uid) {
   setSyncStatusUI('syncing');
   try {
     const userRef = db.collection('users').doc(uid);
-    const [userDoc, txSnap] = await Promise.all([userRef.get(), txCol(uid).get()]);
+    let userDoc = { exists: false, data: () => ({}) };
+    try {
+      userDoc = await userRef.get();
+    } catch (uErr) {
+      console.warn('userRef.get warning:', uErr);
+    }
+    const txSnap = await txCol(uid).get();
     const cloudTx = [];
     cloudSnapshot.clear();
     txSnap.forEach(d => {
@@ -1882,7 +1888,11 @@ async function loadCloudData(uid) {
     setSyncStatusUI('synced', currentUser.email || '');
   } catch (error) {
     console.error('loadCloudData failed:', error);
-    setSyncStatusUI('error', error.code || error.message);
+    const isPerm = String(error.code || '').includes('permission-denied');
+    setSyncStatusUI('error', isPerm ? 'يرجى نشر قواعد Firestore Rules في لوحة Firebase' : (error.code || error.message));
+    if (isPerm) {
+      showToast('⚠️ صلاحيات Firestore غير منشورة: افتح Firebase Console واضغط Publish على Rules', 'error');
+    }
     loadAllLocal();
     refreshAll();
   }
