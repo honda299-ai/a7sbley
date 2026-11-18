@@ -3,7 +3,7 @@
 <head>
   <meta name="google-adsense-account" content="ca-pub-7877107761301154">
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0f1117">
   <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
   <title>احسبلي | a7sbley Financial Manager</title>
@@ -38,7 +38,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="styles.css?v=11.9">
+  <link rel="stylesheet" href="styles.css?v=12.0">
 </head>
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans auth-pending">
@@ -46,55 +46,57 @@
   <!-- HEADER -->
   <header id="appHeader" class="sticky top-0 z-40 border-b border-slate-200 dark:border-dark-800 bg-white dark:bg-dark-900 shadow-sm no-print">
     <div class="max-w-7xl mx-auto px-3 sm:px-6">
-      <div class="flex items-center justify-between min-h-16 py-2.5 gap-2">
+      <div class="flex items-center justify-between min-h-16 py-2 gap-1.5">
         
         <!-- Logo & Brand -->
-        <div class="flex items-center gap-2.5 shrink-0">
-          <img src="logo.png" class="w-10 h-10 rounded-xl object-contain shadow-md border border-orange-500/20" alt="احسبلي">
+        <div class="flex items-center gap-2 shrink-0">
+          <img src="logo.png" class="w-9 h-9 rounded-xl object-contain shadow-md border border-orange-500/20" alt="احسبلي">
           <div>
             <h1 class="text-base sm:text-xl font-black text-slate-900 dark:text-white leading-tight">احسبلي</h1>
-            <div class="text-[9px] font-black text-orange-500 tracking-wider">a7sbley</div>
+            <div class="brand-sub-tag text-[9px] font-black text-orange-500 tracking-wider">a7sbley</div>
           </div>
         </div>
 
         <!-- Right Actions -->
-        <div class="flex items-center gap-1.5 sm:gap-2">
+        <div class="flex items-center gap-1.5 shrink-0">
           <!-- زر تبديل الوضع -->
           <button id="modeSwitcherBtn" onclick="toggleAppMode()" class="mode-pill-btn" title="تبديل وضع الاستخدام">
             <i id="modeSwitchIcon" class="fa-solid fa-store"></i>
             <span id="modeSwitchLabel">المحل</span>
           </button>
-          <!-- زر تثبيت التطبيق السريع في الهيدر -->
+
+          <!-- زر تثبيت التطبيق (ديسكتوب فقط هنا وموجود في مركز التحكم للموبايل) -->
           <button id="headerInstallBtn" onclick="showMobileInstallModal()"
-            class="hidden sm:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-orange-500/15 border border-orange-500/40 text-orange-400 font-black text-xs">
+            class="hidden items-center gap-1 px-2 py-1.5 rounded-xl bg-orange-500/15 border border-orange-500/40 text-orange-400 font-black text-[10px]">
             <i class="fa-solid fa-download"></i>
-            <span>تثبيت</span>
+            <span class="hidden sm:inline">تثبيت</span>
           </button>
           
-          <!-- تنبيه إشعار الفلوس والديون المستحقة والطلبات المعلقة -->
+          <!-- تنبيه المستحقات والطلبات -->
           <div id="globalPendingAlert" onclick="handleMoneyAlertClick()" 
-               class="hidden cursor-pointer flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/50 text-rose-400 font-black text-xs animate-pulse shadow-[0_0_15px_rgba(244,63,94,0.5)] transition hover:scale-105">
+               class="hidden cursor-pointer flex items-center gap-1 px-2 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/50 text-rose-400 font-black text-xs animate-pulse">
             <i class="fa-solid fa-bell text-rose-500"></i>
             <span id="globalPendingText" class="hidden sm:inline">تنبيه مستحقات</span>
-            <span id="globalPendingCount" class="w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center font-black">0</span>
+            <span id="globalPendingCount" class="w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] flex items-center justify-center font-black">0</span>
           </div>
 
-          <!-- زر إضافة عملية سريعة -->
+          <!-- زر إضافة عملية (ديسكتوب، والموبايل له زر + الكبير في المنتصف) -->
           <button onclick="openModal('expense')"
-            class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow hover:brightness-110 active:scale-95 transition">
+            class="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow hover:brightness-110 transition">
             <i class="fa-solid fa-circle-plus"></i>
-            <span class="hidden sm:inline">إضافة عملية</span>
+            <span>إضافة عملية</span>
           </button>
 
-          <!-- أزرار الوصول السريع: الخصوصية والوضع الليلي في الهيدر مباشرة -->
-          <button onclick="togglePrivacyMode()" title="وضع الخصوصية (إخفاء المبالغ)"
-            class="w-9 h-9 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-orange-500 hover:bg-orange-500/10 transition flex items-center justify-center">
-            <i id="privacyIcon" class="fa-solid fa-eye text-sm"></i>
+          <!-- الخصوصية -->
+          <button onclick="togglePrivacyMode()" title="إخفاء المبالغ"
+            class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-orange-500 flex items-center justify-center shrink-0">
+            <i id="privacyIcon" class="fa-solid fa-eye text-xs sm:text-sm"></i>
           </button>
 
-          <button onclick="toggleTheme()" title="تبديل الوضع الليلي / النهاري"
-            class="w-9 h-9 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-amber-500 hover:bg-amber-500/10 transition flex items-center justify-center">
-            <i id="themeIcon" class="fa-solid fa-sun text-sm"></i>
+          <!-- الوضع الليلي -->
+          <button onclick="toggleTheme()" title="الوضع الليلي / النهاري"
+            class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-amber-500 flex items-center justify-center shrink-0">
+            <i id="themeIcon" class="fa-solid fa-sun text-xs sm:text-sm"></i>
           </button>
 
           <!-- بروفايل المستخدم (اضغط لعرض معلومات الحساب) -->
@@ -102,12 +104,12 @@
             <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
               <i class="fa-solid fa-user"></i> مجاني
             </span>
-            <img id="userAvatar" src="" class="w-8 h-8 rounded-lg border border-orange-500/40 object-cover hover:ring-2 hover:ring-orange-500 transition" alt="User">
+            <img id="userAvatar" src="" class="w-8 h-8 rounded-lg border border-orange-500/40 object-cover" alt="User">
           </div>
 
-          <!-- زر مركز التحكم (المنظم بديل القائمة القديمة) -->
-          <button onclick="openControlCenter()" id="controlCenterBtn" title="مركز التحكم والإعدادات"
-            class="flex px-2.5 sm:px-3.5 py-2 rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition items-center gap-1.5 font-black text-xs shadow-sm">
+          <!-- زر مركز التحكم -->
+          <button onclick="openControlCenter()" id="controlCenterBtn" title="مركز التحكم"
+            class="flex px-2.5 sm:px-3.5 py-2 rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition items-center gap-1.5 font-black text-xs shrink-0">
             <i class="fa-solid fa-sliders text-sm"></i>
             <span class="hidden sm:inline">مركز التحكم</span>
           </button>
@@ -1746,6 +1748,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=11.9"></script>
+  <script src="app.js?v=12.0"></script>
 </body>
 </html>

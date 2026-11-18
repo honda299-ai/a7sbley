@@ -588,14 +588,23 @@ html:not(.dark) .quick-btn { background: #f8fafc; border-color: #e2e8f0; }
 
 
 /* =========================================================
-   CLEAN MOBILE TABS, MODE SWITCHER & PROFILE (V11.9)
+   MOBILE NATIVE APP LOCK & CLEAN TABS (V12.0)
    ========================================================= */
 
-/* إخفاء عناصر المحل في الوضع الشخصي والعكس */
+html, body {
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
+}
+
+#appHeader, #appMain, #appFooter {
+  max-width: 100vw !important;
+}
+
+/* الفصل بين وضع المحل والوضع الشخصي */
 body[data-mode="personal"] .business-only { display: none !important; }
 body[data-mode="business"] .personal-only { display: none !important; }
 
-/* زر تبديل الوضع مضغوط وأنيق للموبايل */
+/* زر تبديل الوضع مضغوط جداً يناسب أضيق شاشة موبايل */
 .mode-pill-btn {
   display: inline-flex;
   align-items: center;
@@ -604,17 +613,16 @@ body[data-mode="business"] .personal-only { display: none !important; }
   border-radius: 10px;
   font-size: 10px;
   font-weight: 900;
-  background: rgba(249, 115, 22, 0.14);
-  border: 1px solid rgba(249, 115, 22, 0.4);
+  background: rgba(249, 115, 22, 0.15);
+  border: 1px solid rgba(249, 115, 22, 0.45);
   color: #f97316;
   cursor: pointer;
-  transition: all 0.2s ease;
   white-space: nowrap;
   flex-shrink: 0;
 }
 body[data-mode="personal"] .mode-pill-btn {
-  background: rgba(6, 182, 212, 0.14);
-  border-color: rgba(6, 182, 212, 0.4);
+  background: rgba(6, 182, 212, 0.15);
+  border-color: rgba(6, 182, 212, 0.45);
   color: #06b6d4;
 }
 
@@ -630,25 +638,31 @@ body[data-mode="personal"] .mode-pill-btn {
   gap: 8px;
 }
 
-/* التحكم في أقسام الموبايل بدون تعارض مع كلاس hidden */
+/* ضبط الموبايل لمنع أي انزياح أو تصغير */
 @media (max-width: 767px) {
-  #appHeader .min-h-16 {
-    min-height: 52px;
-    padding-top: 6px;
-    padding-bottom: 6px;
+  #appHeader .max-w-7xl {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
   }
-  /* إخفاء كل الأقسام المعلّمة بـ data-mob-view افتراضياً على الموبايل */
+  #appHeader .min-h-16 {
+    min-height: 52px !important;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+  }
+  /* إخفاء نص البراند الفرعي على الشاشات الصغيرة جداً لتوفير مساحة */
+  .brand-sub-tag {
+    display: none !important;
+  }
+  /* نظام التبويبات السفلية على الموبايل */
   [data-mob-view] {
     display: none !important;
   }
-  /* إظهار القسم النشط فقط */
   [data-mob-view].mob-active-block {
     display: block !important;
   }
   [data-mob-view].mob-active-grid {
     display: grid !important;
   }
-  /* ضمان احترام وضع الشخصي/التجاري حتى لو القسم نشط */
   body[data-mode="personal"] [data-mob-view].business-only {
     display: none !important;
   }
@@ -657,7 +671,7 @@ body[data-mode="personal"] .mode-pill-btn {
   }
 }
 
-/* شاشة اختيار الوضع لأول مرة */
+/* كروت اختيار الوضع في شاشة البداية */
 .mode-choice-card {
   display: flex;
   align-items: center;

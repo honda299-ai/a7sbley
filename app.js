@@ -4646,7 +4646,7 @@ document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeQui
 
 
 /* =========================================================
-   APP MODE, MOBILE TABS & USER PROFILE (V11.9)
+   APP MODE, MOBILE TABS & USER PROFILE (V12.0)
    ========================================================= */
 const APP_MODE_KEY = 'a7sbley_app_mode_v1';
 const DEMO_FLAG_KEY = 'a7sbley_is_demo_v1';
