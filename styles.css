@@ -969,3 +969,16 @@ html.dark .dr-sheet { background: #0f1117; color: #f1f5f9; border-color: #1e222d
 .dr-empty { text-align: center; padding: 28px 8px; font-size: 13px; font-weight: 800; }
 .dr-empty-ico { font-size: 34px; margin-bottom: 6px; }
 .dr-hint { text-align: center; }
+
+
+/* =========================================================
+   AUTO LOCK / FORGOT PIN — v15.2
+   ========================================================= */
+#lockScreen { overflow-y: auto; padding-top: max(20px, env(safe-area-inset-top, 0px)); padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
+#lockScreen > div { margin: auto; }
+#lockScreen button:disabled, #lockScreen input:disabled { opacity: .5; cursor: not-allowed; }
+@keyframes lkShake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-6px); } 40%, 60% { transform: translateX(6px); } }
+.lk-shake { animation: lkShake .4s ease; }
+@keyframes lkPulse { 0% { box-shadow: 0 0 0 0 rgba(249,115,22,.5); } 70% { box-shadow: 0 0 0 10px rgba(249,115,22,0); } 100% { box-shadow: 0 0 0 0 rgba(249,115,22,0); } }
+#lockScreen .lk-pulse { border-color: rgba(249,115,22,.6); color: #fb923c; animation: lkPulse 1.8s infinite; }
+@media (prefers-reduced-motion: reduce) { .lk-shake, #lockScreen .lk-pulse { animation: none; } }

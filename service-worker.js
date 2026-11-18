@@ -3,7 +3,7 @@
    PWA Engine + Offline Precache + Push Notifications
    ========================================================= */
 
-const VERSION = '15.1';
+const VERSION = '15.2';
 const CACHE_VERSION = `a7sbley-v${VERSION}`;
 const RUNTIME_CACHE = `a7sbley-runtime-v${VERSION}`;
 
@@ -16,6 +16,7 @@ const CORE_ASSETS = [
   './manifest.json',
   './app.js',
   './debt-reminders.js',
+  './auto-lock.js',
   './logo.png',
   './icon-192.png',
   './icon-512.png',

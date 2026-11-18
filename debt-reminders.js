@@ -129,17 +129,23 @@
     renderIfOpen();
     if (!s.enabled || !r.all.length) return;
 
+    var hidden = document.visibilityState === 'hidden';
+    // مفيش تنبيهات بتظهر فوق شاشة القفل
+    if (!hidden && typeof isAppLocked === 'function' && isAppLocked()) return;
+
     var today = todayString();
     var notified = loadNotified();
     var fresh = r.all.filter(function (it) { return notified[it.id] !== today; });
     if (!fresh.length) return;
 
-    var hidden = document.visibilityState === 'hidden';
     var delivered = false;
 
     if (hidden) {
       if (notifGranted() && typeof showLocalNotification === 'function') {
-        var sum = buildSummary(fresh, typeof isPrivacyMode !== 'undefined' && isPrivacyMode);
+        // إشعار الجهاز بيظهر على شاشة القفل: نخفي الأسماء لو وضع الخصوصية أو قفل الـ PIN شغال
+        var hideNames = (typeof isPrivacyMode !== 'undefined' && isPrivacyMode) ||
+                        (typeof getPin === 'function' && !!getPin());
+        var sum = buildSummary(fresh, hideNames);
         showLocalNotification(sum.title, sum.body, './');
         delivered = true;
       }

@@ -1570,6 +1570,7 @@ function showPinLock() {
   document.getElementById('unlockPinInput').value = '';
   document.getElementById('unlockError').classList.add('hidden');
   setTimeout(() => document.getElementById('unlockPinInput').focus(), 150);
+  if (typeof onPinLockShown === 'function') onPinLockShown();
 }
 function hidePinLock() {
   document.getElementById('lockScreen').classList.add('hidden');
@@ -1638,7 +1639,8 @@ auth.onAuthStateChanged(async user => {
     checkPendingShare();
 
     loadCloudData(user.uid).finally(() => {
-      if (getPin()) showPinLock();
+      const pinReset = typeof consumePinResetFlag === 'function' && consumePinResetFlag(user.uid);
+      if (getPin() && !pinReset) showPinLock();
       else hidePinLock();
     });
   } else {
@@ -2953,43 +2955,26 @@ function confirmRemovePin() {
   });
 }
 async function unlockApp() {
+  if (typeof pinCooldownActive === 'function' && pinCooldownActive()) return;
   const input = document.getElementById('unlockPinInput');
   const entered = input.value.trim();
   const stored = getPin();
   if (!stored) { hidePinLock(); return; }
-  const ok = (await hashPin(entered)) === stored;
-  if (ok) { hidePinLock(); input.value = ''; }
-  else {
-    document.getElementById('unlockError').classList.remove('hidden');
+  if (!entered) { input.focus(); return; }
+  if ((await hashPin(entered)) === stored) {
     input.value = '';
+    hidePinLock();
+    if (typeof onPinUnlocked === 'function') onPinUnlocked();
+  } else {
+    input.value = '';
+    if (typeof onPinFailed === 'function') onPinFailed();
+    else document.getElementById('unlockError').classList.remove('hidden');
     input.focus();
   }
 }
-async function forgotPinUnlock() {
-  if (!currentUser) return;
-  const user = currentUser;
-  const providers = (user.providerData || []).map(p => p.providerId);
-  try {
-    if (providers.includes('google.com')) {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      const res = await user.reauthenticateWithPopup(provider);
-      if (res.user && res.user.uid === user.uid) {
-        localStorage.removeItem(PIN_KEY);
-        updatePinUI();
-        hidePinLock();
-        showToast('تم التحقق — أزيل القفل', 'success');
-      }
-    } else {
-      const pwd = prompt('أدخل كلمة السر لتأكيد هويتك:');
-      if (!pwd) return;
-      const cred = firebase.auth.EmailAuthProvider.credential(user.email, pwd);
-      await user.reauthenticateWithCredential(cred);
-      localStorage.removeItem(PIN_KEY);
-      updatePinUI();
-      hidePinLock();
-      showToast('تم التحقق — أزيل القفل', 'success');
-    }
-  } catch (error) { showToast('فشل التحقق من الهوية', 'error'); }
+function forgotPinUnlock() {
+  // شاشة الاسترجاع الكاملة موجودة في auto-lock.js
+  if (typeof openForgotPinView === 'function') openForgotPinView();
 }
 
 /* =========================================================
