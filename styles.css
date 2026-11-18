@@ -907,3 +907,65 @@ html:not(.dark) .ft-tx-feed-item {
   border-color: #ff6b00;
   background: rgba(255, 107, 0, 0.09);
 }
+
+
+/* =========================================================
+   DEBT REMINDERS (تذكير الديون) — v15.1
+   ========================================================= */
+.dr-hidden { display: none !important; }
+.dr-btn { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 10px;
+  font-size: 11px; font-weight: 900; color: #f97316; background: rgba(249,115,22,.12); border: 1px solid rgba(249,115,22,.35); cursor: pointer; }
+.dr-btn.dr-urgent { color: #f43f5e; background: rgba(244,63,94,.12); border-color: rgba(244,63,94,.45); }
+.dr-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #f43f5e; color: #fff;
+  font-size: 10px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; }
+
+.dr-overlay { position: fixed; inset: 0; z-index: 125; display: none; align-items: flex-end; justify-content: center;
+  background: rgba(0,0,0,.6); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.dr-overlay.open { display: flex; }
+.dr-sheet { width: 100%; max-width: 520px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 24px 24px 0 0; background: #fff; color: #0f172a; border: 1px solid #e2e8f0;
+  padding-bottom: env(safe-area-inset-bottom, 0px); }
+html.dark .dr-sheet { background: #0f1117; color: #f1f5f9; border-color: #1e222d; }
+@media (min-width: 640px) { .dr-overlay { align-items: center; padding: 16px; } .dr-sheet { border-radius: 24px; } }
+
+.dr-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 16px 10px; }
+.dr-head h3 { font-size: 15px; font-weight: 900; }
+.dr-head p { font-size: 11px; font-weight: 700; color: #94a3b8; margin-top: 2px; }
+.dr-x { width: 36px; height: 36px; border-radius: 50%; font-size: 22px; line-height: 1; color: #94a3b8; background: rgba(148,163,184,.12); border: 0; cursor: pointer; }
+
+.dr-settings { padding: 4px 16px 12px; border-bottom: 1px solid rgba(148,163,184,.25); display: grid; gap: 8px; }
+.dr-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 800; }
+.dr-switch input { width: 20px; height: 20px; accent-color: #f97316; }
+.dr-select { padding: 6px 10px; border-radius: 10px; font-size: 12px; font-weight: 800; color: inherit;
+  background: rgba(148,163,184,.12); border: 1px solid rgba(148,163,184,.3); }
+.dr-note { font-size: 10.5px; font-weight: 700; color: #94a3b8; line-height: 1.6; }
+.dr-ok { font-size: 12px; font-weight: 900; color: #10b981; }
+.dr-link { font-size: 11px; font-weight: 900; color: #f97316; background: none; border: 0; cursor: pointer; }
+.dr-btn-sm { padding: 7px 12px; border-radius: 10px; font-size: 11px; font-weight: 900; color: #fff; background: #f97316; border: 0; cursor: pointer; }
+
+.dr-body { padding: 12px 16px 18px; overflow-y: auto; display: grid; gap: 10px; }
+.dr-sec { font-size: 12px; font-weight: 900; margin-top: 4px; }
+.dr-sec span { color: #94a3b8; }
+.dr-card { padding: 12px; border-radius: 16px; border: 1px solid; display: grid; gap: 8px; }
+.dr-card.dr-late  { background: rgba(244,63,94,.07);  border-color: rgba(244,63,94,.35); }
+.dr-card.dr-today { background: rgba(245,158,11,.08); border-color: rgba(245,158,11,.4); }
+.dr-card.dr-soon  { background: rgba(249,115,22,.06); border-color: rgba(249,115,22,.3); }
+.dr-card-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.dr-card-info { min-width: 0; }
+.dr-card-name { font-size: 13px; font-weight: 900; }
+.dr-card-sub { font-size: 10.5px; font-weight: 700; color: #94a3b8; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dr-card-amt { font-size: 14px; font-weight: 900; white-space: nowrap; }
+.dr-card-meta { display: flex; align-items: center; gap: 8px; }
+.dr-chip { padding: 2px 8px; border-radius: 8px; font-size: 10px; font-weight: 900; background: rgba(148,163,184,.18); }
+.dr-late .dr-chip { color: #f43f5e; background: rgba(244,63,94,.15); }
+.dr-today .dr-chip { color: #d97706; background: rgba(245,158,11,.18); }
+.dr-soon .dr-chip { color: #f97316; background: rgba(249,115,22,.15); }
+.dr-date { font-size: 10px; font-weight: 700; color: #94a3b8; }
+.dr-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.dr-act { padding: 7px 12px; border-radius: 10px; font-size: 11px; font-weight: 900; border: 0; cursor: pointer; }
+.dr-wa { color: #10b981; background: rgba(16,185,129,.14); }
+.dr-pay { color: #f97316; background: rgba(249,115,22,.14); }
+.dr-done { color: #fff; background: #f97316; }
+.dr-empty { text-align: center; padding: 28px 8px; font-size: 13px; font-weight: 800; }
+.dr-empty-ico { font-size: 34px; margin-bottom: 6px; }
+.dr-hint { text-align: center; }

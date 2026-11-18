@@ -2145,6 +2145,7 @@ function renderDebts() {
           ${paid ? 'تم السداد بالكامل ✓' : isReceivable ? 'مستحق لي - معلق' : 'مستحق عليّ - معلق'}
         </span>
         <div class="flex flex-wrap items-center gap-1.5">
+          ${!paid && isReceivable ? `<button onclick="sendDebtReminderWhatsApp('${d.id}')" title="ابعت تذكير واتساب" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white text-[10px] font-black transition"><i class="fa-brands fa-whatsapp"></i> ذكّره</button>` : ''}
           <button onclick="openDebtCardModal('${d.id}')" title="بطاقة مطالبة وتذكير بالدين" class="px-2.5 py-1.5 rounded-xl bg-orange-500/15 text-orange-400 hover:bg-orange-500 hover:text-white text-[10px] font-black transition flex items-center gap-1 border border-orange-500/30">
             <i class="fa-solid fa-receipt"></i> <span>بطاقة مطالبة</span>
           </button>
@@ -3125,6 +3126,7 @@ function refreshAll() {
   applyRoleUI();
   updateQuickInsights();
   checkMoneyNotifications();
+  if (typeof onDebtRemindersDataChanged === 'function') onDebtRemindersDataChanged();
 }
 
 document.addEventListener('keydown', event => {
@@ -4618,8 +4620,12 @@ function handleMoneyAlertClick() {
   if (pendingRequestsCache && pendingRequestsCache.length > 0) {
     openClientRequestsModal();
   } else if (overdueDebts.length > 0) {
-    switchTab('debts', true);
-    showToast(`لديك (${overdueDebts.length}) ديون مستحقة الموعد تتطلب المتابعة ⚠️`, 'error');
+    if (typeof openDebtReminders === 'function') {
+      openDebtReminders();
+    } else {
+      switchTab('debts', true);
+      showToast(`لديك (${overdueDebts.length}) ديون مستحقة الموعد تتطلب المتابعة ⚠️`, 'error');
+    }
   }
 }
 
