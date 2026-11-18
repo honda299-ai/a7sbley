@@ -4646,7 +4646,7 @@ document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeQui
 
 
 /* =========================================================
-   APP MODE (BUSINESS / PERSONAL) & MOBILE TABS ENGINE
+   APP MODE, MOBILE TABS & USER PROFILE (V11.9)
    ========================================================= */
 const APP_MODE_KEY = 'a7sbley_app_mode_v1';
 const DEMO_FLAG_KEY = 'a7sbley_is_demo_v1';
@@ -4690,7 +4690,7 @@ function applyAppMode(mode) {
     if (manageLbl) manageLbl.textContent = 'الإدارة';
   } else {
     if (icon) icon.className = 'fa-solid fa-store';
-    if (label) label.textContent = 'وضع المحل';
+    if (label) label.textContent = 'المحل';
     if (ledgerLbl) ledgerLbl.textContent = 'العملاء والديون';
     if (manageLbl) manageLbl.textContent = 'المخزن والإدارة';
   }
@@ -4706,9 +4706,15 @@ function toggleAppMode() {
 function switchMobileView(viewName) {
   currentMobileView = viewName;
 
-  document.querySelectorAll('.mob-view-section').forEach(sec => {
+  document.querySelectorAll('[data-mob-view]').forEach(sec => {
     const views = (sec.getAttribute('data-mob-view') || '').split(' ');
-    sec.classList.toggle('mob-view-active', views.includes(viewName));
+    const displayType = sec.getAttribute('data-mob-display') || 'block';
+    const isActive = views.includes(viewName);
+
+    sec.classList.remove('mob-active-block', 'mob-active-grid');
+    if (isActive) {
+      sec.classList.add(displayType === 'grid' ? 'mob-active-grid' : 'mob-active-block');
+    }
   });
 
   document.querySelectorAll('.mob-nav-btn[data-mob-tab]').forEach(btn => {
@@ -4759,14 +4765,6 @@ function updateDemoBanner() {
   banner.classList.toggle('hidden', !isDemo);
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  setTimeout(initAppModeAndTabs, 250);
-});
-
-
-/* =========================================================
-   USER PROFILE DETAILS MODAL (V11.8)
-   ========================================================= */
 function formatArabicDateTime(dateInput) {
   if (!dateInput) return 'غير متوفر';
   try {
@@ -4817,7 +4815,7 @@ function openUserProfileModal() {
   if (rolePill) {
     if (isSuperAdmin) {
       rolePill.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black border border-amber-500/40 bg-amber-500/20 text-amber-400';
-      rolePill.innerHTML = '<i class="fa-solid fa-crown"></i> Super Admin (مدير النظام)';
+      rolePill.innerHTML = '<i class="fa-solid fa-crown"></i> Super Admin';
     } else {
       const meta = ROLES_META[userRole] || ROLES_META.free;
       rolePill.className = `mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black border ${meta.badgeClasses}`;
@@ -4825,30 +4823,13 @@ function openUserProfileModal() {
     }
   }
 
-  if (createdEl) {
-    if (isGuest) {
-      createdEl.textContent = 'جلسة مؤقتة على الجهاز';
-    } else {
-      createdEl.textContent = formatArabicDateTime(currentUser.metadata?.creationTime);
-    }
-  }
-
-  if (lastLoginEl) {
-    if (isGuest) {
-      lastLoginEl.textContent = 'الآن (نشط)';
-    } else {
-      lastLoginEl.textContent = formatArabicDateTime(currentUser.metadata?.lastSignInTime);
-    }
-  }
-
+  if (createdEl) createdEl.textContent = isGuest ? 'جلسة مؤقتة' : formatArabicDateTime(currentUser.metadata?.creationTime);
+  if (lastLoginEl) lastLoginEl.textContent = isGuest ? 'الآن' : formatArabicDateTime(currentUser.metadata?.lastSignInTime);
   if (modeEl) {
     const curMode = document.body.getAttribute('data-mode') || 'business';
-    modeEl.textContent = curMode === 'business' ? 'وضع التجارة والمحلات 🏪' : 'الوضع الشخصي 👤';
+    modeEl.textContent = curMode === 'business' ? 'وضع المحل 🏪' : 'الوضع الشخصي 👤';
   }
-
-  if (txCountEl) {
-    txCountEl.textContent = `${getActiveTransactions().length} عملية`;
-  }
+  if (txCountEl) txCountEl.textContent = `${getActiveTransactions().length} عملية`;
 
   modal.classList.remove('hidden');
   modal.classList.add('flex');
@@ -4861,3 +4842,7 @@ function closeUserProfileModal() {
     modal.classList.remove('flex');
   }
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initAppModeAndTabs, 200);
+});

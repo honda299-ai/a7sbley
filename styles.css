@@ -588,21 +588,21 @@ html:not(.dark) .quick-btn { background: #f8fafc; border-color: #e2e8f0; }
 
 
 /* =========================================================
-   MODE SWITCHER & MOBILE TABS UX (V11.7)
+   CLEAN MOBILE TABS, MODE SWITCHER & PROFILE (V11.9)
    ========================================================= */
 
-/* إخفاء العناصر تلقائياً حسب الوضع المختار */
+/* إخفاء عناصر المحل في الوضع الشخصي والعكس */
 body[data-mode="personal"] .business-only { display: none !important; }
 body[data-mode="business"] .personal-only { display: none !important; }
 
-/* زر تبديل الوضع في الهيدر */
+/* زر تبديل الوضع مضغوط وأنيق للموبايل */
 .mode-pill-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 10px;
-  border-radius: 12px;
-  font-size: 11px;
+  gap: 4px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  font-size: 10px;
   font-weight: 900;
   background: rgba(249, 115, 22, 0.14);
   border: 1px solid rgba(249, 115, 22, 0.4);
@@ -610,6 +610,7 @@ body[data-mode="business"] .personal-only { display: none !important; }
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 body[data-mode="personal"] .mode-pill-btn {
   background: rgba(6, 182, 212, 0.14);
@@ -621,30 +622,42 @@ body[data-mode="personal"] .mode-pill-btn {
 .demo-banner-bar {
   background: linear-gradient(90deg, rgba(245, 158, 11, 0.18), rgba(249, 115, 22, 0.18));
   border: 1px solid rgba(249, 115, 22, 0.45);
-  border-radius: 16px;
-  padding: 10px 14px;
+  border-radius: 14px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
-/* نظام التبويبات على الموبايل لمنع التمرير الطويل */
+/* التحكم في أقسام الموبايل بدون تعارض مع كلاس hidden */
 @media (max-width: 767px) {
-  .mob-view-section {
+  #appHeader .min-h-16 {
+    min-height: 52px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  /* إخفاء كل الأقسام المعلّمة بـ data-mob-view افتراضياً على الموبايل */
+  [data-mob-view] {
     display: none !important;
   }
-  .mob-view-section.mob-view-active {
+  /* إظهار القسم النشط فقط */
+  [data-mob-view].mob-active-block {
     display: block !important;
-    animation: modalIn 0.18s ease forwards;
   }
-  /* الكروت الشبكية في الرئيسية */
-  .mob-view-grid.mob-view-active {
+  [data-mob-view].mob-active-grid {
     display: grid !important;
+  }
+  /* ضمان احترام وضع الشخصي/التجاري حتى لو القسم نشط */
+  body[data-mode="personal"] [data-mob-view].business-only {
+    display: none !important;
+  }
+  body[data-mode="business"] [data-mob-view].personal-only {
+    display: none !important;
   }
 }
 
-/* تحسين شاشة اختيار الوضع لأول مرة */
+/* شاشة اختيار الوضع لأول مرة */
 .mode-choice-card {
   display: flex;
   align-items: center;
@@ -660,5 +673,4 @@ body[data-mode="personal"] .mode-pill-btn {
 .mode-choice-card:hover, .mode-choice-card:active {
   border-color: #f97316;
   background: rgba(249, 115, 22, 0.08);
-  transform: translateY(-2px);
 }
