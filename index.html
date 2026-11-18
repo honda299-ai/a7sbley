@@ -38,7 +38,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="styles.css?v=15.2">
+  <link rel="stylesheet" href="styles.css?v=16.0">
 </head>
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans auth-pending">
@@ -195,6 +195,17 @@
 
     <div id="toastBox" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] pointer-events-none opacity-0 transition-all duration-300 max-w-[92vw]">
       <div id="toastInner"></div>
+    </div>
+
+    <!-- تنبيه وضع الزائر (عدم المزامنة بين الأجهزة) -->
+    <div id="guestSyncWarningBanner" class="hidden demo-banner-bar no-print" style="border-color: rgba(244, 63, 94, 0.5); background: rgba(244, 63, 94, 0.12);">
+      <div class="flex items-center gap-2 text-xs font-black text-rose-400">
+        <i class="fa-solid fa-cloud-slash"></i>
+        <span>أنت في وضع الزائر (محلي فقط) — البيانات لن تظهر على جهاز آخر</span>
+      </div>
+      <button onclick="upgradeGuestToGoogle()" class="px-3 py-1 rounded-full bg-white text-slate-900 font-black text-[10px] hover:bg-slate-100 transition shrink-0 flex items-center gap-1">
+        <i class="fa-brands fa-google text-red-500"></i> ربط بـ Google
+      </button>
     </div>
 
     <!-- شريط تنبيه البيانات التجريبية -->
@@ -598,12 +609,7 @@
     <!-- Debts Panel -->
     <section id="panelDebts" data-mob-view="debts" data-mob-display="block" class="ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2">
-          <h3 class="text-sm font-black">سجل الديون</h3>
-          <button type="button" id="debtRemindersBtn" onclick="openDebtReminders()" class="dr-btn" aria-label="تذكيرات الديون">
-            <i class="fa-solid fa-bell" aria-hidden="true"></i><span>التذكيرات</span><span id="debtRemindersCount" class="dr-count dr-hidden">0</span>
-          </button>
-        </div>
+        <h3 class="text-sm font-black">سجل الديون</h3>
         <button onclick="openModal('debt_receivable')" class="px-3 py-2 rounded-lg bg-orange-500 text-white font-black text-xs">
           <i class="fa-solid fa-plus"></i> دين جديد
         </button>
@@ -1088,18 +1094,6 @@
       </div>
       <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"
         class="w-full mt-4 text-center tracking-[.5em] text-2xl font-black py-3 rounded-2xl border border-slate-200 dark:border-dark-750 bg-slate-50 dark:bg-dark-850 focus:outline-none focus:ring-2 focus:ring-orange-500">
-      <label class="block mt-4 text-right">
-        <span class="text-[11px] font-black text-slate-500 dark:text-slate-400">القفل التلقائي</span>
-        <select id="autoLockSelect" aria-label="القفل التلقائي"
-          class="w-full mt-1 py-2.5 px-3 rounded-2xl border border-slate-200 dark:border-dark-750 bg-slate-50 dark:bg-dark-850 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-500">
-          <option value="now">فور الخروج من التطبيق</option>
-          <option value="m1">بعد دقيقة</option>
-          <option value="m5">بعد 5 دقايق</option>
-          <option value="m15">بعد 15 دقيقة</option>
-          <option value="off">بدون قفل تلقائي</option>
-        </select>
-        <span class="block text-[10px] text-slate-400 mt-1">بيشتغل بعد ما تفعّل الـ PIN.</span>
-      </label>
       <p id="pinError" class="hidden text-center text-[10px] text-rose-500 font-bold mt-2"></p>
       <button id="pinActionBtn" onclick="handlePinAction()" class="w-full mt-4 py-3 rounded-2xl bg-orange-500 text-white font-black text-sm">تأكيد</button>
       <button onclick="closePinModal()" class="w-full mt-2 py-2.5 text-xs font-bold text-slate-400">إلغاء</button>
@@ -1187,61 +1181,24 @@
   </div>
 
   <!-- LOCK SCREEN -->
-  <div id="lockScreen" class="hidden fixed inset-0 z-[200] bg-dark-950 text-white items-center justify-center p-5" role="dialog" aria-modal="true" aria-label="التطبيق مقفول">
+  <div id="lockScreen" class="hidden fixed inset-0 z-[200] bg-dark-950 text-white items-center justify-center p-5">
     <div class="relative w-full max-w-sm text-center">
-
-      <!-- الشاشة الرئيسية للقفل -->
-      <div id="lockMainView">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-400 flex items-center justify-center mx-auto">
-          <i class="fa-solid fa-lock text-2xl" aria-hidden="true"></i>
-        </div>
-        <h2 class="text-xl font-black mt-4">احسبلي</h2>
-        <p class="text-xs text-slate-400 mt-1">التطبيق مقفول</p>
-        <input id="unlockPinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off" aria-label="رمز القفل"
-          class="w-full mt-5 text-center tracking-[.5em] text-2xl font-black py-3.5 rounded-2xl bg-dark-900 border border-dark-750 focus:outline-none focus:ring-2 focus:ring-orange-500"
-          onkeydown="if(event.key==='Enter') unlockApp()">
-        <button id="unlockBtn" onclick="unlockApp()" class="w-full mt-3 py-3.5 rounded-2xl bg-orange-500 text-white font-black">فتح</button>
-        <p id="unlockError" class="hidden text-xs text-rose-400 font-bold mt-2 leading-relaxed" role="alert" aria-live="assertive">الرمز غلط</p>
-        <button id="lockForgotBtn" onclick="forgotPinUnlock()" class="w-full mt-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-xs">
-          <i class="fa-solid fa-key" aria-hidden="true"></i> نسيت الرمز؟
-        </button>
-        <button onclick="logoutFromLock()" class="mt-3 text-[11px] font-bold text-slate-500">
-          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> تسجيل الخروج
-        </button>
+      <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-400 flex items-center justify-center mx-auto">
+        <i class="fa-solid fa-lock text-2xl"></i>
       </div>
-
-      <!-- شاشة نسيت الرمز -->
-      <div id="lockForgotView" class="hidden">
-        <div class="w-16 h-16 rounded-2xl bg-orange-500/15 text-orange-400 flex items-center justify-center mx-auto">
-          <i class="fa-solid fa-key text-2xl" aria-hidden="true"></i>
-        </div>
-        <h2 class="text-xl font-black mt-4">نسيت الرمز؟</h2>
-        <p class="text-xs text-slate-400 mt-2 leading-relaxed">هنتأكد إنك صاحب الحساب، وبعدها نشيل القفل وتحط رمز جديد. بياناتك مش هتتأثر.</p>
-
-        <div id="lockForgotGoogle" class="hidden mt-5">
-          <button onclick="forgotWithGoogle()" class="w-full py-3.5 rounded-2xl bg-white text-slate-900 font-black text-sm">
-            <i class="fa-brands fa-google" aria-hidden="true"></i> تأكيد بحساب Google
-          </button>
-        </div>
-
-        <div id="lockForgotEmail" class="hidden mt-4">
-          <input id="lockForgotPwd" type="password" autocomplete="current-password" placeholder="كلمة سر حسابك" aria-label="كلمة سر الحساب"
-            class="w-full text-center text-base font-bold py-3.5 rounded-2xl bg-dark-900 border border-dark-750 focus:outline-none focus:ring-2 focus:ring-orange-500"
-            onkeydown="if(event.key==='Enter') forgotWithPassword()">
-          <button onclick="forgotWithPassword()" class="w-full mt-3 py-3.5 rounded-2xl bg-orange-500 text-white font-black">تأكيد وإزالة القفل</button>
-        </div>
-
-        <p id="lockForgotError" class="hidden text-xs text-rose-400 font-bold mt-3 leading-relaxed" role="alert" aria-live="assertive"></p>
-
-        <div class="mt-5 pt-3 border-t border-white/10">
-          <p id="lockForgotReloginNote" class="text-[11px] text-slate-500 leading-relaxed"></p>
-          <button onclick="forgotViaRelogin()" class="w-full mt-3 py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-xs">
-            <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> تسجيل الخروج والدخول من جديد
-          </button>
-        </div>
-        <button onclick="closeForgotPinView()" class="mt-4 text-[11px] font-bold text-slate-500">← رجوع</button>
-      </div>
-
+      <h2 class="text-xl font-black mt-4">احسبلي</h2>
+      <p class="text-xs text-slate-400 mt-1">التطبيق مقفول</p>
+      <input id="unlockPinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"
+        class="w-full mt-5 text-center tracking-[.5em] text-2xl font-black py-3.5 rounded-2xl bg-dark-900 border border-dark-750 focus:outline-none focus:ring-2 focus:ring-orange-500"
+        onkeydown="if(event.key==='Enter') unlockApp()">
+      <button onclick="unlockApp()" class="w-full mt-3 py-3.5 rounded-2xl bg-orange-500 text-white font-black">فتح</button>
+      <p id="unlockError" class="hidden text-xs text-rose-400 font-bold mt-2">PIN خطأ</p>
+      <button onclick="forgotPinUnlock()" class="w-full mt-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-xs">
+        <i class="fa-solid fa-key"></i> نسيت الرمز؟
+      </button>
+      <button onclick="logoutFromLock()" class="mt-3 text-[11px] font-bold text-slate-500">
+        <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
+      </button>
     </div>
   </div>
 
@@ -1787,7 +1744,10 @@
 
       <!-- Footer Actions -->
       <div class="pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 shrink-0">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <button onclick="closeControlCenter(); manualCloudSyncNow();" class="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-[11px] font-black transition">
+            <i class="fa-solid fa-cloud-arrow-up"></i> مزامنة الآن
+          </button>
           <button onclick="closeControlCenter(); loadDemoData();" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200 text-[11px] font-bold transition">
             <i class="fa-solid fa-rotate"></i> بيانات تجريبية
           </button>
@@ -1901,8 +1861,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=15.2"></script>
-  <script src="debt-reminders.js?v=15.2"></script>
-  <script src="auto-lock.js?v=15.2"></script>
+  <script src="app.js?v=16.0"></script>
 </body>
 </html>

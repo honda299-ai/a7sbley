@@ -1570,7 +1570,6 @@ function showPinLock() {
   document.getElementById('unlockPinInput').value = '';
   document.getElementById('unlockError').classList.add('hidden');
   setTimeout(() => document.getElementById('unlockPinInput').focus(), 150);
-  if (typeof onPinLockShown === 'function') onPinLockShown();
 }
 function hidePinLock() {
   document.getElementById('lockScreen').classList.add('hidden');
@@ -1639,8 +1638,7 @@ auth.onAuthStateChanged(async user => {
     checkPendingShare();
 
     loadCloudData(user.uid).finally(() => {
-      const pinReset = typeof consumePinResetFlag === 'function' && consumePinResetFlag(user.uid);
-      if (getPin() && !pinReset) showPinLock();
+      if (getPin()) showPinLock();
       else hidePinLock();
     });
   } else {
@@ -2147,7 +2145,6 @@ function renderDebts() {
           ${paid ? 'تم السداد بالكامل ✓' : isReceivable ? 'مستحق لي - معلق' : 'مستحق عليّ - معلق'}
         </span>
         <div class="flex flex-wrap items-center gap-1.5">
-          ${!paid && isReceivable ? `<button onclick="sendDebtReminderWhatsApp('${d.id}')" title="ابعت تذكير واتساب" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white text-[10px] font-black transition"><i class="fa-brands fa-whatsapp"></i> ذكّره</button>` : ''}
           <button onclick="openDebtCardModal('${d.id}')" title="بطاقة مطالبة وتذكير بالدين" class="px-2.5 py-1.5 rounded-xl bg-orange-500/15 text-orange-400 hover:bg-orange-500 hover:text-white text-[10px] font-black transition flex items-center gap-1 border border-orange-500/30">
             <i class="fa-solid fa-receipt"></i> <span>بطاقة مطالبة</span>
           </button>
@@ -2433,7 +2430,6 @@ function openModal(type = 'expense', id = null) {
     document.getElementById('formPaymentMethod').value = item.paymentMethod || 'كاش نقدي';
     document.getElementById('formReference').value = item.reference || '';
     document.getElementById('formNotes').value = item.notes || '';
-    const dueDateInput = document.getElementById('formDueDate');
     if (dueDateInput) dueDateInput.value = item.dueDate || '';
     if (item.receipt) { currentReceiptData = item.receipt; setReceiptUI(item.receipt); }
     document.getElementById('submitText').textContent = 'حفظ التعديل';
@@ -2955,26 +2951,43 @@ function confirmRemovePin() {
   });
 }
 async function unlockApp() {
-  if (typeof pinCooldownActive === 'function' && pinCooldownActive()) return;
   const input = document.getElementById('unlockPinInput');
   const entered = input.value.trim();
   const stored = getPin();
   if (!stored) { hidePinLock(); return; }
-  if (!entered) { input.focus(); return; }
-  if ((await hashPin(entered)) === stored) {
+  const ok = (await hashPin(entered)) === stored;
+  if (ok) { hidePinLock(); input.value = ''; }
+  else {
+    document.getElementById('unlockError').classList.remove('hidden');
     input.value = '';
-    hidePinLock();
-    if (typeof onPinUnlocked === 'function') onPinUnlocked();
-  } else {
-    input.value = '';
-    if (typeof onPinFailed === 'function') onPinFailed();
-    else document.getElementById('unlockError').classList.remove('hidden');
     input.focus();
   }
 }
-function forgotPinUnlock() {
-  // شاشة الاسترجاع الكاملة موجودة في auto-lock.js
-  if (typeof openForgotPinView === 'function') openForgotPinView();
+async function forgotPinUnlock() {
+  if (!currentUser) return;
+  const user = currentUser;
+  const providers = (user.providerData || []).map(p => p.providerId);
+  try {
+    if (providers.includes('google.com')) {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      const res = await user.reauthenticateWithPopup(provider);
+      if (res.user && res.user.uid === user.uid) {
+        localStorage.removeItem(PIN_KEY);
+        updatePinUI();
+        hidePinLock();
+        showToast('تم التحقق — أزيل القفل', 'success');
+      }
+    } else {
+      const pwd = prompt('أدخل كلمة السر لتأكيد هويتك:');
+      if (!pwd) return;
+      const cred = firebase.auth.EmailAuthProvider.credential(user.email, pwd);
+      await user.reauthenticateWithCredential(cred);
+      localStorage.removeItem(PIN_KEY);
+      updatePinUI();
+      hidePinLock();
+      showToast('تم التحقق — أزيل القفل', 'success');
+    }
+  } catch (error) { showToast('فشل التحقق من الهوية', 'error'); }
 }
 
 /* =========================================================
@@ -3111,7 +3124,6 @@ function refreshAll() {
   applyRoleUI();
   updateQuickInsights();
   checkMoneyNotifications();
-  if (typeof onDebtRemindersDataChanged === 'function') onDebtRemindersDataChanged();
 }
 
 document.addEventListener('keydown', event => {
@@ -4605,12 +4617,8 @@ function handleMoneyAlertClick() {
   if (pendingRequestsCache && pendingRequestsCache.length > 0) {
     openClientRequestsModal();
   } else if (overdueDebts.length > 0) {
-    if (typeof openDebtReminders === 'function') {
-      openDebtReminders();
-    } else {
-      switchTab('debts', true);
-      showToast(`لديك (${overdueDebts.length}) ديون مستحقة الموعد تتطلب المتابعة ⚠️`, 'error');
-    }
+    switchTab('debts', true);
+    showToast(`لديك (${overdueDebts.length}) ديون مستحقة الموعد تتطلب المتابعة ⚠️`, 'error');
   }
 }
 
@@ -5116,3 +5124,236 @@ function closeUserProfileModal() {
 window.addEventListener('DOMContentLoaded', () => {
   setTimeout(initAppModeAndTabs, 200);
 });
+
+
+/* =========================================================
+   MULTI-DEVICE CLOUD SYNC ENGINE & DIAGNOSTICS (V16.0)
+   ========================================================= */
+
+function isRealCloudUser() {
+  return currentUser && !currentUser.isAnonymous && !String(currentUser.uid || '').startsWith('guest-');
+}
+
+function setSyncStatusUI(state, detail = '') {
+  const footerSync = document.getElementById('footerSyncStatus');
+  if (!footerSync) return;
+  if (state === 'syncing') {
+    footerSync.className = 'text-amber-400 flex items-center gap-1.5 font-black';
+    footerSync.innerHTML = `<i class="fa-solid fa-rotate fa-spin"></i> <span>جاري المزامنة مع السحابة...</span>`;
+  } else if (state === 'synced') {
+    footerSync.className = 'text-emerald-400 flex items-center gap-1.5 font-black';
+    footerSync.innerHTML = `<i class="fa-solid fa-cloud-check"></i> <span>متزامن سحابياً ${detail ? '(' + escapeHTML(detail) + ')' : '✓'}</span>`;
+  } else if (state === 'guest') {
+    footerSync.className = 'text-orange-400 flex items-center gap-1.5 font-black';
+    footerSync.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <span>وضع محلي (زائر) — سجّل بـ Google لنقل البيانات بين الأجهزة</span>`;
+  } else if (state === 'error') {
+    footerSync.className = 'text-rose-400 flex items-center gap-1.5 font-black';
+    footerSync.innerHTML = `<i class="fa-solid fa-cloud-exclamation"></i> <span>خطأ في المزامنة: ${escapeHTML(detail)}</span>`;
+  }
+}
+
+// Override doSyncToCloud to sync transactions + budget + inventory + recurring reliably
+doSyncToCloud = async function() {
+  if (!currentUser) return;
+  if (!isRealCloudUser()) {
+    setSyncStatusUI('guest');
+    return;
+  }
+  const uid = currentUser.uid;
+  setSyncStatusUI('syncing');
+  try {
+    const ops = [];
+    const localIds = new Set();
+    transactions.forEach(t => {
+      if (!t || !t.id || !validateTransaction(t)) return;
+      localIds.add(t.id);
+      const j = txJSON(t);
+      if (cloudSnapshot.get(t.id) !== j) {
+        ops.push({ kind: 'set', id: t.id, json: j });
+      }
+    });
+    cloudSnapshot.forEach((_, id) => {
+      if (!localIds.has(id)) ops.push({ kind: 'del', id });
+    });
+
+    for (let i = 0; i < ops.length; i += 400) {
+      const batch = db.batch();
+      ops.slice(i, i + 400).forEach(op => {
+        const ref = txCol(uid).doc(op.id);
+        if (op.kind === 'set') batch.set(ref, JSON.parse(op.json));
+        else batch.delete(ref);
+      });
+      await batch.commit();
+      ops.slice(i, i + 400).forEach(op => {
+        if (op.kind === 'set') cloudSnapshot.set(op.id, op.json);
+        else cloudSnapshot.delete(op.id);
+      });
+    }
+
+    // Also sync budget, inventory, and recurring expenses so everything transfers across devices
+    await db.collection('users').doc(uid).set({
+      budget: getBudget() || 0,
+      inventory: Array.isArray(inventoryItems) ? inventoryItems : [],
+      recurring: Array.isArray(recurringExpenses) ? recurringExpenses : [],
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    refreshSharedPortals();
+    setSyncStatusUI('synced', currentUser.email || '');
+  } catch (error) {
+    console.error('Cloud sync error:', error);
+    setSyncStatusUI('error', error.code || error.message);
+    showToast('تعذر المزامنة للسحابة: ' + (error.code || error.message), 'error');
+  }
+};
+
+// Override loadCloudData to pull full cloud state first, merge cleanly, then start realtime listener
+let cloudUserMetaUnsubscribe = null;
+
+loadCloudData = async function(uid) {
+  if (!isRealCloudUser()) {
+    setSyncStatusUI('guest');
+    return;
+  }
+  setSyncStatusUI('syncing');
+  try {
+    const userRef = db.collection('users').doc(uid);
+    const [userDoc, txSnap] = await Promise.all([userRef.get(), txCol(uid).get()]);
+
+    const cloudTx = [];
+    cloudSnapshot.clear();
+    txSnap.forEach(d => {
+      const v = d.data();
+      if (validateTransaction(v)) {
+        const norm = normalizeTransaction(v);
+        cloudTx.push(norm);
+        cloudSnapshot.set(d.id, txJSON(norm));
+      }
+    });
+
+    let legacyTx = [], legacyReqs = [];
+    if (userDoc.exists) {
+      const data = userDoc.data();
+      if (Array.isArray(data.transactions)) legacyTx = data.transactions;
+      if (Array.isArray(data.pendingRequests)) legacyReqs = data.pendingRequests;
+      if (data.budget !== undefined) localStorage.setItem(BUDGET_KEY, data.budget);
+      if (Array.isArray(data.inventory)) {
+        inventoryItems = data.inventory;
+        saveInventory();
+      }
+      if (Array.isArray(data.recurring)) {
+        recurringExpenses = data.recurring;
+        saveRecurring();
+      }
+    }
+
+    // Merge local and cloud transactions using _updatedAt timestamp
+    const merged = mergeTransactions(mergeTransactions(transactions, cloudTx), legacyTx);
+    transactions = merged;
+    saveLocalData();
+    refreshAll();
+    if (typeof renderInventory === 'function') renderInventory();
+
+    // Push any local-only items up to cloud
+    await doSyncToCloud();
+
+    if (legacyTx.length || legacyReqs.length) {
+      const b = db.batch();
+      legacyReqs.forEach(r => { if (r && r.id) b.set(userRef.collection('requests').doc(r.id), r); });
+      b.update(userRef, {
+        transactions: firebase.firestore.FieldValue.delete(),
+        pendingRequests: firebase.firestore.FieldValue.delete()
+      });
+      await b.commit();
+    }
+
+    await loadPortalIndex(uid);
+    subscribeToRequests(uid);
+
+    // Subscribe to realtime changes on transactions + user meta (inventory/budget/recurring)
+    subscribeToCloudTransactions(uid);
+    if (cloudUserMetaUnsubscribe) { try { cloudUserMetaUnsubscribe(); } catch(e) {} }
+    cloudUserMetaUnsubscribe = userRef.onSnapshot(snap => {
+      if (!snap.exists || snap.metadata.hasPendingWrites) return;
+      const d = snap.data();
+      let needRefresh = false;
+      if (d.budget !== undefined && Number(d.budget) !== getBudget()) {
+        localStorage.setItem(BUDGET_KEY, d.budget);
+        needRefresh = true;
+      }
+      if (Array.isArray(d.inventory) && JSON.stringify(d.inventory) !== JSON.stringify(inventoryItems)) {
+        inventoryItems = d.inventory;
+        saveInventory();
+        if (typeof renderInventory === 'function') renderInventory();
+      }
+      if (Array.isArray(d.recurring) && JSON.stringify(d.recurring) !== JSON.stringify(recurringExpenses)) {
+        recurringExpenses = d.recurring;
+        saveRecurring();
+      }
+      if (needRefresh) refreshAll();
+    });
+
+    setSyncStatusUI('synced', currentUser.email || '');
+  } catch (error) {
+    console.error('loadCloudData failed:', error);
+    setSyncStatusUI('error', error.code || error.message);
+    loadAllLocal();
+    refreshAll();
+  }
+};
+
+// Hook saveInventory & saveRecurring to trigger cloud sync automatically
+const _origSaveInventory = saveInventory;
+saveInventory = function() {
+  _origSaveInventory();
+  if (isRealCloudUser()) syncToCloud();
+};
+
+const _origSaveRecurring = saveRecurring;
+saveRecurring = function() {
+  _origSaveRecurring();
+  if (isRealCloudUser()) syncToCloud();
+};
+
+// Manual Force Sync Button Function
+async function manualCloudSyncNow() {
+  if (!currentUser) { showToast('سجّل الدخول أولاً', 'error'); return; }
+  if (!isRealCloudUser()) {
+    showToast('أنت في وضع الزائر المحلي! سجّل بحساب Google لمزامنة بياناتك بين الأجهزة.', 'error');
+    return;
+  }
+  showToast('جاري مزامنة البيانات مع السحابة الآن...', 'info');
+  await loadCloudData(currentUser.uid);
+  showToast('تمت المزامنة الكاملة بين الأجهزة بنجاح ✓', 'success');
+}
+
+// Link Guest local data to Google account without losing anything
+async function upgradeGuestToGoogle() {
+  const localTxBackup = [...transactions];
+  const localInvBackup = [...inventoryItems];
+  const localRecBackup = [...recurringExpenses];
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  try {
+    const result = await auth.signInWithPopup(provider);
+    if (result && result.user) {
+      // Restore local items into memory so loadCloudData merges them into the Google account!
+      transactions = mergeTransactions(transactions, localTxBackup);
+      if (localInvBackup.length && !inventoryItems.length) inventoryItems = localInvBackup;
+      if (localRecBackup.length && !recurringExpenses.length) recurringExpenses = localRecBackup;
+      saveLocalData();
+      showToast('تم ربط حسابك ونقل بياناتك للسحابة بنجاح 🎉', 'success');
+    }
+  } catch (err) {
+    showToast('تعذر ربط الحساب: ' + (err.message || err.code), 'error');
+  }
+}
+
+// Show Guest Banner if logged in as Guest so user knows why it doesn't sync across devices
+const _origLoginAsGuest = loginAsGuest;
+loginAsGuest = function() {
+  _origLoginAsGuest();
+  setSyncStatusUI('guest');
+  const guestBanner = document.getElementById('guestSyncWarningBanner');
+  if (guestBanner) guestBanner.classList.remove('hidden');
+};
