@@ -891,6 +891,9 @@ html:not(.dark) .ft-tx-feed-item {
   justify-content: space-between;
   gap: 8px;
 }
+.demo-banner-bar.hidden {
+  display: none !important;
+}
 
 .mode-choice-card {
   display: flex;
