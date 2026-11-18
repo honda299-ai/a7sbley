@@ -4646,11 +4646,73 @@ document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeQui
 
 
 /* =========================================================
-   APP MODE, MOBILE TABS & USER PROFILE (V12.0)
+   FINTECH DARK GLASS ENGINE (V13.0)
    ========================================================= */
 const APP_MODE_KEY = 'a7sbley_app_mode_v1';
 const DEMO_FLAG_KEY = 'a7sbley_is_demo_v1';
 let currentMobileView = 'home';
+
+// Hook renderTransactions to also populate the clean mobile card feed
+const _origRenderTransactions = renderTransactions;
+renderTransactions = function() {
+  _origRenderTransactions();
+  renderMobileTransactionsFeed();
+};
+
+function renderMobileTransactionsFeed() {
+  const feed = document.getElementById('mobileTransactionsFeed');
+  if (!feed) return;
+  const search = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+  feed.innerHTML = '';
+
+  let list = getPeriodTransactions().filter(t => {
+    if (isDebt(t.type)) return false;
+    if (activeFilter !== 'all' && t.type !== activeFilter) return false;
+    if (!search) return true;
+    const text = [t.category, t.notes, t.client, t.paymentMethod, t.reference, t.time, typeName(t.type)].join(' ').toLowerCase();
+    return text.includes(search);
+  });
+  list.sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
+
+  if (!list.length) return;
+
+  list.forEach(item => {
+    const isInc = item.type === 'income';
+    const isChr = item.type === 'charity';
+    const iconBg = isInc ? 'bg-emerald-500/15 text-emerald-400' : isChr ? 'bg-orange-500/15 text-orange-400' : 'bg-rose-500/15 text-rose-400';
+    const iconCls = isInc ? 'fa-arrow-down-left' : isChr ? 'fa-hand-holding-heart' : 'fa-arrow-up-right';
+    const amtColor = isInc ? 'text-emerald-400' : isChr ? 'text-orange-400' : 'text-rose-400';
+    const sign = isInc ? '+' : '-';
+
+    const card = document.createElement('div');
+    card.className = 'ft-tx-feed-item';
+    card.innerHTML = `
+      <div class="flex items-center gap-3 min-w-0 flex-1" onclick="editTransaction('${item.id}')">
+        <div class="w-11 h-11 rounded-2xl ${iconBg} flex items-center justify-center text-base shrink-0">
+          <i class="fa-solid ${iconCls}"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-xs font-black text-slate-900 dark:text-white truncate">
+            ${escapeHTML(item.notes || item.category || 'عملية')}
+          </div>
+          <div class="text-[10px] text-slate-400 font-bold mt-0.5 truncate">
+            ${item.client ? `<span class="text-orange-400">${escapeHTML(item.client)}</span> • ` : ''}${escapeHTML(item.paymentMethod || 'كاش')} • ${escapeHTML(item.date)}
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <div class="text-left">
+          <div class="money-val text-sm font-black ${amtColor}">${sign}${money(item.amount)}</div>
+          <div class="text-[9px] text-slate-500 font-bold text-left">ج.م</div>
+        </div>
+        <button onclick="requestDelete('${item.id}')" class="w-8 h-8 rounded-xl bg-white/5 text-slate-400 hover:text-rose-400 flex items-center justify-center">
+          <i class="fa-solid fa-trash-can text-xs"></i>
+        </button>
+      </div>
+    `;
+    feed.appendChild(card);
+  });
+}
 
 function initAppModeAndTabs() {
   const savedMode = localStorage.getItem(APP_MODE_KEY);
@@ -4665,6 +4727,7 @@ function initAppModeAndTabs() {
   }
   updateDemoBanner();
   switchMobileView('home');
+  renderMobileTransactionsFeed();
 }
 
 function selectInitialMode(mode) {
@@ -4691,8 +4754,8 @@ function applyAppMode(mode) {
   } else {
     if (icon) icon.className = 'fa-solid fa-store';
     if (label) label.textContent = 'المحل';
-    if (ledgerLbl) ledgerLbl.textContent = 'العملاء والديون';
-    if (manageLbl) manageLbl.textContent = 'المخزن والإدارة';
+    if (ledgerLbl) ledgerLbl.textContent = 'العملاء';
+    if (manageLbl) manageLbl.textContent = 'المخزن';
   }
 }
 

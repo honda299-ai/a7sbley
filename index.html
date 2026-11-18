@@ -38,7 +38,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="styles.css?v=12.0">
+  <link rel="stylesheet" href="styles.css?v=13.0">
 </head>
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans auth-pending">
@@ -46,11 +46,11 @@
   <!-- HEADER -->
   <header id="appHeader" class="sticky top-0 z-40 border-b border-slate-200 dark:border-dark-800 bg-white dark:bg-dark-900 shadow-sm no-print">
     <div class="max-w-7xl mx-auto px-3 sm:px-6">
-      <div class="flex items-center justify-between min-h-16 py-2 gap-1.5">
+      <div class="flex items-center justify-between min-h-14 py-2 gap-1.5">
         
         <!-- Logo & Brand -->
         <div class="flex items-center gap-2 shrink-0">
-          <img src="logo.png" class="w-9 h-9 rounded-xl object-contain shadow-md border border-orange-500/20" alt="احسبلي">
+          <img src="logo.png" class="w-9 h-9 rounded-2xl object-contain shadow-md border border-orange-500/30" alt="احسبلي">
           <div>
             <h1 class="text-base sm:text-xl font-black text-slate-900 dark:text-white leading-tight">احسبلي</h1>
             <div class="brand-sub-tag text-[9px] font-black text-orange-500 tracking-wider">a7sbley</div>
@@ -59,58 +59,46 @@
 
         <!-- Right Actions -->
         <div class="flex items-center gap-1.5 shrink-0">
-          <!-- زر تبديل الوضع -->
           <button id="modeSwitcherBtn" onclick="toggleAppMode()" class="mode-pill-btn" title="تبديل وضع الاستخدام">
             <i id="modeSwitchIcon" class="fa-solid fa-store"></i>
             <span id="modeSwitchLabel">المحل</span>
           </button>
 
-          <!-- زر تثبيت التطبيق (ديسكتوب فقط هنا وموجود في مركز التحكم للموبايل) -->
           <button id="headerInstallBtn" onclick="showMobileInstallModal()"
-            class="hidden items-center gap-1 px-2 py-1.5 rounded-xl bg-orange-500/15 border border-orange-500/40 text-orange-400 font-black text-[10px]">
+            class="hidden items-center gap-1 px-2 py-1.5 rounded-full bg-orange-500/15 border border-orange-500/40 text-orange-400 font-black text-[10px]">
             <i class="fa-solid fa-download"></i>
             <span class="hidden sm:inline">تثبيت</span>
           </button>
           
-          <!-- تنبيه المستحقات والطلبات -->
           <div id="globalPendingAlert" onclick="handleMoneyAlertClick()" 
-               class="hidden cursor-pointer flex items-center gap-1 px-2 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/50 text-rose-400 font-black text-xs animate-pulse">
+               class="hidden cursor-pointer flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-rose-500/20 border border-rose-500/50 text-rose-400 font-black text-xs animate-pulse">
             <i class="fa-solid fa-bell text-rose-500"></i>
-            <span id="globalPendingText" class="hidden sm:inline">تنبيه مستحقات</span>
+            <span id="globalPendingText" class="hidden sm:inline">مستحقات</span>
             <span id="globalPendingCount" class="w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] flex items-center justify-center font-black">0</span>
           </div>
 
-          <!-- زر إضافة عملية (ديسكتوب، والموبايل له زر + الكبير في المنتصف) -->
           <button onclick="openModal('expense')"
-            class="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow hover:brightness-110 transition">
-            <i class="fa-solid fa-circle-plus"></i>
-            <span>إضافة عملية</span>
+            class="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow hover:brightness-110 transition">
+            <i class="fa-solid fa-plus"></i>
+            <span>عملية جديدة</span>
           </button>
 
-          <!-- الخصوصية -->
-          <button onclick="togglePrivacyMode()" title="إخفاء المبالغ"
-            class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-orange-500 flex items-center justify-center shrink-0">
-            <i id="privacyIcon" class="fa-solid fa-eye text-xs sm:text-sm"></i>
-          </button>
-
-          <!-- الوضع الليلي -->
           <button onclick="toggleTheme()" title="الوضع الليلي / النهاري"
-            class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-850 text-amber-500 flex items-center justify-center shrink-0">
-            <i id="themeIcon" class="fa-solid fa-sun text-xs sm:text-sm"></i>
+            class="w-9 h-9 rounded-full border border-white/10 bg-white/5 text-amber-400 flex items-center justify-center shrink-0">
+            <i id="themeIcon" class="fa-solid fa-sun text-xs"></i>
           </button>
 
-          <!-- بروفايل المستخدم (اضغط لعرض معلومات الحساب) -->
+          <!-- User Avatar (Opens Profile Details) -->
           <div id="userProfile" onclick="openUserProfileModal()" title="معلومات حسابك" class="flex items-center gap-1.5 cursor-pointer shrink-0">
-            <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
+            <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
               <i class="fa-solid fa-user"></i> مجاني
             </span>
-            <img id="userAvatar" src="" class="w-8 h-8 rounded-lg border border-orange-500/40 object-cover" alt="User">
+            <img id="userAvatar" src="" class="w-9 h-9 rounded-full border-2 border-orange-500/50 object-cover" alt="User">
           </div>
 
-          <!-- زر مركز التحكم -->
           <button onclick="openControlCenter()" id="controlCenterBtn" title="مركز التحكم"
-            class="flex px-2.5 sm:px-3.5 py-2 rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition items-center gap-1.5 font-black text-xs shrink-0">
-            <i class="fa-solid fa-sliders text-sm"></i>
+            class="w-9 h-9 sm:w-auto sm:px-3.5 sm:py-2 rounded-full border border-orange-500/30 bg-orange-500/15 text-orange-400 hover:bg-orange-500 hover:text-white transition flex items-center justify-center gap-1.5 font-black text-xs shrink-0">
+            <i class="fa-solid fa-grid-2 text-sm fa-sliders"></i>
             <span class="hidden sm:inline">مركز التحكم</span>
           </button>
         </div>
@@ -225,7 +213,7 @@
         <i class="fa-solid fa-flask"></i>
         <span>بيانات تجريبية (Demo)</span>
       </div>
-      <button onclick="exitDemoData()" class="px-2.5 py-1 rounded-lg bg-rose-500 text-white font-black text-[10px] hover:bg-rose-600 transition shrink-0">
+      <button onclick="exitDemoData()" class="px-3 py-1 rounded-full bg-rose-500 text-white font-black text-[10px] hover:bg-rose-600 transition shrink-0">
         مسح وبدء حسابي
       </button>
     </div>
@@ -250,24 +238,63 @@
       </div>
     </section>
 
-    <!-- Mobile balance hero -->
-    <section id="mobileHero" data-mob-view="home" data-mob-display="block" class="md:hidden mobile-hero relative overflow-hidden rounded-3xl p-4 text-white no-print">
-      <div class="relative z-10">
-        <div class="text-[11px] font-bold text-orange-300/90">المتاح الآن</div>
-        <div class="flex items-baseline gap-1 mt-0.5">
-          <span id="heroNet" class="money-val text-4xl font-black tracking-tight">0</span>
-          <span class="text-xs font-black text-slate-400">ج.م</span>
+    <!-- Fintech 3D Virtual Card & Quick Action Pills -->
+    <section id="mobileHero" data-mob-view="home" data-mob-display="block" class="md:hidden space-y-4 no-print">
+      <div class="fintech-bank-card">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-[11px] font-bold text-slate-300">الرصيد المتاح الآن</span>
+          </div>
+          <button onclick="togglePrivacyMode()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 flex items-center justify-center transition" title="إخفاء/إظهار الرصيد">
+            <i id="privacyIcon" class="fa-solid fa-eye text-xs"></i>
+          </button>
         </div>
-        <div class="grid grid-cols-3 gap-2 mt-4">
-          <div class="hero-chip"><span class="text-[10px] text-emerald-300 font-bold">دخل</span><b id="heroIncome" class="money-val text-sm">0</b></div>
-          <div class="hero-chip"><span class="text-[10px] text-rose-300 font-bold">مصروف</span><b id="heroExpense" class="money-val text-sm">0</b></div>
-          <div class="hero-chip"><span class="text-[10px] text-orange-300 font-bold">ليّ عند الناس</span><b id="heroDebt" class="money-val text-sm">0</b></div>
+
+        <div class="flex items-baseline gap-1.5 mt-2">
+          <span id="heroNet" class="money-val text-4xl font-black tracking-tight text-white">0</span>
+          <span class="text-xs font-black text-orange-400">ج.م</span>
         </div>
+
+        <div class="grid grid-cols-3 gap-2 mt-5 pt-4 border-t border-white/10">
+          <div>
+            <div class="text-[10px] text-emerald-400 font-bold flex items-center gap-1"><i class="fa-solid fa-arrow-down-left text-[9px]"></i> دخل</div>
+            <div id="heroIncome" class="money-val text-sm font-black text-white mt-0.5">0</div>
+          </div>
+          <div>
+            <div class="text-[10px] text-rose-400 font-bold flex items-center gap-1"><i class="fa-solid fa-arrow-up-right text-[9px]"></i> مصروف</div>
+            <div id="heroExpense" class="money-val text-sm font-black text-white mt-0.5">0</div>
+          </div>
+          <div>
+            <div class="text-[10px] text-cyan-400 font-bold flex items-center gap-1"><i class="fa-solid fa-handshake text-[9px]"></i> ليّ بره</div>
+            <div id="heroDebt" class="money-val text-sm font-black text-white mt-0.5">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Circular Action Pills -->
+      <div class="ft-action-grid">
+        <button onclick="openModal('income')" class="ft-action-btn">
+          <div class="ft-action-circle text-emerald-400"><i class="fa-solid fa-arrow-down-left"></i></div>
+          <span class="ft-action-label">إضافة دخل</span>
+        </button>
+        <button onclick="openModal('expense')" class="ft-action-btn">
+          <div class="ft-action-circle text-rose-400"><i class="fa-solid fa-receipt"></i></div>
+          <span class="ft-action-label">مصروف</span>
+        </button>
+        <button onclick="openModal('debt_receivable')" class="ft-action-btn">
+          <div class="ft-action-circle text-cyan-400"><i class="fa-solid fa-user-plus"></i></div>
+          <span class="ft-action-label">دين جديد</span>
+        </button>
+        <button onclick="openShiftSettlementModal()" class="ft-action-btn">
+          <div class="ft-action-circle text-orange-400"><i class="fa-solid fa-calendar-check"></i></div>
+          <span class="ft-action-label">تقفيل اليوم</span>
+        </button>
       </div>
     </section>
 
     <!-- Periods -->
-    <section data-mob-view="home transactions" data-mob-display="block" class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
+    <section data-mob-view="home transactions" data-mob-display="block" class="ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
       <div class="flex items-center gap-2 mb-2">
         <div class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
           <i class="fa-solid fa-calendar-days text-xs"></i>
@@ -354,7 +381,7 @@
     </section>
 
     <!-- Quick Insights (تحليلات ذكية) -->
-    <section id="insightsSection" data-mob-view="home" data-mob-display="block" class="bg-gradient-to-r from-slate-900 to-dark-850 text-white rounded-2xl p-3.5 border border-orange-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 no-print shadow-md">
+    <section id="insightsSection" data-mob-view="home" data-mob-display="block" class="ft-glass-panel bg-gradient-to-r from-slate-900 to-dark-850 text-white rounded-2xl p-3.5 border border-orange-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 no-print shadow-md">
       <div class="flex items-center gap-3 w-full sm:w-auto">
         <div class="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 text-base">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
@@ -370,7 +397,7 @@
     </section>
 
     <!-- Wallets -->
-    <section data-mob-view="home" data-mob-display="block" class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
+    <section data-mob-view="home" data-mob-display="block" class="ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
       <div class="flex items-center gap-2 mb-3">
         <i class="fa-solid fa-vault text-orange-500"></i>
         <h3 class="text-xs font-black">أرصدة الخزينة</h3>
@@ -402,7 +429,7 @@
         </div>
       </div>
 
-      <div class="personal-only bg-white dark:bg-dark-900 rounded-2xl p-4 border border-slate-200 dark:border-dark-800">
+      <div class="personal-only ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl p-4 border border-slate-200 dark:border-dark-800">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
             <div class="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center">
@@ -460,7 +487,7 @@
     </div>
 
     <!-- Transactions -->
-    <section id="panelTransactions" data-mob-view="transactions" data-mob-display="block" class="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
+    <section id="panelTransactions" data-mob-view="transactions" data-mob-display="block" class="ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800 bg-slate-50/50 dark:bg-dark-850/50">
         <div class="flex flex-col gap-2.5">
           <div class="flex gap-1.5 overflow-x-auto mobile-table-wrap pb-1">
@@ -476,7 +503,11 @@
           </div>
         </div>
       </div>
-      <div class="overflow-x-auto mobile-table-wrap">
+      <!-- Mobile Clean Card Feed -->
+      <div id="mobileTransactionsFeed" class="md:hidden p-3 space-y-2.5"></div>
+
+      <!-- Desktop Table -->
+      <div class="hidden md:block overflow-x-auto mobile-table-wrap">
         <table class="w-full text-right min-w-[800px]">
           <thead>
             <tr class="text-[10px] font-black text-slate-400 bg-slate-50 dark:bg-dark-850">
@@ -501,7 +532,7 @@
     </section>
 
     <!-- Debts Panel -->
-    <section id="panelDebts" data-mob-view="ledger" data-mob-display="block" class="hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
+    <section id="panelDebts" data-mob-view="ledger" data-mob-display="block" class="ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between gap-2">
         <h3 class="text-sm font-black">سجل الديون</h3>
         <button onclick="openModal('debt_receivable')" class="px-3 py-2 rounded-lg bg-orange-500 text-white font-black text-xs">
@@ -518,7 +549,7 @@
     </section>
 
     <!-- Clients Panel -->
-    <section id="panelClients" data-mob-view="ledger" data-mob-display="block" class="business-only hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
+    <section id="panelClients" data-mob-view="ledger" data-mob-display="block" class="business-only ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800">
         <div class="flex items-center justify-between gap-2 mb-2">
           <h3 class="text-sm font-black">دفتر العملاء</h3>
@@ -539,7 +570,7 @@
     </section>
 
     <!-- Inventory Panel (مخزن قطع الغيار) -->
-    <section id="panelInventory" data-mob-view="manage" data-mob-display="block" class="business-only hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
+    <section id="panelInventory" data-mob-view="manage" data-mob-display="block" class="business-only ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between gap-2">
         <h3 class="text-sm font-black"><i class="fa-solid fa-boxes-stacked text-orange-500"></i> إدارة مخزن قطع الغيار والأدوات</h3>
         <button onclick="openInventoryModal()" class="px-3 py-2 rounded-lg bg-orange-500 text-white font-black text-xs">
@@ -556,7 +587,7 @@
     </section>
 
     <!-- Audit Log Panel (سجل الأنشطة) -->
-    <section id="panelAudit" data-mob-view="manage" data-mob-display="block" class="hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
+    <section id="panelAudit" data-mob-view="manage" data-mob-display="block" class="ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between gap-2">
         <h3 class="text-sm font-black"><i class="fa-solid fa-clock-rotate-left text-orange-500"></i> سجل العمليات والتعديلات (Audit Log)</h3>
         <button onclick="clearAuditLog()" class="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-500 font-bold text-xs">
@@ -591,26 +622,26 @@
     </div>
   </footer>
 
-  <!-- BOTTOM NAV -->
+  <!-- FLOATING PILL BOTTOM NAV -->
   <nav id="mobileBottomNav" class="mobile-bottom-nav no-print">
     <button onclick="switchMobileView('home')" class="mob-nav-btn active" data-mob-tab="home">
       <i class="fa-solid fa-house"></i>
       <span>الرئيسية</span>
     </button>
     <button onclick="switchMobileView('transactions')" class="mob-nav-btn" data-mob-tab="transactions">
-      <i class="fa-solid fa-list-check"></i>
-      <span>العمليات</span>
+      <i class="fa-solid fa-receipt"></i>
+      <span>السجل</span>
     </button>
     <button onclick="openQuickAdd()" class="mob-nav-fab" aria-label="إضافة" aria-haspopup="dialog">
       <i class="fa-solid fa-plus"></i>
     </button>
     <button onclick="switchMobileView('ledger')" class="mob-nav-btn" data-mob-tab="ledger">
       <i class="fa-solid fa-users"></i>
-      <span id="mobLedgerLabel">العملاء والديون</span>
+      <span id="mobLedgerLabel">العملاء</span>
     </button>
     <button onclick="switchMobileView('manage')" class="mob-nav-btn" data-mob-tab="manage">
       <i class="fa-solid fa-boxes-stacked"></i>
-      <span id="mobManageLabel">المخزن والإدارة</span>
+      <span id="mobManageLabel">المخزن</span>
     </button>
   </nav>
 
@@ -1656,7 +1687,7 @@
 
   <!-- USER PROFILE DETAILS MODAL -->
   <div id="userProfileModal" class="fixed inset-0 z-[135] hidden items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md" onclick="closeUserProfileModal()">
-    <div class="relative w-full max-w-md rounded-3xl bg-slate-900 border border-orange-500/40 p-5 shadow-2xl modal-enter text-white overflow-hidden" onclick="event.stopPropagation()">
+    <div class="relative w-full max-w-md rounded-3xl bg-[#11131a] border border-orange-500/40 p-5 shadow-2xl modal-enter text-white overflow-hidden" onclick="event.stopPropagation()">
       <div class="flex items-center justify-between pb-3 border-b border-white/10">
         <div class="flex items-center gap-2 text-xs font-black text-orange-400">
           <i class="fa-solid fa-id-card"></i>
@@ -1669,8 +1700,8 @@
 
       <div class="flex flex-col items-center text-center mt-4 mb-4">
         <div class="relative">
-          <img id="profileModalAvatar" src="" class="w-20 h-20 rounded-2xl border-2 border-orange-500/60 object-cover shadow-xl" alt="User">
-          <span id="profileModalMethodBadge" class="absolute -bottom-2 -left-2 px-2 py-0.5 rounded-full bg-slate-800 border border-white/15 text-[10px] font-black text-slate-200">
+          <img id="profileModalAvatar" src="" class="w-20 h-20 rounded-full border-2 border-orange-500 object-cover shadow-xl" alt="User">
+          <span id="profileModalMethodBadge" class="absolute -bottom-1 -left-1 px-2.5 py-0.5 rounded-full bg-slate-800 border border-white/15 text-[10px] font-black text-slate-200">
             Google
           </span>
         </div>
@@ -1715,7 +1746,7 @@
 
   <!-- MODE ONBOARDING MODAL -->
   <div id="modeOnboardingModal" class="fixed inset-0 z-[450] hidden items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-    <div class="relative w-full max-w-md rounded-3xl bg-dark-900 border border-orange-500/40 p-6 text-center text-white shadow-2xl modal-enter">
+    <div class="relative w-full max-w-md rounded-3xl bg-[#11131a] border border-orange-500/40 p-6 text-center text-white shadow-2xl modal-enter">
       <img src="logo.png" class="w-16 h-16 rounded-2xl mx-auto mb-3 border border-orange-500/30 object-contain" alt="احسبلي">
       <h2 class="text-xl font-black">كيف ستستخدم احسبلي؟</h2>
       <p class="text-xs text-slate-400 mt-1 mb-5">اختر الوضع المناسب لتخصيص الواجهة (يمكنك التبديل في أي وقت من الأعلى)</p>
@@ -1748,6 +1779,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=12.0"></script>
+  <script src="app.js?v=13.0"></script>
 </body>
 </html>
