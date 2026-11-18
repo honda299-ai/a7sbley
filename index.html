@@ -38,7 +38,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="styles.css?v=13.0">
+  <link rel="stylesheet" href="styles.css?v=14.0">
 </head>
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans auth-pending">
@@ -46,60 +46,50 @@
   <!-- HEADER -->
   <header id="appHeader" class="sticky top-0 z-40 border-b border-slate-200 dark:border-dark-800 bg-white dark:bg-dark-900 shadow-sm no-print">
     <div class="max-w-7xl mx-auto px-3 sm:px-6">
-      <div class="flex items-center justify-between min-h-14 py-2 gap-1.5">
+      <div class="flex items-center justify-between min-h-14 py-2.5 gap-2">
         
-        <!-- Logo & Brand -->
-        <div class="flex items-center gap-2 shrink-0">
-          <img src="logo.png" class="w-9 h-9 rounded-2xl object-contain shadow-md border border-orange-500/30" alt="احسبلي">
-          <div>
-            <h1 class="text-base sm:text-xl font-black text-slate-900 dark:text-white leading-tight">احسبلي</h1>
-            <div class="brand-sub-tag text-[9px] font-black text-orange-500 tracking-wider">a7sbley</div>
+        <!-- 1. User Avatar & Greeting (Tap to open Profile) -->
+        <div id="userProfile" onclick="openUserProfileModal()" class="flex items-center gap-2.5 cursor-pointer min-w-0">
+          <div class="relative shrink-0">
+            <img id="userAvatar" src="" class="w-10 h-10 rounded-full border-2 border-orange-500/60 object-cover shadow" alt="User">
+            <span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#07080c]"></span>
           </div>
+          <div class="min-w-0">
+            <div class="text-[10px] font-bold text-slate-400 leading-none">أهلاً بك 👋</div>
+            <div id="headerUserGreeting" class="text-sm font-black text-slate-900 dark:text-white truncate mt-1">هوندا</div>
+          </div>
+          <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
+            <i class="fa-solid fa-user"></i> مجاني
+          </span>
         </div>
 
-        <!-- Right Actions -->
-        <div class="flex items-center gap-1.5 shrink-0">
-          <button id="modeSwitcherBtn" onclick="toggleAppMode()" class="mode-pill-btn" title="تبديل وضع الاستخدام">
-            <i id="modeSwitchIcon" class="fa-solid fa-store"></i>
-            <span id="modeSwitchLabel">المحل</span>
-          </button>
+        <!-- 2. Center Mode Switcher Pill -->
+        <button id="modeSwitcherBtn" onclick="toggleAppMode()" class="mode-pill-btn shrink-0" title="تبديل وضع الاستخدام">
+          <i id="modeSwitchIcon" class="fa-solid fa-store"></i>
+          <span id="modeSwitchLabel">المحل</span>
+        </button>
 
-          <button id="headerInstallBtn" onclick="showMobileInstallModal()"
-            class="hidden items-center gap-1 px-2 py-1.5 rounded-full bg-orange-500/15 border border-orange-500/40 text-orange-400 font-black text-[10px]">
-            <i class="fa-solid fa-download"></i>
-            <span class="hidden sm:inline">تثبيت</span>
-          </button>
-          
-          <div id="globalPendingAlert" onclick="handleMoneyAlertClick()" 
-               class="hidden cursor-pointer flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-rose-500/20 border border-rose-500/50 text-rose-400 font-black text-xs animate-pulse">
-            <i class="fa-solid fa-bell text-rose-500"></i>
-            <span id="globalPendingText" class="hidden sm:inline">مستحقات</span>
-            <span id="globalPendingCount" class="w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] flex items-center justify-center font-black">0</span>
-          </div>
+        <!-- 3. Right Minimal Icons (Alert + Control Center) -->
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="headerInstallBtn" onclick="showMobileInstallModal()" class="hidden"></button>
 
           <button onclick="openModal('expense')"
-            class="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow hover:brightness-110 transition">
+            class="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow hover:brightness-110 transition">
             <i class="fa-solid fa-plus"></i>
             <span>عملية جديدة</span>
           </button>
 
-          <button onclick="toggleTheme()" title="الوضع الليلي / النهاري"
-            class="w-9 h-9 rounded-full border border-white/10 bg-white/5 text-amber-400 flex items-center justify-center shrink-0">
-            <i id="themeIcon" class="fa-solid fa-sun text-xs"></i>
-          </button>
-
-          <!-- User Avatar (Opens Profile Details) -->
-          <div id="userProfile" onclick="openUserProfileModal()" title="معلومات حسابك" class="flex items-center gap-1.5 cursor-pointer shrink-0">
-            <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
-              <i class="fa-solid fa-user"></i> مجاني
-            </span>
-            <img id="userAvatar" src="" class="w-9 h-9 rounded-full border-2 border-orange-500/50 object-cover" alt="User">
+          <div id="globalPendingAlert" onclick="handleMoneyAlertClick()" 
+               class="hidden cursor-pointer relative w-10 h-10 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-400 flex items-center justify-center animate-pulse">
+            <i class="fa-solid fa-bell text-sm text-rose-500"></i>
+            <span id="globalPendingCount" class="absolute -top-1 -left-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] flex items-center justify-center font-black">0</span>
+            <span id="globalPendingText" class="hidden"></span>
           </div>
 
           <button onclick="openControlCenter()" id="controlCenterBtn" title="مركز التحكم"
-            class="w-9 h-9 sm:w-auto sm:px-3.5 sm:py-2 rounded-full border border-orange-500/30 bg-orange-500/15 text-orange-400 hover:bg-orange-500 hover:text-white transition flex items-center justify-center gap-1.5 font-black text-xs shrink-0">
-            <i class="fa-solid fa-grid-2 text-sm fa-sliders"></i>
-            <span class="hidden sm:inline">مركز التحكم</span>
+            class="w-10 h-10 sm:w-auto sm:px-4 sm:py-2 rounded-full border border-white/10 bg-white/5 hover:bg-orange-500 hover:text-white text-slate-200 transition flex items-center justify-center gap-1.5 font-black text-xs">
+            <i class="fa-solid fa-sliders text-sm text-orange-400"></i>
+            <span class="hidden sm:inline">الإعدادات</span>
           </button>
         </div>
       </div>
@@ -238,15 +228,16 @@
       </div>
     </section>
 
-    <!-- Fintech 3D Virtual Card & Quick Action Pills -->
+    <!-- ULTRA-CLEAN BANKING HOME (MOBILE) -->
     <section id="mobileHero" data-mob-view="home" data-mob-display="block" class="md:hidden space-y-4 no-print">
+      <!-- 1. 3D Bank Card -->
       <div class="fintech-bank-card">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span class="text-[11px] font-bold text-slate-300">الرصيد المتاح الآن</span>
           </div>
-          <button onclick="togglePrivacyMode()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 flex items-center justify-center transition" title="إخفاء/إظهار الرصيد">
+          <button onclick="togglePrivacyMode()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 flex items-center justify-center transition">
             <i id="privacyIcon" class="fa-solid fa-eye text-xs"></i>
           </button>
         </div>
@@ -266,13 +257,13 @@
             <div id="heroExpense" class="money-val text-sm font-black text-white mt-0.5">0</div>
           </div>
           <div>
-            <div class="text-[10px] text-cyan-400 font-bold flex items-center gap-1"><i class="fa-solid fa-handshake text-[9px]"></i> ليّ بره</div>
-            <div id="heroDebt" class="money-val text-sm font-black text-white mt-0.5">0</div>
+            <div class="text-[10px] text-amber-400 font-bold flex items-center gap-1"><i class="fa-solid fa-hand-holding-heart text-[9px]"></i> الخير</div>
+            <div id="heroCharityVal" class="money-val text-sm font-black text-white mt-0.5">0</div>
           </div>
         </div>
       </div>
 
-      <!-- Circular Action Pills -->
+      <!-- 2. Circular Quick Actions -->
       <div class="ft-action-grid">
         <button onclick="openModal('income')" class="ft-action-btn">
           <div class="ft-action-circle text-emerald-400"><i class="fa-solid fa-arrow-down-left"></i></div>
@@ -291,10 +282,46 @@
           <span class="ft-action-label">تقفيل اليوم</span>
         </button>
       </div>
+
+      <!-- 3. Horizontal Swipeable Wallets -->
+      <div>
+        <div class="flex items-center justify-between px-1 mb-2">
+          <span class="text-xs font-black text-slate-300">الخزائن والمحافظ</span>
+          <span class="text-[10px] font-bold text-slate-500">اسحب لليسار ←</span>
+        </div>
+        <div id="mobileWalletsStrip" class="ft-wallets-strip"></div>
+      </div>
+
+      <!-- 4. Debts 50/50 Cards -->
+      <div class="grid grid-cols-2 gap-2.5">
+        <div onclick="switchMobileView('ledger')" class="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 cursor-pointer active:scale-95 transition">
+          <div class="text-[10px] font-bold text-emerald-400 flex items-center justify-between">
+            <span>ليّ عند الناس</span>
+            <i class="fa-solid fa-arrow-left text-[9px]"></i>
+          </div>
+          <div id="mobCardDebtRec" class="money-val text-base font-black text-white mt-1.5">0 ج.م</div>
+        </div>
+        <div onclick="switchMobileView('ledger')" class="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 cursor-pointer active:scale-95 transition">
+          <div class="text-[10px] font-bold text-rose-400 flex items-center justify-between">
+            <span>عليّ للناس</span>
+            <i class="fa-solid fa-arrow-left text-[9px]"></i>
+          </div>
+          <div id="mobCardDebtPay" class="money-val text-base font-black text-white mt-1.5">0 ج.م</div>
+        </div>
+      </div>
+
+      <!-- 5. Recent Activity Feed (Last 4) -->
+      <div class="ft-glass-panel p-3.5">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-black text-white">أحدث الحركات</span>
+          <button onclick="switchMobileView('transactions')" class="text-[11px] font-black text-orange-400">عرض الكل ←</button>
+        </div>
+        <div id="mobileRecentFeed" class="space-y-2"></div>
+      </div>
     </section>
 
     <!-- Periods -->
-    <section data-mob-view="home transactions" data-mob-display="block" class="ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
+    <section data-mob-view="transactions" data-mob-display="block" class="ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
       <div class="flex items-center gap-2 mb-2">
         <div class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
           <i class="fa-solid fa-calendar-days text-xs"></i>
@@ -321,8 +348,8 @@
       </div>
     </section>
 
-    <!-- Stats -->
-    <section data-mob-view="home" data-mob-display="grid" class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 no-print">
+    <!-- Stats (Desktop Only - Mobile uses 3D Card) -->
+    <section class="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-2.5 no-print">
       <div class="bg-white dark:bg-dark-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-dark-800">
         <div class="flex items-center justify-between mb-2">
           <span class="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400">الإيرادات</span>
@@ -381,7 +408,7 @@
     </section>
 
     <!-- Quick Insights (تحليلات ذكية) -->
-    <section id="insightsSection" data-mob-view="home" data-mob-display="block" class="ft-glass-panel bg-gradient-to-r from-slate-900 to-dark-850 text-white rounded-2xl p-3.5 border border-orange-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 no-print shadow-md">
+    <section id="insightsSection" class="hidden md:flex bg-gradient-to-r from-slate-900 to-dark-850 text-white rounded-2xl p-3.5 border border-orange-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 no-print shadow-md">
       <div class="flex items-center gap-3 w-full sm:w-auto">
         <div class="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 text-base">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
@@ -396,8 +423,8 @@
       </div>
     </section>
 
-    <!-- Wallets -->
-    <section data-mob-view="home" data-mob-display="block" class="ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
+    <!-- Wallets (Desktop Only - Mobile uses Swipe Strip) -->
+    <section class="hidden md:block bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
       <div class="flex items-center gap-2 mb-3">
         <i class="fa-solid fa-vault text-orange-500"></i>
         <h3 class="text-xs font-black">أرصدة الخزينة</h3>
@@ -405,8 +432,8 @@
       <div id="walletsContainer" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2"></div>
     </section>
 
-    <!-- Debts + Budget -->
-    <section data-mob-view="home" data-mob-display="grid" class="grid grid-cols-1 lg:grid-cols-2 gap-3 no-print">
+    <!-- Debts + Budget (Desktop Only) -->
+    <section class="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-3 no-print">
       <div class="bg-white dark:bg-dark-900 rounded-2xl p-4 border border-slate-200 dark:border-dark-800">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
@@ -429,7 +456,7 @@
         </div>
       </div>
 
-      <div class="personal-only ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl p-4 border border-slate-200 dark:border-dark-800">
+      <div class="bg-white dark:bg-dark-900 rounded-2xl p-4 border border-slate-200 dark:border-dark-800">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
             <div class="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center">
@@ -1691,7 +1718,7 @@
       <div class="flex items-center justify-between pb-3 border-b border-white/10">
         <div class="flex items-center gap-2 text-xs font-black text-orange-400">
           <i class="fa-solid fa-id-card"></i>
-          <span>معلومات الحساب</span>
+          <span>حسابي والملف الشخصي</span>
         </div>
         <button onclick="closeUserProfileModal()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center">
           <i class="fa-solid fa-xmark text-sm"></i>
@@ -1731,14 +1758,18 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-2.5 mt-4">
-        <button onclick="closeUserProfileModal(); toggleAppMode();" class="py-3 px-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-black text-xs flex items-center justify-center gap-1.5">
-          <i class="fa-solid fa-repeat text-orange-400"></i>
-          <span>تبديل الوضع</span>
+      <div class="grid grid-cols-3 gap-2 mt-4">
+        <button onclick="toggleTheme()" class="py-3 px-2 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-black text-[11px] flex items-center justify-center gap-1">
+          <i id="themeIcon" class="fa-solid fa-sun text-amber-400"></i>
+          <span>المظهر</span>
         </button>
-        <button onclick="closeUserProfileModal(); logout();" class="py-3 px-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs flex items-center justify-center gap-1.5">
+        <button onclick="closeUserProfileModal(); toggleAppMode();" class="py-3 px-2 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-black text-[11px] flex items-center justify-center gap-1">
+          <i class="fa-solid fa-repeat text-orange-400"></i>
+          <span>الوضع</span>
+        </button>
+        <button onclick="closeUserProfileModal(); logout();" class="py-3 px-2 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-[11px] flex items-center justify-center gap-1 shadow">
           <i class="fa-solid fa-right-from-bracket"></i>
-          <span>تسجيل الخروج</span>
+          <span>خروج</span>
         </button>
       </div>
     </div>
@@ -1779,6 +1810,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=13.0"></script>
+  <script src="app.js?v=14.0"></script>
 </body>
 </html>

@@ -4646,24 +4646,101 @@ document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeQui
 
 
 /* =========================================================
-   FINTECH DARK GLASS ENGINE (V13.0)
+   ULTRA-MINIMAL BANKING UI ENGINE (V14.0)
    ========================================================= */
 const APP_MODE_KEY = 'a7sbley_app_mode_v1';
 const DEMO_FLAG_KEY = 'a7sbley_is_demo_v1';
 let currentMobileView = 'home';
 
-// Hook renderTransactions to also populate the clean mobile card feed
+// Extend updateMetrics to sync 3D card charity, 50/50 debt cards, swipeable wallets, and greeting
+const _origUpdateMetrics = updateMetrics;
+updateMetrics = function() {
+  _origUpdateMetrics();
+  const metrics = calculateMetrics();
+  const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setTxt('heroCharityVal', money(metrics.charity));
+  setTxt('mobCardDebtRec', money(metrics.debtRec) + ' ج.م');
+  setTxt('mobCardDebtPay', money(metrics.debtPay) + ' ج.م');
+
+  // Update header greeting name
+  if (currentUser) {
+    const rawName = currentUser.displayName || '';
+    const firstName = rawName ? rawName.split(' ')[0] : 'هوندا';
+    setTxt('headerUserGreeting', firstName);
+  }
+
+  // Render horizontal swipeable wallets
+  const strip = document.getElementById('mobileWalletsStrip');
+  if (strip) {
+    strip.innerHTML = '';
+    const defaultMethods = ['كاش نقدي', 'إنستاباي (InstaPay)', 'فودافون كاش / محفظة', 'فيزا / بطاقة بنكية'];
+    const allMethods = Array.from(new Set([...defaultMethods, ...Object.keys(metrics.wallets)]));
+    allMethods.forEach(method => {
+      const bal = metrics.wallets[method] || 0;
+      let icon = 'fa-wallet';
+      if (method.includes('كاش')) icon = 'fa-money-bill-1-wave';
+      else if (method.includes('إنستاباي')) icon = 'fa-bolt';
+      else if (method.includes('محفظة')) icon = 'fa-mobile-screen-button';
+      else if (method.includes('فيزا')) icon = 'fa-credit-card';
+
+      const chip = document.createElement('div');
+      chip.className = 'ft-wallet-chip';
+      chip.innerHTML = `
+        <div class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+          <i class="fa-solid ${icon} text-orange-400"></i>
+          <span class="truncate">${escapeHTML(method.split(' ')[0])}</span>
+        </div>
+        <div class="money-val text-sm font-black mt-1.5 ${bal >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-400'}">
+          ${money(bal)} <span class="text-[9px] text-slate-400">ج.م</span>
+        </div>
+      `;
+      strip.appendChild(chip);
+    });
+  }
+};
+
+// Extend renderTransactions to update both full mobile feed and home recent 4 feed
 const _origRenderTransactions = renderTransactions;
 renderTransactions = function() {
   _origRenderTransactions();
   renderMobileTransactionsFeed();
 };
 
+function buildFeedCardHTML(item) {
+  const isInc = item.type === 'income';
+  const isChr = item.type === 'charity';
+  const iconBg = isInc ? 'bg-emerald-500/15 text-emerald-400' : isChr ? 'bg-orange-500/15 text-orange-400' : 'bg-rose-500/15 text-rose-400';
+  const iconCls = isInc ? 'fa-arrow-down-left' : isChr ? 'fa-hand-holding-heart' : 'fa-arrow-up-right';
+  const amtColor = isInc ? 'text-emerald-400' : isChr ? 'text-orange-400' : 'text-rose-400';
+  const sign = isInc ? '+' : '-';
+
+  return `
+    <div class="flex items-center gap-3 min-w-0 flex-1" onclick="editTransaction('${item.id}')">
+      <div class="w-10 h-10 rounded-2xl ${iconBg} flex items-center justify-center text-sm shrink-0">
+        <i class="fa-solid ${iconCls}"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="text-xs font-black text-slate-900 dark:text-white truncate">
+          ${escapeHTML(item.notes || item.category || 'عملية')}
+        </div>
+        <div class="text-[10px] text-slate-400 font-bold mt-0.5 truncate">
+          ${item.client ? `<span class="text-orange-400">${escapeHTML(item.client)}</span> • ` : ''}${escapeHTML(item.paymentMethod || 'كاش')} • ${escapeHTML(item.date)}
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <div class="text-left">
+        <div class="money-val text-sm font-black ${amtColor}">${sign}${money(item.amount)}</div>
+        <div class="text-[9px] text-slate-500 font-bold text-left">ج.م</div>
+      </div>
+    </div>
+  `;
+}
+
 function renderMobileTransactionsFeed() {
   const feed = document.getElementById('mobileTransactionsFeed');
-  if (!feed) return;
+  const recentFeed = document.getElementById('mobileRecentFeed');
   const search = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
-  feed.innerHTML = '';
 
   let list = getPeriodTransactions().filter(t => {
     if (isDebt(t.type)) return false;
@@ -4674,44 +4751,34 @@ function renderMobileTransactionsFeed() {
   });
   list.sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`));
 
-  if (!list.length) return;
-
-  list.forEach(item => {
-    const isInc = item.type === 'income';
-    const isChr = item.type === 'charity';
-    const iconBg = isInc ? 'bg-emerald-500/15 text-emerald-400' : isChr ? 'bg-orange-500/15 text-orange-400' : 'bg-rose-500/15 text-rose-400';
-    const iconCls = isInc ? 'fa-arrow-down-left' : isChr ? 'fa-hand-holding-heart' : 'fa-arrow-up-right';
-    const amtColor = isInc ? 'text-emerald-400' : isChr ? 'text-orange-400' : 'text-rose-400';
-    const sign = isInc ? '+' : '-';
-
-    const card = document.createElement('div');
-    card.className = 'ft-tx-feed-item';
-    card.innerHTML = `
-      <div class="flex items-center gap-3 min-w-0 flex-1" onclick="editTransaction('${item.id}')">
-        <div class="w-11 h-11 rounded-2xl ${iconBg} flex items-center justify-center text-base shrink-0">
-          <i class="fa-solid ${iconCls}"></i>
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="text-xs font-black text-slate-900 dark:text-white truncate">
-            ${escapeHTML(item.notes || item.category || 'عملية')}
-          </div>
-          <div class="text-[10px] text-slate-400 font-bold mt-0.5 truncate">
-            ${item.client ? `<span class="text-orange-400">${escapeHTML(item.client)}</span> • ` : ''}${escapeHTML(item.paymentMethod || 'كاش')} • ${escapeHTML(item.date)}
-          </div>
-        </div>
-      </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <div class="text-left">
-          <div class="money-val text-sm font-black ${amtColor}">${sign}${money(item.amount)}</div>
-          <div class="text-[9px] text-slate-500 font-bold text-left">ج.م</div>
-        </div>
-        <button onclick="requestDelete('${item.id}')" class="w-8 h-8 rounded-xl bg-white/5 text-slate-400 hover:text-rose-400 flex items-center justify-center">
+  if (feed) {
+    feed.innerHTML = '';
+    list.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'ft-tx-feed-item';
+      card.innerHTML = buildFeedCardHTML(item) + `
+        <button onclick="requestDelete('${item.id}')" class="w-8 h-8 rounded-xl bg-white/5 text-slate-400 hover:text-rose-400 flex items-center justify-center shrink-0">
           <i class="fa-solid fa-trash-can text-xs"></i>
-        </button>
-      </div>
-    `;
-    feed.appendChild(card);
-  });
+        </button>`;
+      feed.appendChild(card);
+    });
+  }
+
+  if (recentFeed) {
+    const allSorted = getActiveTransactions().filter(t => !isDebt(t.type))
+      .sort((a, b) => new Date(`${b.date}T23:59:59`) - new Date(`${a.date}T23:59:59`)).slice(0, 4);
+    recentFeed.innerHTML = '';
+    if (!allSorted.length) {
+      recentFeed.innerHTML = '<div class="text-center py-6 text-xs text-slate-500 font-bold">لا توجد حركات مسجلة بعد</div>';
+    } else {
+      allSorted.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'ft-tx-feed-item';
+        card.innerHTML = buildFeedCardHTML(item);
+        recentFeed.appendChild(card);
+      });
+    }
+  }
 }
 
 function initAppModeAndTabs() {
@@ -4727,6 +4794,7 @@ function initAppModeAndTabs() {
   }
   updateDemoBanner();
   switchMobileView('home');
+  updateMetrics();
   renderMobileTransactionsFeed();
 }
 
