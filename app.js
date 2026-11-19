@@ -5137,7 +5137,6 @@ renderTransactions = function() {
           </div>
         </td>
       `;
-      tr.oncontextmenu = (e) => openRowContextMenu(e, item.id);
       tbody.appendChild(tr);
     });
   }
@@ -5484,69 +5483,4 @@ auth.onAuthStateChanged(user => {
       }
     }, 650);
   }
-});
-
-
-/* =========================================================
-   V22.0: HOVER-EXPAND DESKTOP DOCK + RIGHT-CLICK MENU
-   ========================================================= */
-function handleMainAddButton() {
-  if (window.innerWidth >= 768) {
-    openModal('expense');
-  } else {
-    openQuickAdd();
-  }
-}
-
-function openRowContextMenu(e, txId) {
-  if (window.innerWidth < 768) return;
-  e.preventDefault();
-  closeRowContextMenu();
-
-  const menu = document.createElement('div');
-  menu.id = 'rowContextMenu';
-  menu.className = 'desktop-context-menu';
-  menu.innerHTML = `
-    <button class="ctx-item" onclick="editTransaction('${txId}'); closeRowContextMenu();"><i class="fa-solid fa-pen text-orange-500"></i> تعديل العملية</button>
-    <button class="ctx-item" onclick="shareViaWhatsApp('${txId}'); closeRowContextMenu();"><i class="fa-brands fa-whatsapp text-emerald-500"></i> إرسال واتساب</button>
-    <button class="ctx-item text-rose-400" onclick="requestDelete('${txId}'); closeRowContextMenu();"><i class="fa-solid fa-trash-can text-rose-500"></i> حذف نهائي</button>
-  `;
-  document.body.appendChild(menu);
-
-  const x = Math.min(e.clientX, window.innerWidth - 210);
-  const y = Math.min(e.clientY, window.innerHeight - 140);
-  menu.style.left = x + 'px';
-  menu.style.top = y + 'px';
-}
-
-function closeRowContextMenu() {
-  const existing = document.getElementById('rowContextMenu');
-  if (existing) existing.remove();
-}
-window.addEventListener('click', closeRowContextMenu);
-
-const _v20NavigateSegmented = navigateSegmented;
-navigateSegmented = function(target) {
-  _v20NavigateSegmented(target);
-
-  document.querySelectorAll('[data-desk-view]').forEach(sec => {
-    const views = (sec.getAttribute('data-desk-view') || '').split(' ');
-    const displayType = sec.getAttribute('data-desk-display') || 'block';
-    const isActive = views.includes(target);
-
-    sec.classList.remove('desk-active-block', 'desk-active-grid', 'desk-active-flex');
-    if (isActive) {
-      if (displayType === 'grid') sec.classList.add('desk-active-grid');
-      else if (displayType === 'flex') sec.classList.add('desk-active-flex');
-      else sec.classList.add('desk-active-block');
-    }
-  });
-
-  if (target === 'home' && typeof updateCharts === 'function') {
-    setTimeout(updateCharts, 50);
-  }
-};
-
-window.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => navigateSegmented(currentActiveView || 'home'), 260);
 });

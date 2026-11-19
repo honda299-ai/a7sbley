@@ -38,7 +38,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="styles.css?v=22.0">
+  <link rel="stylesheet" href="styles.css?v=20.0">
 </head>
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans auth-pending">
@@ -243,7 +243,7 @@
     </nav>
 
     <!-- Hero -->
-    <section data-desk-view="home" data-desk-display="block" class="hidden md:block relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 to-black text-white p-6 border border-dark-800 shadow-xl no-print">
+    <section class="hidden md:block relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 to-black text-white p-6 border border-dark-800 shadow-xl no-print">
       <div class="relative z-10 flex items-center justify-between gap-4">
         <div>
           <div class="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-black">
@@ -369,7 +369,7 @@
     </section>
 
     <!-- Periods -->
-    <section data-mob-view="transactions" data-mob-display="block" data-desk-view="transactions" data-desk-display="block" class="ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
+    <section data-mob-view="transactions" data-mob-display="block" class="ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
       <div class="flex items-center gap-2 mb-2">
         <div class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
           <i class="fa-solid fa-calendar-days text-xs"></i>
@@ -397,7 +397,7 @@
     </section>
 
     <!-- Stats (Desktop Only) -->
-    <section data-desk-view="home" data-desk-display="grid" class="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-2.5 no-print">
+    <section class="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-2.5 no-print">
       <div class="bg-white dark:bg-dark-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-dark-800">
         <div class="flex items-center justify-between mb-2">
           <span class="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400">الإيرادات</span>
@@ -456,7 +456,7 @@
     </section>
 
     <!-- Quick Insights (تحليلات ذكية) -->
-    <section id="insightsSection" data-desk-view="home" data-desk-display="flex" class="hidden md:flex bg-gradient-to-r from-slate-900 to-dark-850 text-white rounded-2xl p-3.5 border border-orange-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 no-print shadow-md">
+    <section id="insightsSection" class="hidden md:flex bg-gradient-to-r from-slate-900 to-dark-850 text-white rounded-2xl p-3.5 border border-orange-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 no-print shadow-md">
       <div class="flex items-center gap-3 w-full sm:w-auto">
         <div class="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 text-base">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
@@ -472,7 +472,7 @@
     </section>
 
     <!-- Wallets (Desktop Only) -->
-    <section data-desk-view="home" data-desk-display="block" class="hidden md:block bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
+    <section class="hidden md:block bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
       <div class="flex items-center gap-2 mb-3">
         <i class="fa-solid fa-vault text-orange-500"></i>
         <h3 class="text-xs font-black">أرصدة الخزينة</h3>
@@ -481,7 +481,7 @@
     </section>
 
     <!-- Debts + Budget (Desktop Only) -->
-    <section data-desk-view="home" data-desk-display="grid" class="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-3 no-print">
+    <section class="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-3 no-print">
       <div class="bg-white dark:bg-dark-900 rounded-2xl p-4 border border-slate-200 dark:border-dark-800">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
@@ -534,7 +534,7 @@
     </section>
 
     <!-- Charts -->
-    <section data-desk-view="home" data-desk-display="grid" class="hidden lg:grid lg:grid-cols-3 gap-4 no-print">
+    <section class="hidden lg:grid lg:grid-cols-3 gap-4 no-print">
       <div class="bg-white dark:bg-dark-900 p-4 rounded-2xl border border-slate-200 dark:border-dark-800">
         <h3 class="text-sm font-black mb-3"><i class="fa-solid fa-chart-pie text-orange-500"></i> التوزيع</h3>
         <div class="relative h-56">
@@ -562,7 +562,7 @@
     </div>
 
     <!-- Transactions -->
-    <section id="panelTransactions" data-mob-view="transactions" data-mob-display="block" data-desk-view="transactions" data-desk-display="block" class="ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
+    <section id="panelTransactions" data-mob-view="transactions" data-mob-display="block" class="ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800 bg-slate-50/50 dark:bg-dark-850/50">
         <div class="flex flex-col gap-2.5">
           <div class="flex gap-1.5 overflow-x-auto mobile-table-wrap pb-1">
@@ -615,7 +615,7 @@
     </section>
 
     <!-- Debts Panel -->
-    <section id="panelDebts" data-mob-view="debts" data-mob-display="block" data-desk-view="debts" data-desk-display="block" class="ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
+    <section id="panelDebts" data-mob-view="debts" data-mob-display="block" class="ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between gap-2">
         <h3 class="text-sm font-black">سجل الديون</h3>
         <button onclick="openModal('debt_receivable')" class="px-3 py-2 rounded-lg bg-orange-500 text-white font-black text-xs">
@@ -632,7 +632,7 @@
     </section>
 
     <!-- Clients Panel -->
-    <section id="panelClients" data-mob-view="clients" data-mob-display="block" data-desk-view="clients" data-desk-display="block" class="business-only ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
+    <section id="panelClients" data-mob-view="clients" data-mob-display="block" class="business-only ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800">
         <div class="flex items-center justify-between gap-2 mb-2">
           <h3 class="text-sm font-black">دفتر العملاء</h3>
@@ -653,7 +653,7 @@
     </section>
 
     <!-- Inventory Panel (مخزن قطع الغيار) -->
-    <section id="panelInventory" data-mob-view="manage" data-mob-display="block" data-desk-view="manage" data-desk-display="block" class="business-only ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
+    <section id="panelInventory" data-mob-view="manage" data-mob-display="block" class="business-only ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between gap-2">
         <h3 class="text-sm font-black"><i class="fa-solid fa-boxes-stacked text-orange-500"></i> إدارة مخزن قطع الغيار والأدوات</h3>
         <button onclick="openInventoryModal()" class="px-3 py-2 rounded-lg bg-orange-500 text-white font-black text-xs">
@@ -670,7 +670,7 @@
     </section>
 
     <!-- Audit Log Panel (سجل الأنشطة) -->
-    <section id="panelAudit" data-mob-view="manage" data-mob-display="block" data-desk-view="manage" data-desk-display="block" class="ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
+    <section id="panelAudit" data-mob-view="manage" data-mob-display="block" class="ft-glass-panel hidden bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between gap-2">
         <h3 class="text-sm font-black"><i class="fa-solid fa-clock-rotate-left text-orange-500"></i> سجل العمليات والتعديلات (Audit Log)</h3>
         <button onclick="clearAuditLog()" class="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-500 font-bold text-xs">
@@ -705,64 +705,27 @@
     </div>
   </footer>
 
-  <!-- UNIFIED RESPONSIVE NAV (Bottom Bar on Mobile + Compact Hover-Expand Dock on Desktop) -->
-  <nav id="mobileBottomNav" class="mobile-bottom-nav no-print" aria-label="التنقل الرئيسي">
-    <!-- رأس القائمة الجانبية المصغر للكمبيوتر -->
-    <div class="sidebar-desktop-brand">
-      <img src="logo.png" alt="احسبلي">
-      <div class="brand-text-wrap">
-        <div class="brand-title">احسبلي</div>
-        <div class="brand-sub">a7sbley</div>
-      </div>
-    </div>
-
-    <div class="nav-items-container">
-      <button onclick="navigateSegmented('home')" class="mob-nav-btn active" data-mob-tab="home">
-        <i class="fa-solid fa-house"></i>
-        <span>الرئيسية</span>
-      </button>
-
-      <button onclick="navigateSegmented('transactions')" class="mob-nav-btn" data-mob-tab="transactions">
-        <i class="fa-solid fa-receipt"></i>
-        <span>المعاملات</span>
-      </button>
-
-      <button onclick="handleMainAddButton()" class="mob-nav-fab" aria-label="إضافة عملية" aria-haspopup="dialog">
-        <i class="fa-solid fa-plus"></i>
-        <span class="desktop-fab-label">عملية جديدة</span>
-      </button>
-
-      <button onclick="navigateSegmented('debts')" class="business-only mob-nav-btn" data-mob-tab="debts" data-feature="debts">
-        <i class="fa-solid fa-handshake"></i>
-        <span>الديون</span>
-      </button>
-
-      <button onclick="navigateSegmented('clients')" class="business-only desktop-only-nav-item mob-nav-btn" data-mob-tab="clients">
-        <i class="fa-solid fa-users"></i>
-        <span>العملاء</span>
-      </button>
-
-      <button onclick="navigateSegmented('manage')" class="mob-nav-btn" data-mob-tab="manage">
-        <i class="fa-solid fa-boxes-stacked"></i>
-        <span id="mobManageLabel">المخزن</span>
-      </button>
-    </div>
-
-    <!-- فاصل وأدوات سريعة في القائمة الجانبية للكمبيوتر -->
-    <div class="sidebar-desktop-tools">
-      <button onclick="openBudgetModal()" data-feature="budget" class="mob-nav-btn">
-        <i class="fa-solid fa-chart-pie text-cyan-400"></i>
-        <span>الميزانية</span>
-      </button>
-      <button onclick="openReportModal()" data-feature="reports" class="mob-nav-btn">
-        <i class="fa-solid fa-file-pdf text-amber-400"></i>
-        <span>تقرير PDF</span>
-      </button>
-      <button onclick="openControlCenter()" class="mob-nav-btn">
-        <i class="fa-solid fa-sliders text-orange-400"></i>
-        <span>الإعدادات</span>
-      </button>
-    </div>
+  <!-- FLOATING PILL BOTTOM NAV -->
+  <nav id="mobileBottomNav" class="mobile-bottom-nav no-print">
+    <button onclick="navigateSegmented('home')" class="mob-nav-btn active" data-mob-tab="home">
+      <i class="fa-solid fa-house"></i>
+      <span>الرئيسية</span>
+    </button>
+    <button onclick="navigateSegmented('transactions')" class="mob-nav-btn" data-mob-tab="transactions">
+      <i class="fa-solid fa-receipt"></i>
+      <span>المعاملات</span>
+    </button>
+    <button onclick="openQuickAdd()" class="mob-nav-fab" aria-label="إضافة" aria-haspopup="dialog">
+      <i class="fa-solid fa-plus"></i>
+    </button>
+    <button onclick="navigateSegmented('debts')" class="mob-nav-btn" data-mob-tab="debts">
+      <i class="fa-solid fa-handshake"></i>
+      <span>الديون</span>
+    </button>
+    <button onclick="navigateSegmented('manage')" class="mob-nav-btn" data-mob-tab="manage">
+      <i class="fa-solid fa-boxes-stacked"></i>
+      <span id="mobManageLabel">المخزن</span>
+    </button>
   </nav>
 
   <!-- Quick add sheet -->
@@ -1946,6 +1909,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=22.0"></script>
+  <script src="app.js?v=20.0"></script>
 </body>
 </html>
