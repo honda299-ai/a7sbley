@@ -38,7 +38,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="styles.css?v=21.0">
+  <link rel="stylesheet" href="styles.css?v=22.0">
 </head>
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans auth-pending">
@@ -705,52 +705,62 @@
     </div>
   </footer>
 
-  <!-- UNIFIED RESPONSIVE NAV (Bottom Bar on Mobile + Interactive Collapsible Right Sidebar on Desktop) -->
+  <!-- UNIFIED RESPONSIVE NAV (Bottom Bar on Mobile + Compact Hover-Expand Dock on Desktop) -->
   <nav id="mobileBottomNav" class="mobile-bottom-nav no-print" aria-label="التنقل الرئيسي">
-    <!-- رأس القائمة الجانبية (يظهر على الكمبيوتر فقط) -->
+    <!-- رأس القائمة الجانبية المصغر للكمبيوتر -->
     <div class="sidebar-desktop-brand">
-      <div class="flex items-center gap-3 min-w-0">
-        <img src="logo.png" alt="احسبلي">
-        <div class="brand-text-wrap min-w-0">
-          <div class="brand-title truncate">احسبلي</div>
-          <div class="brand-sub truncate">a7sbley Financial</div>
-        </div>
+      <img src="logo.png" alt="احسبلي">
+      <div class="brand-text-wrap">
+        <div class="brand-title">احسبلي</div>
+        <div class="brand-sub">a7sbley</div>
       </div>
-      <button onclick="toggleDesktopSidebar()" title="تصغير / تكبير القائمة"
-        class="sidebar-collapse-btn w-8 h-8 rounded-xl bg-white/5 hover:bg-orange-500/20 text-slate-400 hover:text-orange-500 flex items-center justify-center transition shrink-0">
-        <i id="sidebarCollapseIcon" class="fa-solid fa-angles-right text-xs"></i>
-      </button>
     </div>
 
     <div class="nav-items-container">
-      <button onclick="navigateSegmented('home')" class="mob-nav-btn active" data-mob-tab="home" title="الرئيسية">
+      <button onclick="navigateSegmented('home')" class="mob-nav-btn active" data-mob-tab="home">
         <i class="fa-solid fa-house"></i>
         <span>الرئيسية</span>
       </button>
 
-      <button onclick="navigateSegmented('transactions')" class="mob-nav-btn" data-mob-tab="transactions" title="المعاملات">
+      <button onclick="navigateSegmented('transactions')" class="mob-nav-btn" data-mob-tab="transactions">
         <i class="fa-solid fa-receipt"></i>
         <span>المعاملات</span>
       </button>
 
-      <button onclick="handleMainAddButton()" class="mob-nav-fab" aria-label="إضافة عملية" aria-haspopup="dialog" title="عملية جديدة">
+      <button onclick="handleMainAddButton()" class="mob-nav-fab" aria-label="إضافة عملية" aria-haspopup="dialog">
         <i class="fa-solid fa-plus"></i>
         <span class="desktop-fab-label">عملية جديدة</span>
       </button>
 
-      <button onclick="navigateSegmented('debts')" class="business-only mob-nav-btn" data-mob-tab="debts" data-feature="debts" title="الديون">
+      <button onclick="navigateSegmented('debts')" class="business-only mob-nav-btn" data-mob-tab="debts" data-feature="debts">
         <i class="fa-solid fa-handshake"></i>
         <span>الديون</span>
       </button>
 
-      <button onclick="navigateSegmented('clients')" class="business-only desktop-only-nav-item mob-nav-btn" data-mob-tab="clients" title="العملاء">
+      <button onclick="navigateSegmented('clients')" class="business-only desktop-only-nav-item mob-nav-btn" data-mob-tab="clients">
         <i class="fa-solid fa-users"></i>
         <span>العملاء</span>
       </button>
 
-      <button onclick="navigateSegmented('manage')" class="mob-nav-btn" data-mob-tab="manage" title="المخزن والإدارة">
+      <button onclick="navigateSegmented('manage')" class="mob-nav-btn" data-mob-tab="manage">
         <i class="fa-solid fa-boxes-stacked"></i>
         <span id="mobManageLabel">المخزن</span>
+      </button>
+    </div>
+
+    <!-- فاصل وأدوات سريعة في القائمة الجانبية للكمبيوتر -->
+    <div class="sidebar-desktop-tools">
+      <button onclick="openBudgetModal()" data-feature="budget" class="mob-nav-btn">
+        <i class="fa-solid fa-chart-pie text-cyan-400"></i>
+        <span>الميزانية</span>
+      </button>
+      <button onclick="openReportModal()" data-feature="reports" class="mob-nav-btn">
+        <i class="fa-solid fa-file-pdf text-amber-400"></i>
+        <span>تقرير PDF</span>
+      </button>
+      <button onclick="openControlCenter()" class="mob-nav-btn">
+        <i class="fa-solid fa-sliders text-orange-400"></i>
+        <span>الإعدادات</span>
       </button>
     </div>
   </nav>
@@ -1936,6 +1946,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=21.0"></script>
+  <script src="app.js?v=22.0"></script>
 </body>
 </html>

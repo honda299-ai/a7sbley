@@ -5488,7 +5488,7 @@ auth.onAuthStateChanged(user => {
 
 
 /* =========================================================
-   V21.0: UNIFIED DESKTOP INTERACTIVE SIDEBAR + MOBILE BOTTOM BAR
+   V22.0: HOVER-EXPAND DESKTOP DOCK + RIGHT-CLICK MENU
    ========================================================= */
 function handleMainAddButton() {
   if (window.innerWidth >= 768) {
@@ -5496,16 +5496,6 @@ function handleMainAddButton() {
   } else {
     openQuickAdd();
   }
-}
-
-function toggleDesktopSidebar() {
-  document.body.classList.toggle('sidebar-collapsed');
-  const collapsed = document.body.classList.contains('sidebar-collapsed');
-  const icon = document.getElementById('sidebarCollapseIcon');
-  if (icon) {
-    icon.className = collapsed ? 'fa-solid fa-angles-left text-xs' : 'fa-solid fa-angles-right text-xs';
-  }
-  localStorage.setItem('a7sbley_sidebar_collapsed', collapsed ? '1' : '0');
 }
 
 function openRowContextMenu(e, txId) {
@@ -5558,10 +5548,5 @@ navigateSegmented = function(target) {
 };
 
 window.addEventListener('DOMContentLoaded', () => {
-  if (localStorage.getItem('a7sbley_sidebar_collapsed') === '1' && window.innerWidth >= 768) {
-    document.body.classList.add('sidebar-collapsed');
-    const icon = document.getElementById('sidebarCollapseIcon');
-    if (icon) icon.className = 'fa-solid fa-angles-left text-xs';
-  }
   setTimeout(() => navigateSegmented(currentActiveView || 'home'), 260);
 });

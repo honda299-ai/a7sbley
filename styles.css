@@ -1284,14 +1284,16 @@ html:not(.dark) .native-toast-card {
 
 
 /* =========================================================
-   V21.0: 100% RESPONSIVE (MOBILE BOTTOM BAR + DESKTOP INTERACTIVE SIDEBAR)
+   V22.0: COMPACT HOVER-EXPAND DESKTOP SIDEBAR DOCK + MOBILE BAR
    ========================================================= */
 
 :root {
-  --desktop-sidebar-w: 255px;
+  --dock-collapsed-w: 66px;
+  --dock-expanded-w: 225px;
 }
 
 .sidebar-desktop-brand,
+.sidebar-desktop-tools,
 .desktop-fab-label {
   display: none;
 }
@@ -1310,57 +1312,84 @@ html:not(.dark) .native-toast-card {
 }
 
 @media (min-width: 768px) {
+  /* القائمة الجانبية المدمجة التي تفتح تلقائياً عند مرور الماوس */
   body:not(.auth-pending):not(.not-authed):not(.portal-mode) .mobile-bottom-nav {
     display: flex !important;
     flex-direction: column !important;
-    justify-content: flex-start !important;
+    justify-content: space-between !important;
     align-items: stretch !important;
     position: fixed !important;
-    top: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
+    top: 14px !important;
+    right: 14px !important;
+    bottom: 14px !important;
     left: auto !important;
-    width: var(--desktop-sidebar-w) !important;
-    height: 100vh !important;
-    border-radius: 0 !important;
+    width: var(--dock-collapsed-w) !important;
+    height: calc(100vh - 28px) !important;
+    border-radius: 22px !important;
     margin: 0 !important;
-    padding: 20px 14px !important;
-    background: #0d0f16 !important;
-    border-top: none !important;
-    border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
-    box-shadow: -10px 0 35px rgba(0, 0, 0, 0.35) !important;
-    z-index: 48 !important;
-    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s ease;
+    padding: 14px 9px !important;
+    background: rgba(13, 15, 22, 0.92) !important;
+    backdrop-filter: blur(22px) !important;
+    -webkit-backdrop-filter: blur(22px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    box-shadow: -8px 12px 35px rgba(0, 0, 0, 0.45) !important;
+    z-index: 60 !important;
+    overflow: hidden !important;
+    transition: width 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.26s ease,
+                border-color 0.26s ease !important;
+  }
+
+  /* التوسع التلقائي عند تقريب الماوس والانكماش عند إبعاده */
+  body:not(.auth-pending):not(.not-authed):not(.portal-mode) .mobile-bottom-nav:hover {
+    width: var(--dock-expanded-w) !important;
+    border-color: rgba(249, 115, 22, 0.45) !important;
+    box-shadow: -14px 18px 50px rgba(0, 0, 0, 0.72), 0 0 25px -5px rgba(249, 115, 22, 0.25) !important;
   }
 
   html:not(.dark) body:not(.auth-pending):not(.not-authed):not(.portal-mode) .mobile-bottom-nav {
-    background: #ffffff !important;
-    border-left: 1px solid #e2e8f0 !important;
-    box-shadow: -6px 0 25px rgba(15, 23, 42, 0.05) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: -6px 10px 30px rgba(15, 23, 42, 0.08) !important;
+  }
+  html:not(.dark) body:not(.auth-pending):not(.not-authed):not(.portal-mode) .mobile-bottom-nav:hover {
+    border-color: rgba(249, 115, 22, 0.5) !important;
+    box-shadow: -10px 15px 40px rgba(15, 23, 42, 0.14) !important;
   }
 
+  /* رأس القائمة (اللوجو + الاسم يظهر بنعومة عند الفتح) */
   .sidebar-desktop-brand {
     display: flex !important;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 4px 6px 18px;
-    margin-bottom: 16px;
+    gap: 11px;
+    padding: 2px 4px 12px;
+    margin-bottom: 8px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
   }
   html:not(.dark) .sidebar-desktop-brand {
     border-bottom-color: #e2e8f0;
   }
   .sidebar-desktop-brand img {
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
     border-radius: 12px;
     object-fit: contain;
-    border: 1px solid rgba(249, 115, 22, 0.4);
+    border: 1px solid rgba(249, 115, 22, 0.45);
     flex-shrink: 0;
   }
+  .brand-text-wrap {
+    opacity: 0;
+    transform: translateX(8px);
+    transition: opacity 0.2s ease, transform 0.22s ease;
+    pointer-events: none;
+  }
+  .mobile-bottom-nav:hover .brand-text-wrap {
+    opacity: 1;
+    transform: translateX(0);
+  }
   .sidebar-desktop-brand .brand-title {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 900;
     color: #ffffff;
     line-height: 1.2;
@@ -1372,119 +1401,129 @@ html:not(.dark) .native-toast-card {
     font-size: 10px;
     font-weight: 800;
     color: #f97316;
-    letter-spacing: 0.05em;
   }
 
+  /* أزرار التنقل */
   .nav-items-container {
     flex-direction: column !important;
     align-items: stretch !important;
     justify-content: flex-start !important;
-    gap: 6px !important;
+    gap: 5px !important;
+    flex: 1;
+  }
+
+  .sidebar-desktop-tools {
+    display: flex !important;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  html:not(.dark) .sidebar-desktop-tools {
+    border-top-color: #e2e8f0;
   }
 
   .mob-nav-btn {
     flex: initial !important;
     flex-direction: row !important;
     justify-content: flex-start !important;
-    gap: 12px !important;
-    padding: 12px 14px !important;
-    border-radius: 14px !important;
-    font-size: 13px !important;
+    align-items: center !important;
+    gap: 13px !important;
+    height: 42px !important;
+    padding: 0 13px !important;
+    border-radius: 13px !important;
+    font-size: 12.5px !important;
     font-weight: 800 !important;
-    text-align: right;
-    position: relative;
-    transition: transform 0.15s ease, background-color 0.2s ease, color 0.2s ease;
+    white-space: nowrap !important;
+    overflow: hidden;
+    transition: background-color 0.18s ease, color 0.18s ease, transform 0.15s ease;
   }
   .mob-nav-btn i {
     font-size: 16px !important;
-    width: 20px;
+    width: 20px !important;
     text-align: center;
     flex-shrink: 0;
   }
+  .mob-nav-btn span {
+    opacity: 0;
+    transform: translateX(8px);
+    transition: opacity 0.18s ease, transform 0.2s ease;
+  }
+  .mobile-bottom-nav:hover .mob-nav-btn span {
+    opacity: 1;
+    transform: translateX(0);
+  }
   .mob-nav-btn:hover {
-    transform: translateX(-3px);
-    background: rgba(249, 115, 22, 0.1) !important;
+    background: rgba(249, 115, 22, 0.14) !important;
     color: #f97316 !important;
+    transform: translateX(-2px);
   }
   .mob-nav-btn.active {
-    background: rgba(249, 115, 22, 0.15) !important;
+    background: rgba(249, 115, 22, 0.18) !important;
     color: #f97316 !important;
     font-weight: 900 !important;
   }
   body[data-mode="personal"] .mob-nav-btn.active {
-    background: rgba(0, 168, 255, 0.15) !important;
+    background: rgba(0, 168, 255, 0.18) !important;
     color: #38bdf8 !important;
   }
   body[data-mode="personal"] .mob-nav-btn.business-only {
     display: none !important;
   }
 
+  /* زر الإضافة السريعة: دائرة مدمجة تتحول لزر عريض عند مرور الماوس */
   .mob-nav-fab {
     order: -1 !important;
     width: 100% !important;
-    height: 46px !important;
+    height: 44px !important;
     border-radius: 14px !important;
     border: none !important;
-    margin: 0 0 12px 0 !important;
-    gap: 8px !important;
+    margin: 0 0 8px 0 !important;
+    padding: 0 14px !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
     font-size: 13px !important;
     font-weight: 900 !important;
     font-family: inherit !important;
-    box-shadow: 0 8px 20px -4px rgba(249, 115, 22, 0.5) !important;
-    transition: transform 0.15s ease, filter 0.2s ease;
+    white-space: nowrap !important;
+    overflow: hidden;
+    box-shadow: 0 6px 18px -4px rgba(249, 115, 22, 0.55) !important;
   }
-  .mob-nav-fab:hover {
-    filter: brightness(1.08);
-    transform: translateY(-1px);
+  .mob-nav-fab i {
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+    font-size: 16px;
   }
   .desktop-fab-label {
     display: inline !important;
+    opacity: 0;
+    transform: translateX(8px);
+    transition: opacity 0.18s ease, transform 0.2s ease;
+  }
+  .mobile-bottom-nav:hover .desktop-fab-label {
+    opacity: 1;
+    transform: translateX(0);
   }
 
+  /* إزاحة ثابتة بمقدار الشريط المدمج فقط حتى لا تهتز الصفحة عند فتح القائمة */
   body:not(.auth-pending):not(.not-authed):not(.portal-mode) #appHeader,
   body:not(.auth-pending):not(.not-authed):not(.portal-mode) #appMain,
   body:not(.auth-pending):not(.not-authed):not(.portal-mode) #appFooter {
-    margin-right: var(--desktop-sidebar-w) !important;
-    width: calc(100% - var(--desktop-sidebar-w)) !important;
-    max-width: calc(100% - var(--desktop-sidebar-w)) !important;
-    transition: margin-right 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-right: calc(var(--dock-collapsed-w) + 22px) !important;
+    width: calc(100% - var(--dock-collapsed-w) - 22px) !important;
+    max-width: calc(100% - var(--dock-collapsed-w) - 22px) !important;
   }
 
   #appMain {
-    padding: 20px 28px !important;
+    padding: 18px 24px !important;
   }
 
   #segmentedQuickNav {
     display: none !important;
   }
 
-  /* Collapsible Sidebar State */
-  body.sidebar-collapsed .mobile-bottom-nav {
-    width: 82px !important;
-    padding: 20px 10px !important;
-  }
-  body.sidebar-collapsed #appHeader,
-  body.sidebar-collapsed #appMain,
-  body.sidebar-collapsed #appFooter {
-    margin-right: 82px !important;
-    width: calc(100% - 82px) !important;
-    max-width: calc(100% - 82px) !important;
-  }
-  body.sidebar-collapsed .sidebar-desktop-brand {
-    flex-direction: column;
-    justify-content: center;
-  }
-  body.sidebar-collapsed .brand-text-wrap,
-  body.sidebar-collapsed .mob-nav-btn span,
-  body.sidebar-collapsed .desktop-fab-label {
-    display: none !important;
-  }
-  body.sidebar-collapsed .mob-nav-btn {
-    justify-content: center !important;
-    padding: 13px !important;
-  }
-
-  /* Mouse Interactive Rows & Cards */
+  /* تفاعلية الماوس مع الجداول والكروت */
   #transactionsTbody tr {
     transition: background-color 0.15s ease;
   }
@@ -1493,12 +1532,12 @@ html:not(.dark) .native-toast-card {
     cursor: pointer;
   }
   #transactionsTbody tr td:last-child > div {
-    opacity: 0.45;
+    opacity: 0.4;
     transition: opacity 0.15s ease, transform 0.15s ease;
   }
   #transactionsTbody tr:hover td:last-child > div {
     opacity: 1;
-    transform: scale(1.04);
+    transform: scale(1.05);
   }
 
   #debtsContainer > div,
@@ -1514,7 +1553,7 @@ html:not(.dark) .native-toast-card {
     box-shadow: 0 12px 28px -10px rgba(249, 115, 22, 0.25);
   }
 
-  /* Desktop Tabbed Views */
+  /* نظام التبويبات للكمبيوتر */
   [data-desk-view] {
     display: none !important;
   }
@@ -1532,7 +1571,7 @@ html:not(.dark) .native-toast-card {
   }
 }
 
-/* Desktop Right-Click Context Menu */
+/* قائمة كليك يمين السريعة (Desktop Context Menu) */
 .desktop-context-menu {
   position: fixed;
   z-index: 9999;
