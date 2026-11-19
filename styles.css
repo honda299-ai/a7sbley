@@ -1281,3 +1281,296 @@ html:not(.dark) .native-toast-card {
     padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
+
+
+/* =========================================================
+   V21.0: 100% RESPONSIVE (MOBILE BOTTOM BAR + DESKTOP INTERACTIVE SIDEBAR)
+   ========================================================= */
+
+:root {
+  --desktop-sidebar-w: 255px;
+}
+
+.sidebar-desktop-brand,
+.desktop-fab-label {
+  display: none;
+}
+
+.nav-items-container {
+  display: flex;
+  width: 100%;
+  justify-content: space-around;
+  align-items: center;
+}
+
+@media (max-width: 767px) {
+  .desktop-only-nav-item {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) {
+  body:not(.auth-pending):not(.not-authed):not(.portal-mode) .mobile-bottom-nav {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: auto !important;
+    width: var(--desktop-sidebar-w) !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 20px 14px !important;
+    background: #0d0f16 !important;
+    border-top: none !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: -10px 0 35px rgba(0, 0, 0, 0.35) !important;
+    z-index: 48 !important;
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s ease;
+  }
+
+  html:not(.dark) body:not(.auth-pending):not(.not-authed):not(.portal-mode) .mobile-bottom-nav {
+    background: #ffffff !important;
+    border-left: 1px solid #e2e8f0 !important;
+    box-shadow: -6px 0 25px rgba(15, 23, 42, 0.05) !important;
+  }
+
+  .sidebar-desktop-brand {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 4px 6px 18px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  html:not(.dark) .sidebar-desktop-brand {
+    border-bottom-color: #e2e8f0;
+  }
+  .sidebar-desktop-brand img {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    object-fit: contain;
+    border: 1px solid rgba(249, 115, 22, 0.4);
+    flex-shrink: 0;
+  }
+  .sidebar-desktop-brand .brand-title {
+    font-size: 16px;
+    font-weight: 900;
+    color: #ffffff;
+    line-height: 1.2;
+  }
+  html:not(.dark) .sidebar-desktop-brand .brand-title {
+    color: #0f172a;
+  }
+  .sidebar-desktop-brand .brand-sub {
+    font-size: 10px;
+    font-weight: 800;
+    color: #f97316;
+    letter-spacing: 0.05em;
+  }
+
+  .nav-items-container {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 6px !important;
+  }
+
+  .mob-nav-btn {
+    flex: initial !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    padding: 12px 14px !important;
+    border-radius: 14px !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    text-align: right;
+    position: relative;
+    transition: transform 0.15s ease, background-color 0.2s ease, color 0.2s ease;
+  }
+  .mob-nav-btn i {
+    font-size: 16px !important;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .mob-nav-btn:hover {
+    transform: translateX(-3px);
+    background: rgba(249, 115, 22, 0.1) !important;
+    color: #f97316 !important;
+  }
+  .mob-nav-btn.active {
+    background: rgba(249, 115, 22, 0.15) !important;
+    color: #f97316 !important;
+    font-weight: 900 !important;
+  }
+  body[data-mode="personal"] .mob-nav-btn.active {
+    background: rgba(0, 168, 255, 0.15) !important;
+    color: #38bdf8 !important;
+  }
+  body[data-mode="personal"] .mob-nav-btn.business-only {
+    display: none !important;
+  }
+
+  .mob-nav-fab {
+    order: -1 !important;
+    width: 100% !important;
+    height: 46px !important;
+    border-radius: 14px !important;
+    border: none !important;
+    margin: 0 0 12px 0 !important;
+    gap: 8px !important;
+    font-size: 13px !important;
+    font-weight: 900 !important;
+    font-family: inherit !important;
+    box-shadow: 0 8px 20px -4px rgba(249, 115, 22, 0.5) !important;
+    transition: transform 0.15s ease, filter 0.2s ease;
+  }
+  .mob-nav-fab:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+  .desktop-fab-label {
+    display: inline !important;
+  }
+
+  body:not(.auth-pending):not(.not-authed):not(.portal-mode) #appHeader,
+  body:not(.auth-pending):not(.not-authed):not(.portal-mode) #appMain,
+  body:not(.auth-pending):not(.not-authed):not(.portal-mode) #appFooter {
+    margin-right: var(--desktop-sidebar-w) !important;
+    width: calc(100% - var(--desktop-sidebar-w)) !important;
+    max-width: calc(100% - var(--desktop-sidebar-w)) !important;
+    transition: margin-right 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  #appMain {
+    padding: 20px 28px !important;
+  }
+
+  #segmentedQuickNav {
+    display: none !important;
+  }
+
+  /* Collapsible Sidebar State */
+  body.sidebar-collapsed .mobile-bottom-nav {
+    width: 82px !important;
+    padding: 20px 10px !important;
+  }
+  body.sidebar-collapsed #appHeader,
+  body.sidebar-collapsed #appMain,
+  body.sidebar-collapsed #appFooter {
+    margin-right: 82px !important;
+    width: calc(100% - 82px) !important;
+    max-width: calc(100% - 82px) !important;
+  }
+  body.sidebar-collapsed .sidebar-desktop-brand {
+    flex-direction: column;
+    justify-content: center;
+  }
+  body.sidebar-collapsed .brand-text-wrap,
+  body.sidebar-collapsed .mob-nav-btn span,
+  body.sidebar-collapsed .desktop-fab-label {
+    display: none !important;
+  }
+  body.sidebar-collapsed .mob-nav-btn {
+    justify-content: center !important;
+    padding: 13px !important;
+  }
+
+  /* Mouse Interactive Rows & Cards */
+  #transactionsTbody tr {
+    transition: background-color 0.15s ease;
+  }
+  #transactionsTbody tr:hover {
+    background: rgba(249, 115, 22, 0.06) !important;
+    cursor: pointer;
+  }
+  #transactionsTbody tr td:last-child > div {
+    opacity: 0.45;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  #transactionsTbody tr:hover td:last-child > div {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+
+  #debtsContainer > div,
+  #clientsContainer > div,
+  #inventoryContainer > div {
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  #debtsContainer > div:hover,
+  #clientsContainer > div:hover,
+  #inventoryContainer > div:hover {
+    transform: translateY(-3px);
+    border-color: rgba(249, 115, 22, 0.5) !important;
+    box-shadow: 0 12px 28px -10px rgba(249, 115, 22, 0.25);
+  }
+
+  /* Desktop Tabbed Views */
+  [data-desk-view] {
+    display: none !important;
+  }
+  [data-desk-view].desk-active-block {
+    display: block !important;
+  }
+  [data-desk-view].desk-active-grid {
+    display: grid !important;
+  }
+  [data-desk-view].desk-active-flex {
+    display: flex !important;
+  }
+  body[data-mode="personal"] [data-desk-view].business-only {
+    display: none !important;
+  }
+}
+
+/* Desktop Right-Click Context Menu */
+.desktop-context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 195px;
+  background: rgba(18, 21, 30, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(249, 115, 22, 0.35);
+  border-radius: 16px;
+  padding: 6px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+  animation: modalIn 0.14s ease forwards;
+}
+html:not(.dark) .desktop-context-menu {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 15px 35px rgba(15, 23, 42, 0.15);
+}
+.ctx-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #e2e8f0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: right;
+  font-family: inherit;
+}
+html:not(.dark) .ctx-item {
+  color: #1e293b;
+}
+.ctx-item:hover {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
