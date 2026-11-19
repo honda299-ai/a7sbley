@@ -1539,6 +1539,67 @@ async function hashPin(pin) {
 }
 function getPin() { return localStorage.getItem(PIN_KEY); }
 
+/* ---------- PIN v3: PBKDF2 + salt عشوائي + مزامنة عبر Firestore ----------
+   المسار السحابي: users/{uid}/security/lock  => { v:3, salt, hash, iter, updatedAt }
+   المحلي (PIN_KEY): نفس السجل كـ JSON (أو hash قديم SHA-256 يتم ترقيته تلقائيًا) */
+const PIN_ITER = 200000;
+function pinB64(u8) { let s = ''; u8.forEach(b => { s += String.fromCharCode(b); }); return btoa(s); }
+function pinUnB64(b64) { return Uint8Array.from(atob(b64), c => c.charCodeAt(0)); }
+async function pbkdf2Pin(pin, saltB64, iter) {
+  if (!(window.crypto && crypto.subtle)) throw new Error('crypto-unavailable');
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: pinUnB64(saltB64), iterations: iter, hash: 'SHA-256' }, key, 256);
+  return pinB64(new Uint8Array(bits));
+}
+async function makePinRecord(pin) {
+  const salt = pinB64(crypto.getRandomValues(new Uint8Array(16)));
+  return { v: 3, salt, hash: await pbkdf2Pin(pin, salt, PIN_ITER), iter: PIN_ITER };
+}
+function parsePinRecord(raw) {
+  if (!raw || raw.charAt(0) !== '{') return null;
+  try {
+    const r = JSON.parse(raw);
+    if (r && r.v === 3 && typeof r.salt === 'string' && typeof r.hash === 'string' && Number.isInteger(r.iter)) return r;
+  } catch (e) { /* ignore */ }
+  return null;
+}
+async function verifyPin(entered) {
+  const raw = getPin();
+  if (!raw) return true;
+  const rec = parsePinRecord(raw);
+  if (rec) return (await pbkdf2Pin(entered, rec.salt, rec.iter)) === rec.hash;
+  return (await hashPin(entered)) === raw; // رمز قديم (قبل v3)
+}
+function pinDocRef(uid) { return db.collection('users').doc(uid).collection('security').doc('lock'); }
+function pinWithTimeout(promise, ms) {
+  return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+}
+async function syncPinFromCloud(uid) {
+  try {
+    const snap = await pinWithTimeout(pinDocRef(uid).get(), 4000);
+    if (snap.exists) {
+      const d = snap.data() || {};
+      if (d.v === 3 && d.salt && d.hash && Number.isInteger(d.iter)) {
+        localStorage.setItem(PIN_KEY, JSON.stringify({ v: 3, salt: d.salt, hash: d.hash, iter: d.iter }));
+      }
+    } else if (parsePinRecord(getPin())) {
+      localStorage.removeItem(PIN_KEY); // اتشال من جهاز تاني
+    }
+    return true;
+  } catch (e) { console.warn('PIN cloud sync skipped:', e); return false; }
+}
+async function savePinEverywhere(pin) {
+  if (!currentUser) throw new Error('auth');
+  const rec = await makePinRecord(pin);
+  await pinDocRef(currentUser.uid).set({ ...rec, updatedAt: Date.now() });
+  localStorage.setItem(PIN_KEY, JSON.stringify(rec));
+}
+async function clearPinEverywhere() {
+  if (currentUser) await pinDocRef(currentUser.uid).delete();
+  localStorage.removeItem(PIN_KEY);
+}
+
 function showAuthLoading() {
   document.body.classList.add('auth-pending');
   document.body.classList.remove('not-authed');
@@ -1577,6 +1638,7 @@ function hidePinLock() {
 function handleUserSwitch(uid) {
   const lastUid = localStorage.getItem(LAST_UID_KEY);
   if (lastUid && lastUid !== uid) {
+    localStorage.removeItem(PIN_KEY);
     transactions = [];
     localStorage.removeItem(BUDGET_KEY);
     localStorage.removeItem(STORAGE_KEY);
@@ -1620,6 +1682,10 @@ auth.onAuthStateChanged(async user => {
       footerSync.innerHTML = `<i class="fa-solid fa-cloud-check text-emerald-500"></i> متصل بالسحاب (${escapeHTML(userIdentifier)})`;
     }
 
+    // مزامنة قفل الـ PIN من السحابة وإظهار القفل قبل عرض أي بيانات
+    await syncPinFromCloud(user.uid);
+    if (getPin()) showPinLock();
+
     await loadUserRole(user.uid);
     await loadRolePermissions();
 
@@ -1636,8 +1702,7 @@ auth.onAuthStateChanged(async user => {
     checkPendingShare();
 
     loadCloudData(user.uid).finally(() => {
-      if (getPin()) showPinLock();
-      else hidePinLock();
+      if (!getPin()) hidePinLock();
     });
   } else {
     currentUser = null;
@@ -3063,7 +3128,13 @@ async function handlePinAction() {
     error.classList.remove('hidden');
     return;
   }
-  localStorage.setItem(PIN_KEY, await hashPin(pin));
+  try {
+    await savePinEverywhere(pin);
+  } catch (e) {
+    error.textContent = 'تعذّر حفظ الرمز، تأكد من الاتصال بالإنترنت وحاول مرة أخرى';
+    error.classList.remove('hidden');
+    return;
+  }
   closePinModal();
   updatePinUI();
   showToast('تم حفظ PIN بنجاح', 'success');
@@ -3072,8 +3143,9 @@ async function handlePinAction() {
 function confirmRemovePin() {
   if (!requireAuth()) return;
   closeMenus();
-  openConfirm('إزالة رمز القفل؟', 'سيتم إلغاء قفل التطبيق PIN.', () => {
-    localStorage.removeItem(PIN_KEY);
+  openConfirm('إزالة رمز القفل؟', 'سيتم إلغاء قفل التطبيق PIN من كل أجهزتك.', async () => {
+    try { await clearPinEverywhere(); }
+    catch (e) { showToast('تعذّرت إزالة الرمز، تأكد من الاتصال بالإنترنت', 'error'); return; }
     updatePinUI();
     showToast('تمت إزالة رمز القفل', 'success');
   });
@@ -3083,8 +3155,13 @@ async function unlockApp() {
   const entered = input.value.trim();
   const stored = getPin();
   if (!stored) { hidePinLock(); return; }
-  const ok = (await hashPin(entered)) === stored;
-  if (ok) { hidePinLock(); input.value = ''; }
+  let ok = false;
+  try { ok = await verifyPin(entered); } catch (e) { ok = false; }
+  if (ok) {
+    hidePinLock(); input.value = '';
+    // ترقية الرمز القديم (SHA-256 محلي) إلى v3 متزامن مع السحابة
+    if (!parsePinRecord(stored)) { try { await savePinEverywhere(entered); updatePinUI(); } catch (e) { /* هيترقّى المرة الجاية */ } }
+  }
   else {
     document.getElementById('unlockError').classList.remove('hidden');
     input.value = '';
@@ -3100,7 +3177,7 @@ async function forgotPinUnlock() {
       const provider = new firebase.auth.GoogleAuthProvider();
       const res = await user.reauthenticateWithPopup(provider);
       if (res.user && res.user.uid === user.uid) {
-        localStorage.removeItem(PIN_KEY);
+        await clearPinEverywhere();
         updatePinUI();
         hidePinLock();
         showToast('تم التحقق — أزيل القفل', 'success');
@@ -3110,7 +3187,7 @@ async function forgotPinUnlock() {
       if (!pwd) return;
       const cred = firebase.auth.EmailAuthProvider.credential(user.email, pwd);
       await user.reauthenticateWithCredential(cred);
-      localStorage.removeItem(PIN_KEY);
+      await clearPinEverywhere();
       updatePinUI();
       hidePinLock();
       showToast('تم التحقق — أزيل القفل', 'success');

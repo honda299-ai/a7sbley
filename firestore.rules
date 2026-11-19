@@ -27,6 +27,32 @@ service cloud.firestore {
     function isStr(v, maxLen) {
       return v is string && v.size() <= maxLen;
     }
+    // الحقول الاختيارية في طلب العميل: لو موجودة لازم تكون بالنوع والحجم الصح
+    function optStr(d, key, maxLen) {
+      return !(key in d) || isStr(d[key], maxLen);
+    }
+    function validClientRequest(userId, reqId, d) {
+      return d.keys().hasOnly(
+               ['id','portalId','client','type','amount','category','notes','date','time',
+                'paymentMethod','status','createdAt'])
+          && d.keys().hasAll(['id','portalId','client','type','amount','notes'])
+          && d.id == reqId
+          && d.status == 'pending_approval'
+          && d.type in ['income', 'debt_receivable', 'expense']
+          && d.amount is number
+          && d.amount > 0
+          && d.amount < 100000000
+          && isStr(d.client, 100)
+          && isStr(d.notes, 300)
+          && isStr(d.portalId, 64)
+          && optStr(d, 'category', 60)
+          && optStr(d, 'date', 20)
+          && optStr(d, 'time', 20)
+          && optStr(d, 'paymentMethod', 60)
+          && (!('createdAt' in d) || d.createdAt is number)
+          && exists(/databases/$(database)/documents/client_portals/$(d.portalId))
+          && get(/databases/$(database)/documents/client_portals/$(d.portalId)).data.ownerUid == userId;
+    }
 
     // ---------- Roles & global config ----------
     match /config/roles {
@@ -62,28 +88,27 @@ service cloud.firestore {
         allow read, write: if isOwner(userId);
       }
 
+      // قفل التطبيق (PIN) المتزامن بين الأجهزة: يخزّن hash مملّح فقط (PBKDF2) وليس الرمز نفسه
+      match /security/lock {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['v','salt','hash','iter','updatedAt'])
+          && request.resource.data.keys().hasAll(['v','salt','hash','iter'])
+          && request.resource.data.v == 3
+          && isStr(request.resource.data.salt, 64)
+          && isStr(request.resource.data.hash, 128)
+          && request.resource.data.iter is int
+          && request.resource.data.iter >= 100000
+          && request.resource.data.iter <= 2000000
+          && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is number);
+      }
+
       // Client requests submitted from a public portal link.
       // The portalId acts as an unguessable capability and must belong to this user.
       match /requests/{reqId} {
-        allow create: if (
-              request.resource.data.keys().hasOnly(
-                ['id','portalId','client','type','amount','category','notes','date','time',
-                 'paymentMethod','status','createdAt'])
-              && request.resource.data.keys().hasAll(['id','portalId','client','type','amount','notes'])
-              && request.resource.data.id == reqId
-              && request.resource.data.status == 'pending_approval'
-              && request.resource.data.type in ['income', 'debt_receivable', 'expense']
-              && request.resource.data.amount is number
-              && request.resource.data.amount > 0
-              && request.resource.data.amount < 100000000
-              && isStr(request.resource.data.client, 100)
-              && isStr(request.resource.data.notes, 300)
-              && isStr(request.resource.data.portalId, 64)
-              && exists(/databases/$(database)/documents/client_portals/$(request.resource.data.portalId))
-              && get(/databases/$(database)/documents/client_portals/$(request.resource.data.portalId)).data.ownerUid == userId
-            );
+        allow create: if isOwner(userId)
+                      || validClientRequest(userId, reqId, request.resource.data);
         allow read, update, delete: if isOwner(userId);
-        allow create: if isOwner(userId);
       }
     }
 
