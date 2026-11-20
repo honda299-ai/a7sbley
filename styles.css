@@ -1281,3 +1281,60 @@ html:not(.dark) .native-toast-card {
     padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
+
+/* =========================================================
+   🧭 APP TOUR (Driver.js) — RTL / موبايل / كمبيوتر / داكن وفاتح
+   ========================================================= */
+.driver-popover.a7-tour {
+  --a7-bg: #ffffff; --a7-fg: #0f172a; --a7-muted: #475569; --a7-line: rgba(249,115,22,.28);
+  direction: rtl; text-align: right;
+  font-family: 'Cairo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: var(--a7-bg); color: var(--a7-fg);
+  border: 1px solid var(--a7-line); border-radius: 22px;
+  padding: 18px 18px 14px; min-width: 260px;
+  max-width: min(360px, calc(100vw - 24px));
+  box-shadow: 0 24px 60px -12px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.02);
+}
+html.dark .driver-popover.a7-tour {
+  --a7-bg: #14161e; --a7-fg: #f1f5f9; --a7-muted: #a8b3c5; --a7-line: rgba(249,115,22,.4);
+}
+.a7-tour .driver-popover-title {
+  font-family: inherit; font-size: 17px; font-weight: 900; line-height: 1.5; color: var(--a7-fg);
+  margin: 0 0 6px;
+}
+.a7-tour .driver-popover-description {
+  font-family: inherit; font-size: 13.5px; font-weight: 600; line-height: 1.9; color: var(--a7-muted);
+  margin: 0;
+}
+.a7-tour .driver-popover-footer {
+  margin-top: 14px; display: grid; grid-template-columns: auto auto;
+  grid-template-areas: "nav nav" "prog skip"; row-gap: 12px; align-items: center;
+}
+.a7-tour .driver-popover-navigation-btns { grid-area: nav; display: flex; gap: 8px; justify-content: stretch; flex-direction: row-reverse; }
+.a7-tour .driver-popover-footer button {
+  font-family: inherit; font-size: 13.5px; font-weight: 800; text-shadow: none;
+  border: 0; border-radius: 13px; padding: 11px 16px; min-height: 44px; /* مساحة لمس مريحة */
+  flex: 1; cursor: pointer; transition: transform .12s ease, filter .12s ease;
+}
+.a7-tour .driver-popover-footer button:active { transform: scale(.97); }
+.a7-tour .driver-popover-next-btn { background: linear-gradient(135deg, #f97316, #fb923c); color: #fff; box-shadow: 0 8px 20px -6px rgba(249,115,22,.6); }
+.a7-tour .driver-popover-prev-btn { background: rgba(148,163,184,.18); color: var(--a7-fg); }
+.a7-tour .driver-popover-btn-disabled { display: none !important; }
+.a7-tour .driver-popover-footer button:focus-visible,
+.a7-tour .a7-tour-skip:focus-visible { outline: 2px solid #f97316; outline-offset: 2px; }
+.a7-tour .driver-popover-progress-text { grid-area: prog; font-family: inherit; font-size: 12px; font-weight: 800; color: var(--a7-muted); }
+.a7-tour .a7-tour-skip {
+  grid-area: skip; justify-self: end; background: none !important; box-shadow: none !important;
+  flex: none !important; min-height: 32px !important; padding: 4px 6px !important;
+  font-size: 12px !important; font-weight: 700 !important; color: var(--a7-muted) !important; text-decoration: underline;
+}
+/* ألوان السهم تتبع لون الخلفية */
+.driver-popover.a7-tour .driver-popover-arrow-side-top.driver-popover-arrow    { border-top-color: var(--a7-bg); }
+.driver-popover.a7-tour .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: var(--a7-bg); }
+.driver-popover.a7-tour .driver-popover-arrow-side-left.driver-popover-arrow   { border-left-color: var(--a7-bg); }
+.driver-popover.a7-tour .driver-popover-arrow-side-right.driver-popover-arrow  { border-right-color: var(--a7-bg); }
+@media (max-width: 767px) {
+  .driver-popover.a7-tour { padding: 16px 16px 12px; border-radius: 20px; }
+  .a7-tour .driver-popover-title { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .a7-tour .driver-popover-footer button { transition: none; } }

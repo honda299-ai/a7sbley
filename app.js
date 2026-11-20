@@ -52,6 +52,46 @@ const PERMS_CACHE_KEY = 'ehsebli_perms_cache';
 
 const INVENTORY_KEY = 'ehsebli_inventory_v1';
 const AUDIT_KEY = 'ehsebli_audit_v1';
+
+/* =========================================================
+   عزل بيانات كل مستخدم (حساب / زائر) على نفس الجهاز
+   كل مفتاح بيانات بيتخزن باسم:  المفتاح::UID
+   فبيانات الزائر وبيانات كل حساب عمرهم ما يختلطوا.
+   ========================================================= */
+function dataScope() { return (currentUser && currentUser.uid) ? String(currentUser.uid) : null; }
+function scopedKey(key, scope) { return key + '::' + (scope || dataScope()); }
+function lsGet(key) {
+  const sc = dataScope();
+  return sc ? localStorage.getItem(scopedKey(key, sc)) : null;
+}
+function lsSet(key, value) {
+  const sc = dataScope();
+  if (!sc) return;
+  try { localStorage.setItem(scopedKey(key, sc), value); } catch (e) { console.warn('localStorage full/blocked', e); }
+}
+function lsDel(key) {
+  const sc = dataScope();
+  if (sc) localStorage.removeItem(scopedKey(key, sc));
+}
+// نقل البيانات القديمة (قبل العزل) مرة واحدة لصاحبها بدل ما تفضل مشتركة
+function migrateLegacyLocalData(uid) {
+  try {
+    if (localStorage.getItem('a7sbley_scope_migrated_v1') === 'true') return;
+    const legacyKeys = [STORAGE_KEY, BUDGET_KEY, INVENTORY_KEY, AUDIT_KEY, RECURRING_KEY, PIN_KEY, PERMS_CACHE_KEY, APP_MODE_KEY, DEMO_FLAG_KEY];
+    const hasLegacy = legacyKeys.some(k => localStorage.getItem(k) !== null);
+    if (!hasLegacy) { localStorage.setItem('a7sbley_scope_migrated_v1', 'true'); return; }
+    const lastUid = localStorage.getItem(LAST_UID_KEY);
+    const isGuestUid = String(uid).startsWith('guest-');
+    // صاحب البيانات القديمة: آخر مستخدم معروف، أو أول حساب حقيقي يدخل (الزائر مايستولاش عليها)
+    const owner = lastUid || (!isGuestUid ? uid : null);
+    if (owner !== uid) return;
+    legacyKeys.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v !== null) { localStorage.setItem(scopedKey(k, uid), v); localStorage.removeItem(k); }
+    });
+    localStorage.setItem('a7sbley_scope_migrated_v1', 'true');
+  } catch (e) { console.warn('legacy migration failed', e); }
+}
 let inventoryItems = [];
 let auditLogs = [];
 let editingInvId = null;
@@ -858,10 +898,10 @@ async function loadRolePermissions() {
       Object.keys(merged).forEach(r => { if (cloud[r]) merged[r] = { ...merged[r], ...cloud[r] }; });
       rolePermissions = merged;
     }
-    localStorage.setItem(PERMS_CACHE_KEY, JSON.stringify(rolePermissions));
+    lsSet(PERMS_CACHE_KEY, JSON.stringify(rolePermissions));
   } catch (error) {
     try {
-      const cached = localStorage.getItem(PERMS_CACHE_KEY);
+      const cached = lsGet(PERMS_CACHE_KEY);
       if (cached) rolePermissions = JSON.parse(cached);
     } catch(e) {}
   }
@@ -876,7 +916,7 @@ async function saveRolePermissionsToCloud() {
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedBy: currentUser.uid
     }, { merge: true });
-    localStorage.setItem(PERMS_CACHE_KEY, JSON.stringify(rolePermissions));
+    lsSet(PERMS_CACHE_KEY, JSON.stringify(rolePermissions));
     return true;
   } catch (error) { showToast('فشل الحفظ في السحابة', 'error'); return false; }
 }
@@ -1355,10 +1395,11 @@ function loginAsGuest() {
   loadRecurring();
   loadAuditLog();
   refreshAll();
+  syncModeForCurrentUser();
   navigateSegmented('home');
   applyRoleUI();
   updatePinUI();
-  setTimeout(startAppTour, 800);
+  scheduleAppTour(800);
 }
 
 function setEmailMode(mode) {
@@ -1542,7 +1583,7 @@ async function hashPin(pin) {
   for (let i = 0; i < salted.length; i++) { h ^= salted.charCodeAt(i); h = Math.imul(h, 16777619); }
   return 'fnv_' + (h >>> 0).toString(16);
 }
-function getPin() { return localStorage.getItem(PIN_KEY); }
+function getPin() { return lsGet(PIN_KEY); }
 
 /* ---------- PIN v3: PBKDF2 + salt عشوائي + مزامنة عبر Firestore ----------
    المسار السحابي: users/{uid}/security/lock  => { v:3, salt, hash, iter, updatedAt }
@@ -1586,10 +1627,10 @@ async function syncPinFromCloud(uid) {
     if (snap.exists) {
       const d = snap.data() || {};
       if (d.v === 3 && d.salt && d.hash && Number.isInteger(d.iter)) {
-        localStorage.setItem(PIN_KEY, JSON.stringify({ v: 3, salt: d.salt, hash: d.hash, iter: d.iter }));
+        lsSet(PIN_KEY, JSON.stringify({ v: 3, salt: d.salt, hash: d.hash, iter: d.iter }));
       }
     } else if (parsePinRecord(getPin())) {
-      localStorage.removeItem(PIN_KEY); // اتشال من جهاز تاني
+      lsDel(PIN_KEY); // اتشال من جهاز تاني
     }
     return true;
   } catch (e) { console.warn('PIN cloud sync skipped:', e); return false; }
@@ -1598,11 +1639,11 @@ async function savePinEverywhere(pin) {
   if (!currentUser) throw new Error('auth');
   const rec = await makePinRecord(pin);
   await pinDocRef(currentUser.uid).set({ ...rec, updatedAt: Date.now() });
-  localStorage.setItem(PIN_KEY, JSON.stringify(rec));
+  lsSet(PIN_KEY, JSON.stringify(rec));
 }
 async function clearPinEverywhere() {
   if (currentUser) await pinDocRef(currentUser.uid).delete();
-  localStorage.removeItem(PIN_KEY);
+  lsDel(PIN_KEY);
 }
 
 function showAuthLoading() {
@@ -1641,14 +1682,14 @@ function hidePinLock() {
 }
 
 function handleUserSwitch(uid) {
-  const lastUid = localStorage.getItem(LAST_UID_KEY);
-  if (lastUid && lastUid !== uid) {
-    localStorage.removeItem(PIN_KEY);
-    transactions = [];
-    localStorage.removeItem(BUDGET_KEY);
-    localStorage.removeItem(STORAGE_KEY);
-    lastDeletedId = null;
-  }
+  // بدل ما نمسح بيانات المستخدم اللي قبله، كل مستخدم له مساحة تخزين مستقلة.
+  // هنا بس بنصفّر الذاكرة (RAM) عشان مايفضلش أي أثر من الجلسة السابقة.
+  migrateLegacyLocalData(uid);
+  transactions = [];
+  inventoryItems = [];
+  recurringExpenses = [];
+  auditLogs = [];
+  lastDeletedId = null;
   localStorage.setItem(LAST_UID_KEY, uid);
 }
 
@@ -1657,112 +1698,210 @@ function handleUserSwitch(uid) {
    ========================================================= */
 
 /* =========================================================
-   FIRST TIME TUTORIAL (ONBOARDING TOUR) - ROBUST V3
+   حالة "غير مسجّل" (بعد تسجيل الخروج من حساب أو من وضع الزائر)
    ========================================================= */
-function startAppTour() {
-  // التأكد من وجود المكتبة الأول
-  if (!window.driver || !window.driver.js) {
-    console.warn("Driver.js not found!");
-    return;
+function applySignedOutState() {
+  currentUser = null;
+  userRole = 'free';
+  isSuperAdmin = false;
+  currentUserPermissionsOverride = null;
+  rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+
+  transactions = [];
+  inventoryItems = [];
+  recurringExpenses = [];
+  auditLogs = [];
+
+  [() => userDocUnsubscribe, () => transactionsUnsubscribe, () => requestsUnsubscribe, () => cloudUserMetaUnsubscribe]
+    .forEach(get => { try { const fn = get(); if (typeof fn === 'function') fn(); } catch (e) {} });
+  userDocUnsubscribe = null; transactionsUnsubscribe = null; requestsUnsubscribe = null; cloudUserMetaUnsubscribe = null;
+  cloudSnapshot.clear(); portalIndex.clear(); portalPayloadCache.clear();
+
+  if (typeof _tourDriver !== 'undefined' && _tourDriver) _finishTour(false);
+  hidePinLock();
+  showLoginWall();
+  const footerSync = document.getElementById('footerSyncStatus');
+  if (footerSync) footerSync.innerHTML = `<i class="fa-solid fa-database text-amber-500"></i> سجّل الدخول للمزامنة`;
+  loadAllLocal();
+  applyRoleUI();
+}
+
+/* =========================================================
+   الجولة التعريفية (Onboarding Tour) — احترافية للموبايل والكمبيوتر
+   - بتستنى لحد ما شاشة الدخول / القفل / اختيار الوضع تتقفل
+   - بتتخطى أي عنصر مش ظاهر على الجهاز الحالي (موبايل أو كمبيوتر)
+   - بتظهر مرة واحدة على الجهاز، وممكن تتعاد من الملف الشخصي
+   ========================================================= */
+const TOUR_DONE_KEY = 'a7sbley_tour_done_v5';
+let _tourDriver = null;
+let _tourTimer = null;
+let _tourKeyHandler = null;
+
+function _tourVisible(el) {
+  if (!el || !el.isConnected) return false;
+  const r = el.getBoundingClientRect();
+  if (r.width < 2 || r.height < 2) return false;
+  const cs = getComputedStyle(el);
+  return cs.display !== 'none' && cs.visibility !== 'hidden';
+}
+function _tourFirstVisible(selectors) {
+  for (const sel of [].concat(selectors)) {
+    for (const el of document.querySelectorAll(sel)) if (_tourVisible(el)) return el;
   }
-  
-  const isTourDone = localStorage.getItem('a7sbley_tour_done_v4');
-  if (isTourDone) return; // خلاص عملها قبل كده
-
-  const isMobile = window.innerWidth < 768;
-  const driver = window.driver.js.driver;
-  
-  const steps = [];
-
-  // الخطوة 1: ترحيب عام على الهيدر
-  steps.push({
-    element: '#appHeader',
-    popover: {
-      title: 'أهلاً بك في احسبلي! 👋',
-      description: 'نظامك المالي الشامل للتحكم في حساباتك وديونك بكل بساطة.',
-      side: "bottom", align: 'center'
-    }
+  return null;
+}
+function _tourBlocked() {
+  const b = document.body.classList;
+  if (b.contains('not-authed') || b.contains('auth-pending')) return true;
+  return ['authLoading', 'loginWall', 'lockScreen', 'modeOnboardingModal', 'userProfileModal'].some(id => {
+    const el = document.getElementById(id);
+    return el && !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none';
   });
+}
 
-  // الخطوة 2: زر التبديل
-  const modeBtn = document.getElementById('modeSwitcherBtn');
-  if (modeBtn && modeBtn.offsetParent !== null) {
-    steps.push({
-      element: '#modeSwitcherBtn',
-      popover: {
-        title: 'شخصي ولا شغل؟ 🏪/👤',
-        description: 'بضغطة هنا تفصل بين حسابات المحل (ديون ومخزن) وحساباتك الشخصية.',
-        side: "bottom", align: 'center'
-      }
-    });
+function scheduleAppTour(delay = 800, force = false) {
+  if (!force && localStorage.getItem(TOUR_DONE_KEY)) return;
+  clearTimeout(_tourTimer);
+  const deadline = Date.now() + 90000;
+  const tick = () => {
+    if (!currentUser || _tourDriver) return;
+    if (_tourBlocked()) {
+      if (Date.now() < deadline) _tourTimer = setTimeout(tick, 700);
+      return;
+    }
+    startAppTour({ force });
+  };
+  _tourTimer = setTimeout(tick, delay);
+}
+
+function _finishTour(completed) {
+  localStorage.setItem(TOUR_DONE_KEY, 'true');
+  const d = _tourDriver;
+  _tourDriver = null;
+  if (_tourKeyHandler) { document.removeEventListener('keydown', _tourKeyHandler, true); _tourKeyHandler = null; }
+  try { if (d) d.destroy(); } catch (e) {}
+  if (completed && typeof confetti === 'function' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    confetti({ particleCount: 90, spread: 75, origin: { y: .65 } });
   }
+}
+
+function startAppTour(opts) {
+  const force = opts === true || !!(opts && opts.force);
+  if (_tourDriver || !currentUser) return;
+  if (!force && localStorage.getItem(TOUR_DONE_KEY)) return;
+  const driverFactory = window.driver && window.driver.js && window.driver.js.driver;
+  if (!driverFactory) { console.warn('Driver.js not loaded'); return; }
+
+  navigateSegmented('home');
+  window.scrollTo(0, 0);
+  setTimeout(() => _runAppTour(driverFactory), 400);
+}
+
+function _runAppTour(driverFactory) {
+  if (_tourDriver || !currentUser || _tourBlocked()) return;
+
+  const isMobile = window.matchMedia('(max-width: 767px)').matches;
+  const isBusiness = (document.body.getAttribute('data-mode') || 'business') === 'business';
+
+  const defs = [
+    { title: 'أهلاً بيك في احسبلي 👋',
+      desc: 'جولة سريعة (أقل من دقيقة) تعرّفك على أهم الأماكن في التطبيق. تقدر تتخطاها في أي وقت وتعيدها من ملفك الشخصي.' },
+    { el: ['#modeSwitcherBtn'], side: 'bottom',
+      title: 'شخصي ولا شغل؟ 🏪 / 👤',
+      desc: 'بضغطة واحدة تفصل بين حسابات المحل (ديون وعملاء ومخزن) وحساباتك الشخصية.' }
+  ];
 
   if (isMobile) {
-    // خطوات الموبايل
-    steps.push({
-      element: '.fintech-bank-card',
-      popover: {
-        title: 'خزنتك ورصيدك 💰',
-        description: 'شوف رصيدك الكلي اللي في إيدك بعد الخصم والإضافات في كارت واحد.',
-        side: "bottom", align: 'center'
-      }
-    });
-    steps.push({
-      element: '.ft-action-grid',
-      popover: {
-        title: 'الإضافة السريعة ⚡',
-        description: 'سجل دخلك أو مصروفاتك بسرعة جداً من هنا.',
-        side: "top", align: 'center'
-      }
-    });
-    steps.push({
-      element: '#mobileBottomNav',
-      popover: {
-        title: 'التنقل السريع 🔄',
-        description: 'اتنقل بين المعاملات، الديون، والعملاء من الشريط الثابت ده.',
-        side: "top", align: 'center'
-      }
-    });
+    defs.push(
+      { el: ['.fintech-bank-card'], side: 'bottom', title: 'رصيدك في كارت واحد 💳',
+        desc: 'صافي رصيدك بعد الدخل والمصروفات بيظهر هنا مباشرة، وتقدر تخفيه بضغطة لو حابب خصوصية.' },
+      { el: ['.ft-action-grid'], side: 'top', title: 'إضافة سريعة ⚡',
+        desc: 'سجّل دخل أو مصروف في ثواني من الأزرار دي.' },
+      { el: ['.mob-nav-fab'], side: 'top', title: 'زر الإضافة (+)',
+        desc: 'متاح في أي صفحة. اضغط عليه وسجّل أي عملية من غير ما تخرج من مكانك.' },
+      { el: ['#mobileBottomNav'], side: 'top', title: 'التنقل بين الأقسام 🔄',
+        desc: 'من الشريط ده تنتقل بين الرئيسية والمعاملات والديون والمخزن.' }
+    );
   } else {
-    // خطوات الكمبيوتر
-    steps.push({
-      element: '#statNet',
-      popover: {
-        title: 'الرصيد المتاح 💰',
-        description: 'صافي رصيدك بيظهر هنا مباشرة بناءً على الإيرادات والمصروفات.',
-        side: "bottom", align: 'start'
-      }
-    });
-    steps.push({
-      element: '#mobileBottomNav',
-      popover: {
-        title: 'القائمة التفاعلية 🖱️',
-        description: 'هتلاقي هنا كل أقسام التطبيق والإعدادات. القائمة بتفتح لوحدها لما تقرب الماوس منها.',
-        side: "right", align: 'start'
-      }
-    });
+    defs.push(
+      { el: ['#statNet'], side: 'bottom', align: 'start', pick: el => el.closest('div[class*="rounded"]') || el,
+        title: 'الرصيد المتاح 💰', desc: 'صافي رصيدك بيتحدث لحظياً من الإيرادات والمصروفات.' },
+      { el: ['section button[onclick="openModal(\'income\')"]'], side: 'bottom', pick: el => el.parentElement,
+        title: 'إضافة العمليات ⚡', desc: 'سجّل دخل أو مصروف أو صدقة من الأزرار دي في أي وقت.' },
+      { el: ['#segmentedQuickNav'], side: 'bottom', title: 'التنقل بين الأقسام 🔄',
+        desc: 'بدّل بين الرئيسية والمعاملات والديون والعملاء بضغطة واحدة.' }
+    );
   }
 
-  const driverObj = driver({
+  defs.push(
+    { el: ['#userProfile'], side: 'bottom', title: 'حسابك وبياناتك 🔐',
+      desc: 'من هنا تشوف حسابك، وتخرج، وتعيد الجولة دي. بيانات كل حساب منفصلة تماماً عن بيانات وضع الزائر.' },
+    { title: 'جاهز تبدأ! 🚀',
+      desc: isBusiness
+        ? 'ابدأ بتسجيل أول عملية، ولو حابب تجرب قبل ما تدخل بياناتك الحقيقية استخدم البيانات التجريبية.'
+        : 'ابدأ بتسجيل أول مصروف أو دخل، وحدد ميزانية شهرية عشان تتابع صرفك بسهولة.' }
+  );
+
+  const steps = [];
+  defs.forEach(d => {
+    const popover = { title: d.title, description: d.desc };
+    if (d.side) popover.side = d.side;
+    popover.align = d.align || 'center';
+    if (d.el) {
+      let el = _tourFirstVisible(d.el);
+      if (!el) return;
+      if (d.pick) { try { el = d.pick(el) || el; } catch (e) {} }
+      steps.push({ element: el, popover });
+    } else {
+      steps.push({ popover });
+    }
+  });
+  if (steps.length < 2) return;
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const lastIndex = steps.length - 1;
+
+  _tourDriver = driverFactory({
+    steps,
+    popoverClass: 'a7-tour',
     showProgress: true,
-    nextBtnText: 'التالي ➔',
-    prevBtnText: '⬅️ السابق',
-    doneBtnText: 'فهمت، يلا نبدأ! 🚀',
-    progressText: 'خطوة {{current}} من {{total}}',
+    progressText: '{{current}} من {{total}}',
+    nextBtnText: 'التالي',
+    prevBtnText: 'السابق',
+    doneBtnText: 'يلا نبدأ 🚀',
+    showButtons: ['next', 'previous'],
     allowClose: false,
-    steps: steps,
-    onDestroyStarted: () => {
-      localStorage.setItem('a7sbley_tour_done_v4', 'true');
-      driverObj.destroy();
-      if (typeof confetti === 'function') confetti({ particleCount: 100, spread: 80, origin: { y: .6 } });
+    allowKeyboardControl: true,
+    disableActiveInteraction: true,
+    smoothScroll: !reduceMotion,
+    animate: !reduceMotion,
+    overlayColor: '#05060a',
+    overlayOpacity: 0.78,
+    stagePadding: isMobile ? 6 : 10,
+    stageRadius: 16,
+    popoverOffset: 14,
+    onPopoverRender: (popover, { state }) => {
+      try {
+        const old = popover.footer.querySelector('.a7-tour-skip');
+        if (old) old.remove();
+        if (state.activeIndex !== lastIndex) {
+          const skip = document.createElement('button');
+          skip.type = 'button';
+          skip.className = 'a7-tour-skip';
+          skip.textContent = 'تخطي الجولة';
+          skip.addEventListener('click', () => _finishTour(false));
+          popover.footer.appendChild(skip);
+        }
+      } catch (e) { /* الجولة تشتغل حتى من غير زر التخطي */ }
+    },
+    onDestroyStarted: (element, step, { state }) => {
+      _finishTour(!!state && state.activeIndex === lastIndex);
     }
   });
 
-  // نفتح الشاشة الرئيسية الأول عشان كل العناصر تبان صح
-  navigateSegmented('home');
-  setTimeout(() => {
-    driverObj.drive();
-  }, 1000); // استنى ثانية عشان الواجهة ترسم نفسها صح
+  _tourKeyHandler = e => { if (e.key === 'Escape') _finishTour(false); };
+  document.addEventListener('keydown', _tourKeyHandler, true);
+  _tourDriver.drive();
 }
 
 auth.onAuthStateChanged(async user => {
@@ -1780,6 +1919,7 @@ auth.onAuthStateChanged(async user => {
     currentUser = user;
     handleUserSwitch(user.uid);
     hideLoginWall();
+    syncModeForCurrentUser();
     if (userProfile) {
       userProfile.classList.remove('hidden');
       userProfile.classList.add('flex');
@@ -1817,38 +1957,25 @@ auth.onAuthStateChanged(async user => {
       else hidePinLock();
       
       // تشغيل التوتوريال بعد ما كل حاجة تحمل
-      setTimeout(startAppTour, 1500);
+      scheduleAppTour(1500);
     });
   } else {
-    currentUser = null;
-    userRole = 'free';
-    isSuperAdmin = false;
-    currentUserPermissionsOverride = null;
-    rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
-    
-    transactions = [];
-    inventoryItems = [];
-    recurringExpenses = [];
-    localStorage.removeItem(LAST_UID_KEY);
-
-    if (userDocUnsubscribe) { try { userDocUnsubscribe(); } catch(e) {} userDocUnsubscribe = null; }
-    if (transactionsUnsubscribe) { try { transactionsUnsubscribe(); } catch(e) {} transactionsUnsubscribe = null; }
-    if (requestsUnsubscribe) { try { requestsUnsubscribe(); } catch(e) {} requestsUnsubscribe = null; }
-    cloudSnapshot.clear(); portalIndex.clear(); portalPayloadCache.clear();
-    hidePinLock();
-    showLoginWall();
-    if(footerSync) footerSync.innerHTML = `<i class="fa-solid fa-database text-amber-500"></i> سجّل الدخول للمزامنة`;
-    loadAllLocal();
-    applyRoleUI();
+    applySignedOutState();
   }
 });
 
 
 function logout() {
   if (!currentUser) return;
-  openConfirm('تسجيل الخروج؟', 'سيتم إنهاء الجلسة. بياناتك محفوظة في السحابة بأمان.', () => auth.signOut());
+  if (isRealCloudUser()) {
+    openConfirm('تسجيل الخروج؟', 'سيتم إنهاء الجلسة. بياناتك محفوظة في السحابة بأمان.', () => auth.signOut());
+  } else {
+    openConfirm('الخروج من وضع الزائر؟', 'بيانات الزائر محفوظة على هذا الجهاز فقط ومنفصلة تماماً عن أي حساب، وهتلاقيها لما تدخل كزائر تاني.', () => applySignedOutState());
+  }
 }
-function logoutFromLock() { auth.signOut(); }
+function logoutFromLock() {
+  if (isRealCloudUser()) auth.signOut(); else applySignedOutState();
+}
 
 /* =========================================================
    REALTIME LISTENER
@@ -2019,14 +2146,14 @@ async function loadCloudData(uid) {
       const data = userDoc.data();
       if (Array.isArray(data.transactions)) legacyTx = data.transactions;
       if (Array.isArray(data.pendingRequests)) legacyReqs = data.pendingRequests;
-      if (data.budget !== undefined) localStorage.setItem(BUDGET_KEY, data.budget);
+      if (data.budget !== undefined) lsSet(BUDGET_KEY, data.budget);
       if (Array.isArray(data.inventory)) {
         inventoryItems = data.inventory;
-        localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventoryItems));
+        lsSet(INVENTORY_KEY, JSON.stringify(inventoryItems));
       }
       if (Array.isArray(data.recurring)) {
         recurringExpenses = data.recurring;
-        localStorage.setItem(RECURRING_KEY, JSON.stringify(recurringExpenses));
+        lsSet(RECURRING_KEY, JSON.stringify(recurringExpenses));
       }
     }
 
@@ -2057,17 +2184,17 @@ async function loadCloudData(uid) {
       const d = snap.data();
       let needRefresh = false;
       if (d.budget !== undefined && Number(d.budget) !== getBudget()) {
-        localStorage.setItem(BUDGET_KEY, d.budget);
+        lsSet(BUDGET_KEY, d.budget);
         needRefresh = true;
       }
       if (Array.isArray(d.inventory) && JSON.stringify(d.inventory) !== JSON.stringify(inventoryItems)) {
         inventoryItems = d.inventory;
-        localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventoryItems));
+        lsSet(INVENTORY_KEY, JSON.stringify(inventoryItems));
         if (typeof renderInventory === 'function') renderInventory();
       }
       if (Array.isArray(d.recurring) && JSON.stringify(d.recurring) !== JSON.stringify(recurringExpenses)) {
         recurringExpenses = d.recurring;
-        localStorage.setItem(RECURRING_KEY, JSON.stringify(recurringExpenses));
+        lsSet(RECURRING_KEY, JSON.stringify(recurringExpenses));
       }
       if (needRefresh) refreshAll();
     });
@@ -2156,12 +2283,12 @@ function loadAllLocal() {
 
 function loadLocalData() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = lsGet(STORAGE_KEY);
     const arr = saved ? JSON.parse(saved) : [];
     transactions = Array.isArray(arr) ? arr.filter(validateTransaction).map(normalizeTransaction) : [];
   } catch (error) { transactions = []; }
 }
-function saveLocalData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions)); }
+function saveLocalData() { lsSet(STORAGE_KEY, JSON.stringify(transactions)); }
 function saveData(options = {}) {
   if (!requireAuth()) return;
   saveLocalData();
@@ -2922,7 +3049,7 @@ function toggleDebtStatus(id) {
 /* =========================================================
    BUDGET
    ========================================================= */
-function getBudget() { return Number(localStorage.getItem(BUDGET_KEY) || 0); }
+function getBudget() { return Number(lsGet(BUDGET_KEY) || 0); }
 
 function openBudgetModal() {
   if (!requireAuth()) return;
@@ -2939,7 +3066,7 @@ function saveBudget() {
   if (!requireAuth()) return;
   const value = Number(document.getElementById('budgetInput').value);
   if (!isFinite(value) || value < 0 || value > 1e9) { showToast('قيمة الميزانية غير صحيحة', 'error'); return; }
-  localStorage.setItem(BUDGET_KEY, value);
+  lsSet(BUDGET_KEY, value);
   closeBudgetModal();
   updateBudget();
   syncToCloud();
@@ -2947,7 +3074,7 @@ function saveBudget() {
 }
 function clearBudget() {
   if (!requireAuth()) return;
-  localStorage.removeItem(BUDGET_KEY);
+  lsDel(BUDGET_KEY);
   closeBudgetModal();
   updateBudget();
   syncToCloud();
@@ -3026,7 +3153,7 @@ function restoreBackup(event) {
       openConfirm('استعادة النسخة؟', `سيتم استبدال العمليات بـ <strong>${restored.length}</strong> عملية.`, () => {
         const now = Date.now();
         transactions = restored.map((item, i) => normalizeTransaction({ ...item, _updatedAt: now + i }));
-        if (backup.budget !== undefined) localStorage.setItem(BUDGET_KEY, Number(backup.budget) || 0);
+        if (backup.budget !== undefined) lsSet(BUDGET_KEY, Number(backup.budget) || 0);
         saveData({ force: true });
         refreshAll();
         closeBackupModal();
@@ -3577,7 +3704,7 @@ function confirmClearData() {
   closeMenus();
   openConfirm('تصفير جميع البيانات؟', 'سيتم حذف كل المعاملات والميزانية نهائياً.', () => {
     transactions = [];
-    localStorage.removeItem(BUDGET_KEY);
+    lsDel(BUDGET_KEY);
     saveData({ force: true });
     refreshAll();
     showToast('تم تصفير البيانات بالكامل', 'info');
@@ -3651,7 +3778,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('formTime').value = currentInputTimeString();
 
   try {
-    const cached = localStorage.getItem(PERMS_CACHE_KEY);
+    const cached = lsGet(PERMS_CACHE_KEY);
     if (cached) rolePermissions = JSON.parse(cached);
   } catch(e) {}
   applyRoleUI();
@@ -4651,12 +4778,12 @@ function calculateProfit() {
    ========================================================= */
 function loadInventory() {
   try {
-    const saved = localStorage.getItem(INVENTORY_KEY);
+    const saved = lsGet(INVENTORY_KEY);
     inventoryItems = saved ? JSON.parse(saved) : [];
   } catch(e) { inventoryItems = []; }
 }
 function saveInventory() {
-  localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventoryItems));
+  lsSet(INVENTORY_KEY, JSON.stringify(inventoryItems));
   if (isRealCloudUser()) syncToCloud();
 }
 function openInventoryModal(id = null) {
@@ -4770,12 +4897,12 @@ function renderInventory() {
    ========================================================= */
 function loadAuditLog() {
   try {
-    const saved = localStorage.getItem(AUDIT_KEY);
+    const saved = lsGet(AUDIT_KEY);
     auditLogs = saved ? JSON.parse(saved) : [];
   } catch(e) { auditLogs = []; }
 }
 function saveAuditLog() {
-  localStorage.setItem(AUDIT_KEY, JSON.stringify(auditLogs));
+  lsSet(AUDIT_KEY, JSON.stringify(auditLogs));
 }
 function logAudit(action, details) {
   const log = {
@@ -4839,12 +4966,12 @@ let recurringExpenses = [];
 
 function loadRecurring() {
   try {
-    const saved = localStorage.getItem(RECURRING_KEY);
+    const saved = lsGet(RECURRING_KEY);
     recurringExpenses = saved ? JSON.parse(saved) : [];
   } catch(e) { recurringExpenses = []; }
 }
 function saveRecurring() {
-  localStorage.setItem(RECURRING_KEY, JSON.stringify(recurringExpenses));
+  lsSet(RECURRING_KEY, JSON.stringify(recurringExpenses));
   if (isRealCloudUser()) syncToCloud();
 }
 function openRecurringModal() {
@@ -5452,20 +5579,24 @@ switchTab = function(tab, shouldScroll = false) {
 };
 
 function initAppModeAndTabs() {
-  const savedMode = localStorage.getItem(APP_MODE_KEY);
-  if (!savedMode) {
-    applyAppMode('business');
-    if (currentUser && !isPortalModeActive) {
-      const modal = document.getElementById('modeOnboardingModal');
-      if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
-    }
-  } else {
-    applyAppMode(savedMode);
-  }
+  if (currentUser) syncModeForCurrentUser(); else applyAppMode('business', false);
   updateDemoBanner();
   navigateSegmented('home');
   updateMetrics();
   renderTransactions();
+}
+
+// تطبيق وضع (محل/شخصي) المستخدم الحالي، أو إظهار شاشة الاختيار لو أول مرة
+function syncModeForCurrentUser() {
+  if (!currentUser || window.isPortalModeActive) return;
+  const saved = lsGet(APP_MODE_KEY);
+  applyAppMode(saved || 'business', false);
+  const modal = document.getElementById('modeOnboardingModal');
+  if (modal) {
+    modal.classList.toggle('hidden', !!saved);
+    modal.classList.toggle('flex', !saved);
+  }
+  updateDemoBanner();
 }
 
 function selectInitialMode(mode) {
@@ -5475,9 +5606,9 @@ function selectInitialMode(mode) {
   showToast(mode === 'business' ? 'تم تفعيل وضع المحل والتجارة 🏪' : 'تم تفعيل الوضع الشخصي 👤', 'success');
 }
 
-function applyAppMode(mode) {
+function applyAppMode(mode, persist = true) {
   document.body.setAttribute('data-mode', mode);
-  localStorage.setItem(APP_MODE_KEY, mode);
+  if (persist) lsSet(APP_MODE_KEY, mode);
 
   const icon = document.getElementById('modeSwitchIcon');
   const label = document.getElementById('modeSwitchLabel');
@@ -5505,7 +5636,7 @@ function startWithDemoMode() {
   selectInitialMode('business');
   const now = Date.now();
   transactions = JSON.parse(JSON.stringify(DEMO_ITEMS)).map((t, i) => normalizeTransaction({ ...t, _updatedAt: now + i }));
-  localStorage.setItem(DEMO_FLAG_KEY, 'true');
+  lsSet(DEMO_FLAG_KEY, 'true');
   saveLocalData();
   refreshAll();
   updateDemoBanner();
@@ -5515,7 +5646,7 @@ function startWithDemoMode() {
 function exitDemoData() {
   openConfirm('مسح البيانات التجريبية؟', 'سيتم تصفير البيانات التجريبية لتبدأ تسجيل حساباتك الحقيقية.', () => {
     transactions = [];
-    localStorage.removeItem(DEMO_FLAG_KEY);
+    lsDel(DEMO_FLAG_KEY);
     saveData({ force: true });
     refreshAll();
     updateDemoBanner();
@@ -5526,7 +5657,7 @@ function exitDemoData() {
 function updateDemoBanner() {
   const banner = document.getElementById('demoModeBanner');
   if (!banner) return;
-  const isDemo = localStorage.getItem(DEMO_FLAG_KEY) === 'true';
+  const isDemo = lsGet(DEMO_FLAG_KEY) === 'true';
   banner.classList.toggle('hidden', !isDemo);
 }
 
@@ -5671,15 +5802,5 @@ applyAppMode = function(mode) {
   }
 };
 
-// Check on auth resolved if mode onboarding should pop up
-auth.onAuthStateChanged(user => {
-  if (user && !isPortalModeActive && !localStorage.getItem(APP_MODE_KEY)) {
-    setTimeout(() => {
-      const modal = document.getElementById('modeOnboardingModal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
-    }, 650);
-  }
-});
+// (اختيار الوضع بيتم الآن داخل syncModeForCurrentUser لكل مستخدم على حدة)
+

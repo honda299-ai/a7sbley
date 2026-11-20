@@ -38,7 +38,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20.0">
+  <link rel="stylesheet" href="styles.css?v=20.2">
 
   <!-- Driver.js for Elegant Tutorial -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
@@ -1917,6 +1917,9 @@
         </div>
 
         <!-- Logout Button -->
+        <button onclick="closeUserProfileModal(); scheduleAppTour(250, true);" class="w-full mt-4 py-3 rounded-2xl bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white border border-orange-500/30 font-black text-xs transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-route"></i> إعادة الجولة التعريفية
+        </button>
         <button onclick="closeUserProfileModal(); logout();" class="w-full mt-4 py-3 rounded-2xl bg-rose-500/15 hover:bg-rose-600 text-rose-500 hover:text-white border border-rose-500/30 font-black text-xs transition flex items-center justify-center gap-2">
           <i class="fa-solid fa-right-from-bracket"></i>
           <span>تسجيل الخروج من الحساب</span>
@@ -1960,6 +1963,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20.1"></script>
+  <script src="app.js?v=20.2"></script>
 </body>
 </html>
