@@ -58,6 +58,8 @@ const AUDIT_KEY = 'ehsebli_audit_v1';
    كل مفتاح بيانات بيتخزن باسم:  المفتاح::UID
    فبيانات الزائر وبيانات كل حساب عمرهم ما يختلطوا.
    ========================================================= */
+let categoryBudgets = {};
+const CATBUDGET_KEY = 'ehsebli_catbudget_v1';
 function dataScope() { return (currentUser && currentUser.uid) ? String(currentUser.uid) : null; }
 function scopedKey(key, scope) { return key + '::' + (scope || dataScope()); }
 function lsGet(key) {
@@ -1394,12 +1396,15 @@ function loginAsGuest() {
   loadInventory();
   loadRecurring();
   loadAuditLog();
+  loadCatBudgets();
   refreshAll();
   syncModeForCurrentUser();
   navigateSegmented('home');
   applyRoleUI();
   updatePinUI();
   scheduleAppTour(800);
+  scheduleBackupCheck();
+  scheduleLibPrefetch();
 }
 
 function setEmailMode(mode) {
@@ -1689,6 +1694,7 @@ function handleUserSwitch(uid) {
   inventoryItems = [];
   recurringExpenses = [];
   auditLogs = [];
+  categoryBudgets = {};
   lastDeletedId = null;
   localStorage.setItem(LAST_UID_KEY, uid);
 }
@@ -1711,6 +1717,8 @@ function applySignedOutState() {
   inventoryItems = [];
   recurringExpenses = [];
   auditLogs = [];
+  categoryBudgets = {};
+  if (typeof clearNotices === 'function') clearNotices();
 
   [() => userDocUnsubscribe, () => transactionsUnsubscribe, () => requestsUnsubscribe, () => cloudUserMetaUnsubscribe]
     .forEach(get => { try { const fn = get(); if (typeof fn === 'function') fn(); } catch (e) {} });
@@ -1753,7 +1761,7 @@ function _tourFirstVisible(selectors) {
 function _tourBlocked() {
   const b = document.body.classList;
   if (b.contains('not-authed') || b.contains('auth-pending')) return true;
-  return ['authLoading', 'loginWall', 'lockScreen', 'modeOnboardingModal', 'userProfileModal'].some(id => {
+  return ['authLoading', 'loginWall', 'lockScreen', 'modeOnboardingModal', 'userProfileModal', 'guestImportModal'].some(id => {
     const el = document.getElementById(id);
     return el && !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none';
   });
@@ -1957,7 +1965,10 @@ auth.onAuthStateChanged(async user => {
       else hidePinLock();
       
       // تشغيل التوتوريال بعد ما كل حاجة تحمل
+      maybeOfferGuestImport();
       scheduleAppTour(1500);
+      scheduleBackupCheck();
+      scheduleLibPrefetch();
     });
   } else {
     applySignedOutState();
@@ -2101,6 +2112,7 @@ async function doSyncToCloud() {
       budget: getBudget() || 0,
       inventory: Array.isArray(inventoryItems) ? inventoryItems : [],
       recurring: Array.isArray(recurringExpenses) ? recurringExpenses : [],
+      catBudgets: sanitizeCatBudgets(categoryBudgets),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
 
@@ -2155,6 +2167,10 @@ async function loadCloudData(uid) {
         recurringExpenses = data.recurring;
         lsSet(RECURRING_KEY, JSON.stringify(recurringExpenses));
       }
+      if (data.catBudgets && typeof data.catBudgets === 'object') {
+        categoryBudgets = sanitizeCatBudgets(data.catBudgets);
+        lsSet(CATBUDGET_KEY, JSON.stringify(categoryBudgets));
+      }
     }
 
     transactions = mergeTransactions(mergeTransactions(transactions, cloudTx), legacyTx);
@@ -2195,6 +2211,14 @@ async function loadCloudData(uid) {
       if (Array.isArray(d.recurring) && JSON.stringify(d.recurring) !== JSON.stringify(recurringExpenses)) {
         recurringExpenses = d.recurring;
         lsSet(RECURRING_KEY, JSON.stringify(recurringExpenses));
+      }
+      if (d.catBudgets && typeof d.catBudgets === 'object') {
+        const incoming = sanitizeCatBudgets(d.catBudgets);
+        if (JSON.stringify(incoming) !== JSON.stringify(categoryBudgets)) {
+          categoryBudgets = incoming;
+          lsSet(CATBUDGET_KEY, JSON.stringify(categoryBudgets));
+          needRefresh = true;
+        }
       }
       if (needRefresh) refreshAll();
     });
@@ -2278,6 +2302,7 @@ function loadAllLocal() {
   loadInventory();
   loadRecurring();
   loadAuditLog();
+  loadCatBudgets();
   checkOverdueDebtsAlert();
 }
 
@@ -2971,6 +2996,7 @@ function handleFormSubmit(event) {
   saveData();
   refreshAll();
   closeModal();
+  try { checkCategoryBudgetAlert(type, category); } catch (e) { console.warn(e); }
   if (!wasEditing && isDebt(type)) switchTab('debts');
 }
 
@@ -3123,10 +3149,13 @@ function downloadBackup() {
   if (!requireAuth()) return;
   const backup = {
     app: 'Ehsebli Honda Financial Manager',
-    version: '9.3',
+    version: '10.0',
     createdAt: new Date().toISOString(),
     transactions,
     budget: getBudget(),
+    inventory: inventoryItems,
+    recurring: recurringExpenses,
+    categoryBudgets: sanitizeCatBudgets(categoryBudgets),
     count: transactions.length
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
@@ -3136,6 +3165,7 @@ function downloadBackup() {
   a.download = `احسبلي_نسخة_احتياطية_${todayString()}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
+  lsSet(BACKUP_TS_KEY, String(Date.now()));
   showToast(`تم تحميل النسخة الاحتياطية (${transactions.length} عملية)`, 'success');
 }
 
@@ -3154,6 +3184,9 @@ function restoreBackup(event) {
         const now = Date.now();
         transactions = restored.map((item, i) => normalizeTransaction({ ...item, _updatedAt: now + i }));
         if (backup.budget !== undefined) lsSet(BUDGET_KEY, Number(backup.budget) || 0);
+        if (Array.isArray(backup.inventory)) { inventoryItems = backup.inventory; lsSet(INVENTORY_KEY, JSON.stringify(inventoryItems)); }
+        if (Array.isArray(backup.recurring)) { recurringExpenses = backup.recurring; lsSet(RECURRING_KEY, JSON.stringify(recurringExpenses)); }
+        if (backup.categoryBudgets && typeof backup.categoryBudgets === 'object') { categoryBudgets = sanitizeCatBudgets(backup.categoryBudgets); lsSet(CATBUDGET_KEY, JSON.stringify(categoryBudgets)); }
         saveData({ force: true });
         refreshAll();
         closeBackupModal();
@@ -5780,9 +5813,7 @@ function updateProfileModalLabels() {
   if (themeSub) themeSub.textContent = isDark ? 'الوضع الليلي الداكن 🌙' : 'الوضع النهاري الهادئ ☀️';
   if (modeSub) modeSub.textContent = curMode === 'business' ? 'وضع التجارة والمحل 🏪' : 'الوضع الشخصي البسيط 👤';
   if (modeEl) modeEl.textContent = curMode === 'business' ? 'وضع المحل 🏪' : 'الوضع الشخصي 👤';
-  if (avatarImg) {
-    avatarImg.style.borderColor = isDark ? '#11131a' : '#ffffff';
-  }
+  if (typeof refreshProfileExtras === 'function') refreshProfileExtras();
 }
 
 const _origOpenUserProfileModal = openUserProfileModal;
@@ -5804,3 +5835,423 @@ applyAppMode = function(mode) {
 
 // (اختيار الوضع بيتم الآن داخل syncModeForCurrentUser لكل مستخدم على حدة)
 
+
+/* =========================================================
+   V20.3 — نقل بيانات الزائر، ميزانية الفئات، تنبيهات ذكية،
+   نسخ احتياطي دوري، مؤشر الأوفلاين، تحميل المكتبات عند الحاجة
+   ========================================================= */
+const GUEST_UID = 'guest-local-user';
+const GUEST_IMPORT_KEY = 'a7sbley_guest_import_v1';
+const BACKUP_TS_KEY = 'a7sbley_last_backup_v1';
+const BACKUP_SNOOZE_KEY = 'a7sbley_backup_snooze_v1';
+const FIRST_SEEN_KEY = 'a7sbley_first_seen_v1';
+const CATALERT_KEY = 'ehsebli_catalert_v1';
+const HINTS_KEY = 'a7sbley_hints_seen_v1';
+
+function _safeJSON(str, fallback) { try { const v = JSON.parse(str); return v == null ? fallback : v; } catch (e) { return fallback; } }
+
+/* ---------- 1) تحميل المكتبات الثقيلة عند الحاجة (xlsx / html2pdf) ---------- */
+const LAZY_LIBS = {
+  xlsx: { src: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+          integrity: 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw',
+          ready: () => typeof XLSX !== 'undefined' },
+  html2pdf: { src: 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js',
+              integrity: 'sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc',
+              ready: () => typeof html2pdf !== 'undefined' }
+};
+const _libPromises = {};
+function ensureLib(name) {
+  const L = LAZY_LIBS[name];
+  if (!L) return Promise.resolve(false);
+  if (L.ready()) return Promise.resolve(true);
+  if (_libPromises[name]) return _libPromises[name];
+  _libPromises[name] = new Promise(resolve => {
+    const s = document.createElement('script');
+    s.src = L.src; s.integrity = L.integrity; s.crossOrigin = 'anonymous';
+    s.onload = () => resolve(L.ready());
+    s.onerror = () => { delete _libPromises[name]; resolve(false); };
+    document.head.appendChild(s);
+  });
+  return _libPromises[name];
+}
+[['exportToExcel', 'xlsx'], ['exportClientLedgerPDF', 'html2pdf'], ['downloadReportPDF', 'html2pdf']].forEach(([fnName, lib]) => {
+  const orig = window[fnName];
+  if (typeof orig !== 'function') return;
+  window[fnName] = async function () {
+    if (!LAZY_LIBS[lib].ready()) {
+      showToast('جاري تجهيز أداة التصدير...', 'info');
+      const ok = await ensureLib(lib);
+      if (!ok) showToast('تعذر تحميل أداة التصدير (محتاجة إنترنت أول مرة)، هنستخدم البديل المتاح', 'info');
+    }
+    return orig.apply(this, arguments);
+  };
+});
+let _prefetchTimer = null;
+function scheduleLibPrefetch() {
+  clearTimeout(_prefetchTimer);
+  _prefetchTimer = setTimeout(() => {
+    const c = navigator.connection;
+    if (!navigator.onLine || (c && (c.saveData || (c.effectiveType && c.effectiveType !== '4g')))) return;
+    ensureLib('xlsx'); ensureLib('html2pdf'); // عشان التصدير يشتغل حتى لو النت قطع بعدين
+  }, 20000);
+}
+
+/* ---------- 2) نظام الإشعارات الصغيرة (تلميحات / تذكيرات) ---------- */
+const _noticeQueue = [];
+let _noticeActive = null;
+let _noticeTimer = null;
+
+function _anyModalOpen() {
+  return Array.from(document.querySelectorAll('[id$="Modal"], #quickAddSheet')).some(el =>
+    !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none');
+}
+function a7Notice(opts) {
+  if (opts.id && (_noticeQueue.some(n => n.id === opts.id) || (_noticeActive && _noticeActive.id === opts.id))) return;
+  _noticeQueue.push(opts);
+  pumpNotices();
+}
+function pumpNotices() {
+  if (_noticeActive || !_noticeQueue.length) return;
+  if (!currentUser) { _noticeQueue.length = 0; return; }
+  if (_tourDriver || _tourBlocked() || _anyModalOpen()) { setTimeout(pumpNotices, 2500); return; }
+  const host = document.getElementById('a7NoticeHost');
+  if (!host) return;
+  const o = _noticeQueue.shift();
+  _noticeActive = o;
+
+  const card = document.createElement('div');
+  card.className = 'a7n a7n-' + (o.tone || 'hint');
+  card.setAttribute('role', 'status');
+  const ic = document.createElement('div'); ic.className = 'a7n-ic';
+  ic.innerHTML = `<i class="fa-solid ${escapeHTML(o.icon || 'fa-lightbulb')}"></i>`;
+  const body = document.createElement('div'); body.className = 'a7n-body';
+  const t = document.createElement('div'); t.className = 'a7n-t'; t.textContent = o.title || '';
+  const d = document.createElement('div'); d.className = 'a7n-d'; d.textContent = o.text || '';
+  body.append(t, d);
+  const acts = document.createElement('div'); acts.className = 'a7n-acts';
+  (o.actions && o.actions.length ? o.actions : [{ label: 'تمام', primary: true }]).forEach(a => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = a.label;
+    b.className = a.primary ? 'a7n-btn a7n-btn-p' : 'a7n-btn';
+    b.addEventListener('click', () => { closeNotice(); try { if (a.run) a.run(); } catch (e) { console.error(e); } });
+    acts.appendChild(b);
+  });
+  body.appendChild(acts);
+  const x = document.createElement('button');
+  x.type = 'button'; x.className = 'a7n-x'; x.setAttribute('aria-label', 'إغلاق'); x.innerHTML = '&times;';
+  x.addEventListener('click', () => { closeNotice(); if (o.onDismiss) { try { o.onDismiss(); } catch (e) {} } });
+  card.append(ic, body, x);
+  host.replaceChildren(card);
+  clearTimeout(_noticeTimer);
+  if (o.ttl) _noticeTimer = setTimeout(() => { if (_noticeActive === o) { closeNotice(); if (o.onDismiss) { try { o.onDismiss(); } catch (e) {} } } }, o.ttl);
+}
+function closeNotice() {
+  clearTimeout(_noticeTimer);
+  _noticeActive = null;
+  const host = document.getElementById('a7NoticeHost');
+  if (host) host.replaceChildren();
+  setTimeout(pumpNotices, 400);
+}
+function clearNotices() { _noticeQueue.length = 0; closeNotice(); }
+
+/* ---------- 3) تلميحات سياقية لأول زيارة لكل قسم ---------- */
+const SECTION_HINTS = {
+  transactions: { icon: 'fa-receipt', title: 'سجل المعاملات',
+    text: 'هنا كل عملياتك مرتبة بالأحدث. تقدر تعدّل أي عملية أو تحذفها، ولو حذفت بالغلط فيه تراجع فوري.' },
+  debts: { icon: 'fa-handshake', title: 'الديون',
+    text: 'سجّل دين لك أو عليك وحدد تاريخ استحقاق، وهتتنبّه لما الموعد يقرّب أو يتأخر.' },
+  clients: { icon: 'fa-users', title: 'العملاء',
+    text: 'كل عميل له كشف حساب كامل، وتقدر تنزّله PDF بضغطة واحدة.' },
+  manage: { icon: 'fa-boxes-stacked', title: 'الإدارة',
+    text: 'من هنا تدير المخزن والمصاريف المتكررة، وتراجع سجل العمليات (التدقيق).' }
+};
+function maybeShowHint(view) {
+  const h = SECTION_HINTS[view];
+  if (!h || !currentUser || !localStorage.getItem(TOUR_DONE_KEY)) return;
+  const seen = _safeJSON(localStorage.getItem(HINTS_KEY), []);
+  if (seen.includes(view)) return;
+  setTimeout(() => {
+    if (typeof currentActiveView !== 'undefined' && currentActiveView !== view) return;
+    const again = _safeJSON(localStorage.getItem(HINTS_KEY), []);
+    if (again.includes(view)) return;
+    const mark = () => { const s = _safeJSON(localStorage.getItem(HINTS_KEY), []); if (!s.includes(view)) s.push(view); localStorage.setItem(HINTS_KEY, JSON.stringify(s)); };
+    a7Notice({ id: 'hint-' + view, tone: 'hint', icon: h.icon, title: h.title, text: h.text, ttl: 14000,
+      actions: [{ label: 'فهمت', primary: true, run: mark }], onDismiss: mark });
+  }, 800);
+}
+(function hookNavigationForHints() {
+  const orig = window.navigateSegmented;
+  if (typeof orig !== 'function') return;
+  window.navigateSegmented = function (target) {
+    const r = orig.apply(this, arguments);
+    try { maybeShowHint(target); } catch (e) {}
+    return r;
+  };
+})();
+
+/* ---------- 4) ميزانية الفئات ---------- */
+function sanitizeCatBudgets(obj) {
+  const out = {};
+  if (!obj || typeof obj !== 'object') return out;
+  Object.keys(obj).slice(0, 40).forEach(k => {
+    const v = Number(obj[k]);
+    if (isFinite(v) && v > 0 && v <= 1e9) out[sanitizeString(k, 100)] = v;
+  });
+  return out;
+}
+function loadCatBudgets() { categoryBudgets = sanitizeCatBudgets(_safeJSON(lsGet(CATBUDGET_KEY), {})); }
+function saveCatBudgets() {
+  lsSet(CATBUDGET_KEY, JSON.stringify(categoryBudgets));
+  if (isRealCloudUser()) syncToCloud();
+}
+function _expenseCategoriesForMode() {
+  const personal = (document.body.getAttribute('data-mode') || 'business') === 'personal';
+  const src = personal && typeof PERSONAL_CATEGORIES !== 'undefined' ? PERSONAL_CATEGORIES : (typeof BUSINESS_CATEGORIES !== 'undefined' ? BUSINESS_CATEGORIES : CATEGORIES);
+  const list = (src.expense || []).filter(c => c !== 'أخرى');
+  Object.keys(categoryBudgets || {}).forEach(c => { if (!list.includes(c)) list.push(c); });
+  list.push('أخرى');
+  return Array.from(new Set(list));
+}
+function monthSpentByCategory() {
+  const m = {};
+  getActiveTransactions().forEach(t => {
+    if (t.type === 'expense' && isInPeriod(t.date, 'month')) m[t.category] = (m[t.category] || 0) + Number(t.amount || 0);
+  });
+  return m;
+}
+function renderCatBudgets() {
+  const host = document.getElementById('catBudgetList');
+  if (!host) return;
+  const entries = Object.entries(categoryBudgets || {});
+  if (!entries.length) { host.hidden = true; host.innerHTML = ''; return; }
+  const spent = monthSpentByCategory();
+  const rows = entries.map(([c, l]) => ({ c, l, u: spent[c] || 0, p: ((spent[c] || 0) / l) * 100 }))
+    .sort((a, b) => b.p - a.p).slice(0, 6);
+  host.innerHTML = '<div class="cb-list-h">الفئات</div>' + rows.map(r => {
+    const lvl = r.p >= 100 ? 'over' : (r.p >= 80 ? 'warn' : 'ok');
+    return `<div class="cb-row cb-${lvl}"><div class="cb-row-top"><span class="cb-name">${escapeHTML(r.c)}</span>` +
+      `<span class="cb-amt money-val">${money(r.u)} / ${money(r.l)}</span></div>` +
+      `<div class="cb-bar"><i style="width:${Math.min(100, r.p).toFixed(0)}%"></i></div></div>`;
+  }).join('');
+  host.hidden = false;
+}
+(function hookBudgetUI() {
+  const origUpdate = window.updateBudget;
+  window.updateBudget = function () { origUpdate.apply(this, arguments); try { renderCatBudgets(); } catch (e) {} };
+  const origOpen = window.openBudgetModal;
+  window.openBudgetModal = function () {
+    origOpen.apply(this, arguments);
+    const box = document.getElementById('catBudgetInputs');
+    if (!box) return;
+    box.innerHTML = '';
+    _expenseCategoriesForMode().forEach(c => {
+      const row = document.createElement('label'); row.className = 'cb-in-row';
+      const name = document.createElement('span'); name.textContent = c;
+      const inp = document.createElement('input');
+      inp.type = 'number'; inp.min = '0'; inp.inputMode = 'numeric'; inp.placeholder = 'بدون حد';
+      inp.className = 'form-input cb-in'; inp.setAttribute('data-cat', c);
+      if (categoryBudgets[c]) inp.value = categoryBudgets[c];
+      row.append(name, inp); box.appendChild(row);
+    });
+  };
+  const origSave = window.saveBudget;
+  window.saveBudget = function () {
+    const box = document.getElementById('catBudgetInputs');
+    if (box && box.children.length) {
+      const next = {};
+      box.querySelectorAll('input[data-cat]').forEach(i => {
+        const v = Number(i.value);
+        if (isFinite(v) && v > 0) next[i.getAttribute('data-cat')] = v;
+      });
+      // نحتفظ بحدود فئات مش ظاهرة في الوضع الحالي
+      Object.keys(categoryBudgets).forEach(k => { if (!box.querySelector(`input[data-cat="${CSS.escape(k)}"]`)) next[k] = categoryBudgets[k]; });
+      categoryBudgets = sanitizeCatBudgets(next);
+      lsSet(CATBUDGET_KEY, JSON.stringify(categoryBudgets));
+    }
+    return origSave.apply(this, arguments); // بيحفظ الإجمالي ويزامن للسحابة
+  };
+})();
+function checkCategoryBudgetAlert(type, category) {
+  if (type !== 'expense') return;
+  const limit = categoryBudgets[category];
+  if (!limit) return;
+  const used = monthSpentByCategory()[category] || 0;
+  const pct = (used / limit) * 100;
+  const level = pct >= 100 ? 2 : (pct >= 80 ? 1 : 0);
+  const month = todayString().slice(0, 7);
+  let st = _safeJSON(lsGet(CATALERT_KEY), {});
+  if (st.month !== month) st = { month, levels: {} };
+  const prev = st.levels[category] || 0;
+  if (level > prev) {
+    st.levels[category] = level;
+    lsSet(CATALERT_KEY, JSON.stringify(st));
+    showToast(level === 2
+      ? `⚠️ تجاوزت ميزانية «${category}» (${money(used)} من ${money(limit)})`
+      : `تنبيه: وصلت ${pct.toFixed(0)}% من ميزانية «${category}»`, level === 2 ? 'error' : 'info');
+  } else if (level < prev) {
+    st.levels[category] = level; lsSet(CATALERT_KEY, JSON.stringify(st));
+  }
+}
+
+/* ---------- 5) نقل بيانات الزائر للحساب ---------- */
+function readGuestScope() {
+  const rd = (k, def) => _safeJSON(localStorage.getItem(scopedKey(k, GUEST_UID)), def);
+  const txAll = (rd(STORAGE_KEY, []) || []);
+  const tx = Array.isArray(txAll) ? txAll.filter(validateTransaction).map(normalizeTransaction) : [];
+  const inv = rd(INVENTORY_KEY, []); const rec = rd(RECURRING_KEY, []);
+  return {
+    tx, inv: Array.isArray(inv) ? inv : [], rec: Array.isArray(rec) ? rec : [],
+    budget: Number(localStorage.getItem(scopedKey(BUDGET_KEY, GUEST_UID)) || 0),
+    cat: sanitizeCatBudgets(rd(CATBUDGET_KEY, {}))
+  };
+}
+function guestHasData() {
+  const g = readGuestScope();
+  return g.tx.some(t => !t._deleted) || g.inv.length > 0 || g.rec.length > 0 || g.budget > 0 || Object.keys(g.cat).length > 0;
+}
+function openGuestImportModal() {
+  if (!isRealCloudUser()) return;
+  const g = readGuestScope();
+  const list = document.getElementById('gimCounts');
+  if (list) {
+    list.innerHTML = '';
+    const items = [[g.tx.filter(t => !t._deleted).length, 'عملية مالية'], [g.inv.length, 'صنف في المخزن'], [g.rec.length, 'مصروف متكرر']].filter(x => x[0] > 0);
+    if (g.budget > 0) items.push(['✓', 'ميزانية شهرية']);
+    items.forEach(([n, label]) => {
+      const li = document.createElement('li');
+      const b = document.createElement('b'); b.textContent = n;
+      li.append(b, ' ' + label); list.appendChild(li);
+    });
+  }
+  const m = document.getElementById('guestImportModal');
+  if (m) { m.classList.remove('hidden'); m.classList.add('flex'); }
+}
+function closeGuestImportModal(dismiss) {
+  const m = document.getElementById('guestImportModal');
+  if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+  if (dismiss && isRealCloudUser() && !lsGet(GUEST_IMPORT_KEY)) lsSet(GUEST_IMPORT_KEY, 'dismissed');
+}
+function maybeOfferGuestImport() {
+  if (!isRealCloudUser() || window._guestUpgradeInProgress) return;
+  if (lsGet(GUEST_IMPORT_KEY)) return;
+  if (!guestHasData()) return;
+  openGuestImportModal();
+}
+function importGuestData() {
+  if (!isRealCloudUser()) return;
+  const g = readGuestScope();
+  transactions = mergeTransactions(transactions, g.tx);
+  const keyOf = x => (x && x.id) ? String(x.id) : JSON.stringify(x);
+  const invIds = new Set(inventoryItems.map(keyOf));
+  g.inv.forEach(i => { if (i && !invIds.has(keyOf(i))) inventoryItems.push(i); });
+  const recIds = new Set(recurringExpenses.map(keyOf));
+  g.rec.forEach(r => { if (r && !recIds.has(keyOf(r))) recurringExpenses.push(r); });
+  if (!getBudget() && g.budget > 0) lsSet(BUDGET_KEY, g.budget);
+  categoryBudgets = sanitizeCatBudgets({ ...g.cat, ...categoryBudgets });
+  lsSet(INVENTORY_KEY, JSON.stringify(inventoryItems));
+  lsSet(RECURRING_KEY, JSON.stringify(recurringExpenses));
+  lsSet(CATBUDGET_KEY, JSON.stringify(categoryBudgets));
+  saveLocalData();
+  lsSet(GUEST_IMPORT_KEY, 'imported');
+  closeGuestImportModal(false);
+  refreshAll();
+  if (typeof renderInventory === 'function') renderInventory();
+  updateBudget();
+  syncToCloud();
+  showToast('تم نقل بيانات الزائر إلى حسابك ✓', 'success');
+}
+(function hookGuestUpgrade() {
+  const orig = window.upgradeGuestToGoogle;
+  if (typeof orig !== 'function') return;
+  window.upgradeGuestToGoogle = async function () {
+    window._guestUpgradeInProgress = true;      // الدالة دي بتنقل البيانات بنفسها، فمش هنسأل تاني
+    try { await orig.apply(this, arguments); if (isRealCloudUser()) lsSet(GUEST_IMPORT_KEY, 'imported'); }
+    finally { window._guestUpgradeInProgress = false; }
+  };
+})();
+
+/* ---------- 6) تذكير النسخ الاحتياطي الأسبوعي ---------- */
+let _backupCheckTimer = null;
+function scheduleBackupCheck() { clearTimeout(_backupCheckTimer); _backupCheckTimer = setTimeout(checkBackupReminder, 9000); }
+function checkBackupReminder() {
+  if (!currentUser || !hasFeature('backup')) return;
+  if (getActiveTransactions().length < 5) return;
+  const now = Date.now(), DAY = 864e5;
+  let first = Number(lsGet(FIRST_SEEN_KEY)) || 0;
+  if (!first) { first = now; lsSet(FIRST_SEEN_KEY, String(now)); }
+  const last = Number(lsGet(BACKUP_TS_KEY)) || 0;
+  if (now < (Number(lsGet(BACKUP_SNOOZE_KEY)) || 0)) return;
+  if (now - (last || first) < 7 * DAY) return;
+  const guest = !isRealCloudUser();
+  a7Notice({
+    id: 'backup', tone: 'warn', icon: 'fa-cloud-arrow-down',
+    title: guest ? 'خد نسخة احتياطية الآن' : 'وقت النسخة الاحتياطية الأسبوعية',
+    text: guest ? 'بياناتك محفوظة على هذا الجهاز فقط، ولو اتمسحت بيانات المتصفح هتضيع. نزّل نسخة دلوقتي.'
+      : (last ? 'عدّى أكتر من أسبوع على آخر نسخة احتياطية. نسخة على جهازك أمان إضافي للمزامنة السحابية.'
+              : 'لسه ماعملتش أي نسخة احتياطية. نسخة على جهازك أمان إضافي للمزامنة السحابية.'),
+    actions: [
+      { label: 'نسخ احتياطي الآن', primary: true, run: () => downloadBackup() },
+      { label: 'ذكّرني بعد 3 أيام', run: () => lsSet(BACKUP_SNOOZE_KEY, String(Date.now() + 3 * DAY)) }
+    ]
+  });
+}
+
+/* ---------- 7) مؤشر الأوفلاين ---------- */
+let _pendingOfflineSync = false;
+(function hookOfflineSync() {
+  const orig = window.syncToCloud;
+  if (typeof orig !== 'function') return;
+  window.syncToCloud = function () {
+    if (navigator.onLine === false && isRealCloudUser()) { _pendingOfflineSync = true; return Promise.resolve(); }
+    return orig.apply(this, arguments);
+  };
+})();
+function updateConnectivityUI(announce) {
+  const off = navigator.onLine === false;
+  document.documentElement.classList.toggle('is-offline', off);
+  const bar = document.getElementById('a7OfflineBar');
+  if (bar) {
+    bar.hidden = !off;
+    const txt = bar.querySelector('span');
+    if (txt) txt.textContent = isRealCloudUser()
+      ? 'أنت أوفلاين — التطبيق شغال وبياناتك على جهازك، وهتتزامن لما النت يرجع'
+      : 'أنت أوفلاين — التطبيق شغال عادي وبياناتك محفوظة على جهازك';
+  }
+  if (announce && !off) {
+    if (isRealCloudUser() && _pendingOfflineSync) {
+      _pendingOfflineSync = false;
+      showToast('رجع الاتصال — جاري مزامنة تغييراتك ☁️', 'success');
+      syncToCloud();
+    } else if (currentUser) showToast('رجع الاتصال بالإنترنت', 'success');
+  }
+  const pill = document.getElementById('profileSyncPill');
+  if (pill && typeof refreshProfileExtras === 'function') refreshProfileExtras();
+}
+window.addEventListener('offline', () => updateConnectivityUI(true));
+window.addEventListener('online', () => updateConnectivityUI(true));
+window.addEventListener('DOMContentLoaded', () => updateConnectivityUI(false));
+
+/* ---------- 8) الملف الشخصي ---------- */
+function refreshProfileExtras() {
+  const real = isRealCloudUser();
+  const banner = document.getElementById('profileGuestBanner');
+  if (banner) banner.hidden = real || !currentUser;
+  const pill = document.getElementById('profileSyncPill');
+  if (pill) {
+    const off = navigator.onLine === false;
+    pill.className = 'pf-pill ' + (!real ? 'pf-pill-local' : (off ? 'pf-pill-off' : 'pf-pill-ok'));
+    pill.innerHTML = !real ? '<i class="fa-solid fa-mobile-screen"></i> محلي على الجهاز'
+      : (off ? '<i class="fa-solid fa-plane"></i> أوفلاين' : '<i class="fa-solid fa-cloud-check"></i> متزامن');
+  }
+  const imp = document.getElementById('profileImportTile');
+  if (imp) imp.hidden = !(real && guestHasData());
+  const lbl = document.getElementById('profileLogoutLabel');
+  if (lbl) lbl.textContent = real ? 'تسجيل الخروج' : 'الخروج من وضع الزائر';
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const p = document.getElementById('userProfileModal');
+  if (p && !p.classList.contains('hidden')) closeUserProfileModal();
+  const g = document.getElementById('guestImportModal');
+  if (g && !g.classList.contains('hidden')) closeGuestImportModal(false);
+});

@@ -1338,3 +1338,184 @@ html.dark .driver-popover.a7-tour {
   .a7-tour .driver-popover-title { font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { .a7-tour .driver-popover-footer button { transition: none; } }
+
+/* =========================================================
+   🎨 V20.3 — تصميم موحّد (متغيرات فاتح/داكن) + الملف الشخصي + الإشعارات
+   ========================================================= */
+:root {
+  --u-bg: #ffffff; --u-bg2: #f4f6fa; --u-fg: #0f172a; --u-mut: #64748b;
+  --u-line: rgba(15,23,42,.09); --u-acc: #f97316;
+}
+html.dark {
+  --u-bg: #12141b; --u-bg2: #1b1e29; --u-fg: #f1f5f9; --u-mut: #98a4b8;
+  --u-line: rgba(255,255,255,.09);
+}
+@keyframes pfPop { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes pfUp  { from { transform: translateY(100%); } to { transform: none; } }
+
+/* ----- Profile / Dialog shell ----- */
+.pf-root { position: fixed; inset: 0; z-index: 135; align-items: center; justify-content: center; padding: 16px; background: rgba(5,6,10,.66); }
+.pf-card {
+  position: relative; width: 100%; max-width: 440px; max-height: calc(100dvh - 32px); overflow: auto;
+  background: var(--u-bg); color: var(--u-fg); border: 1px solid var(--u-line); border-radius: 28px;
+  box-shadow: 0 30px 70px -22px rgba(0,0,0,.65); direction: rtl; text-align: right;
+  font-family: 'Cairo', system-ui, sans-serif; animation: pfPop .22s ease-out; overscroll-behavior: contain;
+}
+.pf-x {
+  position: absolute; top: 12px; left: 12px; z-index: 3; width: 38px; height: 38px; border-radius: 50%;
+  border: 1px solid var(--u-line); background: var(--u-bg); color: var(--u-fg); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
+.pf-grab { display: none; width: 40px; height: 4px; border-radius: 4px; background: var(--u-line); margin: 0 auto 10px; }
+
+.pf-side {
+  position: relative; padding: 26px 18px 16px; text-align: center;
+  background: linear-gradient(165deg, rgba(249,115,22,.20), rgba(251,191,36,.08) 55%, transparent);
+}
+.pf-ava { width: 96px; height: 96px; margin: 0 auto; padding: 3px; border-radius: 50%;
+  background: conic-gradient(from 210deg, #f97316, #fbbf24, #22d3ee, #f97316); }
+.pf-ava img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: var(--u-bg2); border: 3px solid var(--u-bg); }
+.pf-method {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: -14px; position: relative;
+  padding: 2px 10px; border-radius: 99px; font-size: 10px; font-weight: 800;
+  background: var(--u-bg); color: var(--u-fg); border: 1px solid var(--u-line);
+}
+.pf-name { margin: 10px 0 0; font-size: 20px; font-weight: 900; line-height: 1.4; word-break: break-word; }
+.pf-mail { margin: 2px 0 0; font-size: 12px; font-weight: 700; color: var(--u-mut); word-break: break-all; }
+.pf-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px; }
+.pf-role { margin: 0 !important; }
+.pf-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 99px; font-size: 11px; font-weight: 800; border: 1px solid var(--u-line); }
+.pf-pill-ok { color: #10b981; background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.3); }
+.pf-pill-local { color: #f59e0b; background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.3); }
+.pf-pill-off { color: #94a3b8; background: rgba(148,163,184,.14); }
+
+.pf-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+.pf-stat { background: var(--u-bg2); border: 1px solid var(--u-line); border-radius: 16px; padding: 10px 6px; min-width: 0; }
+.pf-stat-l { display: block; font-size: 10px; font-weight: 700; color: var(--u-mut); margin-bottom: 3px; }
+.pf-stat-l i { color: var(--u-acc); margin-inline-end: 3px; }
+.pf-stat b { display: block; font-size: 11.5px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-last { margin: 12px 0 0; font-size: 11px; font-weight: 700; color: var(--u-mut); }
+
+.pf-main { padding: 6px 18px 18px; }
+.pf-h { margin: 14px 2px 10px; font-size: 12px; font-weight: 900; color: var(--u-mut); letter-spacing: .02em; }
+.pf-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pf-tile {
+  display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 10px; text-align: right;
+  background: var(--u-bg2); color: var(--u-fg); border: 1px solid var(--u-line); border-radius: 18px;
+  cursor: pointer; font-family: inherit; transition: transform .12s ease, border-color .12s ease;
+}
+.pf-tile:hover { border-color: var(--c, var(--u-acc)); }
+.pf-tile:active { transform: scale(.97); }
+.pf-tile[hidden] { display: none; }
+.pf-tile-ic { flex: none; width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  font-size: 15px; color: var(--c); background: color-mix(in srgb, var(--c) 15%, transparent); }
+.pf-tile-tx { display: flex; flex-direction: column; min-width: 0; }
+.pf-tile-tx b { font-size: 12.5px; font-weight: 900; }
+.pf-tile-tx small { font-size: 10.5px; font-weight: 700; color: var(--u-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.pf-guest { padding: 12px; border-radius: 18px; background: rgba(245,158,11,.10); border: 1px solid rgba(245,158,11,.35); margin-top: 8px; }
+.pf-guest[hidden] { display: none; }
+.pf-guest-t { font-size: 12.5px; font-weight: 900; color: #f59e0b; }
+.pf-guest p { margin: 4px 0 10px; font-size: 11.5px; font-weight: 700; color: var(--u-mut); line-height: 1.8; }
+.pf-guest button { width: 100%; min-height: 42px; border: 0; border-radius: 12px; background: #fff; color: #0f172a; font: 800 12.5px 'Cairo', sans-serif; cursor: pointer; border: 1px solid var(--u-line); }
+.pf-guest button i { color: #ea4335; margin-inline-end: 6px; }
+
+.pf-logout {
+  width: 100%; margin-top: 14px; min-height: 46px; border-radius: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font: 800 13px 'Cairo', sans-serif; color: #f43f5e; background: rgba(244,63,94,.10); border: 1px solid rgba(244,63,94,.28);
+}
+.pf-logout:hover { background: #e11d48; color: #fff; }
+.pf-x:focus-visible, .pf-tile:focus-visible, .pf-logout:focus-visible, .gim-btn:focus-visible { outline: 2px solid var(--u-acc); outline-offset: 2px; }
+
+/* كمبيوتر: بطاقة من عمودين */
+@media (min-width: 768px) {
+  .pf-card { max-width: 800px; display: grid; grid-template-columns: 290px 1fr; overflow: hidden; max-height: min(640px, calc(100dvh - 48px)); }
+  .pf-side { border-inline-end: 1px solid var(--u-line); padding-top: 34px; overflow: auto; }
+  .pf-stats { grid-template-columns: 1fr; }
+  .pf-stat { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; }
+  .pf-stat-l { margin: 0; }
+  .pf-stat b { max-width: 55%; }
+  .pf-main { padding: 58px 22px 20px; overflow: auto; }
+  .pf-h:first-child, .pf-guest + .pf-h { margin-top: 4px; }
+  .pf-tiles { grid-template-columns: 1fr 1fr; }
+  .pf-dialog { display: block; max-width: 420px; }
+}
+/* موبايل: شيت من تحت */
+@media (max-width: 767px) {
+  .pf-root { align-items: flex-end; padding: 0; }
+  .pf-card { max-width: none; max-height: 92dvh; border-radius: 26px 26px 0 0; border-bottom: 0; animation: pfUp .28s cubic-bezier(.2,.8,.2,1); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .pf-grab { display: block; }
+  .pf-side { padding-top: 14px; }
+  .pf-x { top: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .pf-card { animation: none; } .pf-tile { transition: none; } }
+
+/* ----- نقل بيانات الزائر ----- */
+.pf-dialog { padding: 22px 20px 18px; text-align: center; }
+.gim-ic { width: 56px; height: 56px; border-radius: 18px; margin: 4px auto 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #ec4899; background: rgba(236,72,153,.14); }
+.gim-t { margin: 0; font-size: 17px; font-weight: 900; line-height: 1.6; }
+.gim-list { list-style: none; margin: 12px 0 4px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.gim-list li { padding: 6px 12px; border-radius: 99px; background: var(--u-bg2); border: 1px solid var(--u-line); font-size: 12px; font-weight: 700; color: var(--u-mut); }
+.gim-list b { color: var(--u-fg); margin-inline-end: 4px; font-weight: 900; }
+.gim-p { margin: 10px 0 16px; font-size: 12.5px; font-weight: 600; line-height: 1.9; color: var(--u-mut); }
+.gim-btn { width: 100%; min-height: 46px; margin-top: 8px; border-radius: 14px; cursor: pointer; font: 800 13.5px 'Cairo', sans-serif; color: var(--u-fg); background: var(--u-bg2); border: 1px solid var(--u-line); }
+.gim-btn-p { color: #fff; border: 0; background: linear-gradient(135deg, #f97316, #fb923c); box-shadow: 0 10px 24px -8px rgba(249,115,22,.6); }
+.gim-s { display: block; margin-top: 10px; font-size: 11px; color: var(--u-mut); font-weight: 600; }
+
+/* ----- مؤشر الأوفلاين ----- */
+.a7-offline {
+  position: fixed; z-index: 150; left: 50%; transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top, 0px) + 8px); max-width: calc(100vw - 24px);
+  display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 99px;
+  background: #1e293b; color: #f8fafc; border: 1px solid rgba(255,255,255,.14);
+  font: 700 12px/1.6 'Cairo', sans-serif; box-shadow: 0 12px 30px -10px rgba(0,0,0,.6); direction: rtl;
+}
+.a7-offline[hidden] { display: none; }
+.a7-offline i { color: #fbbf24; }
+
+/* ----- الإشعارات الصغيرة (تلميحات / تذكيرات) ----- */
+.a7n-host { position: fixed; z-index: 120; left: 0; right: 0; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); display: flex; justify-content: center; padding: 0 12px; pointer-events: none; }
+.a7n {
+  --tone: #f97316; pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; width: 100%; max-width: 440px;
+  padding: 12px; direction: rtl; text-align: right; font-family: 'Cairo', sans-serif;
+  background: var(--u-bg); color: var(--u-fg); border: 1px solid var(--u-line); border-inline-start: 4px solid var(--tone);
+  border-radius: 18px; box-shadow: 0 20px 45px -14px rgba(0,0,0,.55); animation: pfPop .25s ease-out;
+}
+.a7n-info { --tone: #06b6d4; } .a7n-warn { --tone: #f59e0b; } .a7n-ok { --tone: #10b981; }
+.a7n-ic { flex: none; width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--tone); background: color-mix(in srgb, var(--tone) 15%, transparent); }
+.a7n-body { flex: 1; min-width: 0; }
+.a7n-t { font-size: 13.5px; font-weight: 900; }
+.a7n-d { margin-top: 2px; font-size: 12px; font-weight: 600; line-height: 1.8; color: var(--u-mut); }
+.a7n-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.a7n-btn { min-height: 38px; padding: 6px 14px; border-radius: 11px; cursor: pointer; font: 800 12px 'Cairo', sans-serif; color: var(--u-fg); background: var(--u-bg2); border: 1px solid var(--u-line); }
+.a7n-btn-p { color: #fff; border: 0; background: linear-gradient(135deg, #f97316, #fb923c); }
+.a7n-x { flex: none; width: 30px; height: 30px; border: 0; background: none; color: var(--u-mut); font-size: 20px; line-height: 1; cursor: pointer; border-radius: 8px; }
+@media (min-width: 768px) { .a7n-host { left: 24px; right: auto; bottom: 24px; padding: 0; justify-content: flex-start; } }
+
+/* ----- ميزانية الفئات ----- */
+.cb-card { max-height: 92dvh; overflow: auto; }
+.cb-sec { margin-top: 16px; padding-top: 14px; border-top: 1px dashed rgba(148,163,184,.4); }
+.cb-sec-h { font-size: 13px; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+.cb-sec-h span { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 99px; color: #94a3b8; background: rgba(148,163,184,.15); }
+.cb-sec-p { margin: 4px 0 10px; font-size: 11px; font-weight: 600; color: #94a3b8; line-height: 1.8; }
+.cb-inputs { display: grid; gap: 8px; max-height: 38dvh; overflow: auto; padding-inline-end: 2px; }
+.cb-in-row { display: grid; grid-template-columns: 1fr 120px; align-items: center; gap: 10px; font-size: 12px; font-weight: 700; }
+.cb-in-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-in { padding: 8px 10px !important; text-align: center; }
+.cb-list { margin-top: 12px; padding-top: 10px; border-top: 1px dashed rgba(148,163,184,.35); display: grid; gap: 9px; }
+.cb-list[hidden] { display: none; }
+.cb-list-h { font-size: 10px; font-weight: 900; color: #94a3b8; }
+.cb-row-top { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; font-weight: 800; }
+.cb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-amt { color: #94a3b8; font-weight: 700; flex: none; }
+.cb-bar { height: 6px; border-radius: 99px; background: rgba(148,163,184,.2); overflow: hidden; margin-top: 4px; }
+.cb-bar i { display: block; height: 100%; border-radius: 99px; background: #10b981; transition: width .4s ease; }
+.cb-warn .cb-bar i { background: #f59e0b; } .cb-over .cb-bar i { background: #f43f5e; }
+.cb-over .cb-amt { color: #f43f5e; }
+
+/* ----- أخرى ----- */
+.u-note { margin: 6px 0 0; font-size: 10.5px; font-weight: 600; line-height: 1.8; color: #94a3b8; }
+/* السماح بالتكبير على الموبايل من غير ما iOS يكبّر الصفحة عند الضغط على حقل */
+:where(input, select, textarea) { font-size: max(16px, 1em); }
+@media (max-width: 767px) { .form-input, select.form-input, textarea.form-input { font-size: 16px; } }

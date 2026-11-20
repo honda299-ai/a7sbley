@@ -3,7 +3,7 @@
 <head>
   <meta name="google-adsense-account" content="ca-pub-7877107761301154">
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0f1117">
   <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
   <title>احسبلي | a7sbley Financial Manager</title>
@@ -35,10 +35,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20.2">
+  <link rel="stylesheet" href="styles.css?v=20.3">
 
   <!-- Driver.js for Elegant Tutorial -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
@@ -581,6 +579,7 @@
           <span id="budgetRemaining" class="text-slate-400">حدد ميزانية</span>
           <span id="budgetPercent" class="text-orange-500">0%</span>
         </div>
+        <div id="catBudgetList" class="cb-list" hidden></div>
       </div>
     </section>
 
@@ -1130,10 +1129,15 @@
   <!-- BUDGET MODAL -->
   <div id="budgetModal" class="fixed inset-0 z-[60] hidden items-center justify-center p-3">
     <div class="fixed inset-0 bg-black/75" onclick="closeBudgetModal()"></div>
-    <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-dark-750 p-5 modal-enter">
+    <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-dark-750 p-5 modal-enter cb-card">
       <h3 class="text-base font-black mb-4">ميزانية الشهر</h3>
       <label class="field-label">الميزانية بالجنيه</label>
       <input id="budgetInput" type="number" min="0" placeholder="15000" class="form-input">
+      <div class="cb-sec">
+        <div class="cb-sec-h">ميزانية الفئات <span>اختياري</span></div>
+        <p class="cb-sec-p">حدد حداً شهرياً لكل فئة، وهننبّهك لما توصل 80% أو تتخطى الحد.</p>
+        <div id="catBudgetInputs" class="cb-inputs"></div>
+      </div>
       <div class="flex justify-end gap-2 mt-4">
         <button onclick="clearBudget()" class="px-4 py-2.5 rounded-xl text-sm font-bold text-rose-500">حذف</button>
         <button onclick="saveBudget()" class="px-5 py-2.5 rounded-xl text-sm font-black bg-orange-500 text-white">حفظ</button>
@@ -1150,6 +1154,7 @@
           <i class="fa-solid fa-lock text-xl"></i>
         </div>
         <h3 id="pinTitle" class="text-lg font-black mt-3">قفل التطبيق</h3>
+        <p class="u-note">الـ PIN بيمنع فتح التطبيق من جهازك، لكنه مش تشفير للبيانات المخزنة.</p>
       </div>
       <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"
         class="w-full mt-4 text-center tracking-[.5em] text-2xl font-black py-3 rounded-2xl border border-slate-200 dark:border-dark-750 bg-slate-50 dark:bg-dark-850 focus:outline-none focus:ring-2 focus:ring-orange-500">
@@ -1823,110 +1828,89 @@
   </div>
 
   <!-- CLEAN & SOOTHING USER PROFILE MODAL (V19.0) -->
-  <div id="userProfileModal" class="fixed inset-0 z-[135] hidden items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md" onclick="closeUserProfileModal()">
-    <div class="adaptive-modal-card relative w-full max-w-md rounded-3xl bg-[#11131a] border border-white/10 shadow-2xl modal-enter text-white overflow-hidden" onclick="event.stopPropagation()">
-      
-      <!-- Soft Gradient Cover Banner -->
-      <div class="relative h-24 bg-gradient-to-l from-orange-500/30 via-amber-500/15 to-cyan-500/20 px-5 pt-4 flex items-start justify-between">
-        <span class="px-3 py-1 rounded-full bg-black/30 backdrop-blur-md text-[10px] font-black text-white/90 border border-white/10">
-          الملف الشخصي
-        </span>
-        <button onclick="closeUserProfileModal()" class="w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center transition">
-          <i class="fa-solid fa-xmark text-sm"></i>
-        </button>
-      </div>
+  <!-- ========= PROFILE (موبايل: شيت من تحت | كمبيوتر: بطاقة من عمودين) ========= -->
+  <div id="userProfileModal" class="pf-root hidden" onclick="closeUserProfileModal()" role="dialog" aria-modal="true" aria-labelledby="profileModalName">
+    <div class="pf-card" onclick="event.stopPropagation()">
+      <button type="button" class="pf-x" onclick="closeUserProfileModal()" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button>
 
-      <!-- Overlapping Avatar & Identity -->
-      <div class="px-5 pb-5">
-        <div class="flex flex-col items-center text-center -mt-12">
-          <div class="relative">
-            <img id="profileModalAvatar" src="" class="w-24 h-24 rounded-full border-4 border-[#11131a] dark:border-[#11131a] object-cover shadow-xl bg-slate-800" alt="User">
-            <span id="profileModalMethodBadge" class="absolute bottom-0 left-0 px-2.5 py-0.5 rounded-full bg-slate-900 border border-white/15 text-[10px] font-black text-slate-200 shadow">
-              Google
-            </span>
-          </div>
-          <h3 id="profileModalName" class="adaptive-modal-text text-xl font-black text-white mt-3">-</h3>
-          <p id="profileModalEmail" class="adaptive-modal-muted text-xs font-bold text-slate-400 mt-0.5">-</p>
-          <div id="profileModalRolePill" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black border border-orange-500/30 bg-orange-500/15 text-orange-500">
-            مجاني
-          </div>
+      <aside class="pf-side">
+        <div class="pf-grab" aria-hidden="true"></div>
+        <div class="pf-ava"><img id="profileModalAvatar" src="" alt="صورة الحساب"></div>
+        <span id="profileModalMethodBadge" class="pf-method">Google</span>
+        <h3 id="profileModalName" class="pf-name">-</h3>
+        <p id="profileModalEmail" class="pf-mail">-</p>
+        <div class="pf-pills">
+          <div id="profileModalRolePill" class="pf-role">مجاني</div>
+          <span id="profileSyncPill" class="pf-pill"></span>
         </div>
 
-        <!-- Clean 2x2 Summary Grid -->
-        <div class="grid grid-cols-2 gap-2.5 mt-5">
-          <div class="adaptive-modal-subcard p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]">
-            <div class="adaptive-modal-muted text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
-              <i class="fa-solid fa-layer-group text-cyan-500"></i> وضع الاستخدام
-            </div>
-            <div id="profileModalMode" class="adaptive-modal-text text-xs font-black text-white mt-1">وضع المحل 🏪</div>
-          </div>
+        <div class="pf-stats">
+          <div class="pf-stat"><span class="pf-stat-l"><i class="fa-solid fa-receipt"></i> العمليات</span><b id="profileModalTxCount">0 عملية</b></div>
+          <div class="pf-stat"><span class="pf-stat-l"><i class="fa-solid fa-layer-group"></i> الوضع</span><b id="profileModalMode">وضع المحل 🏪</b></div>
+          <div class="pf-stat"><span class="pf-stat-l"><i class="fa-regular fa-calendar-plus"></i> عضو منذ</span><b id="profileModalCreated">-</b></div>
+        </div>
+        <p class="pf-last"><i class="fa-solid fa-clock-rotate-left"></i> آخر دخول: <span id="profileModalLastLogin">-</span></p>
+      </aside>
 
-          <div class="adaptive-modal-subcard p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]">
-            <div class="adaptive-modal-muted text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
-              <i class="fa-solid fa-receipt text-orange-500"></i> إجمالي العمليات
-            </div>
-            <div id="profileModalTxCount" class="adaptive-modal-text text-xs font-black text-white mt-1">0 عملية</div>
-          </div>
-
-          <div class="adaptive-modal-subcard p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]">
-            <div class="adaptive-modal-muted text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
-              <i class="fa-regular fa-calendar-plus text-emerald-500"></i> تاريخ الإنشاء
-            </div>
-            <div id="profileModalCreated" class="adaptive-modal-text text-[11px] font-black text-white mt-1 truncate">-</div>
-          </div>
-
-          <div class="adaptive-modal-subcard p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]">
-            <div class="adaptive-modal-muted text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
-              <i class="fa-solid fa-clock-rotate-left text-amber-500"></i> آخر تسجيل دخول
-            </div>
-            <div id="profileModalLastLogin" class="adaptive-modal-text text-[11px] font-black text-white mt-1 truncate">-</div>
-          </div>
+      <section class="pf-main">
+        <div id="profileGuestBanner" class="pf-guest" hidden>
+          <div class="pf-guest-t"><i class="fa-solid fa-triangle-exclamation"></i> أنت في وضع الزائر</div>
+          <p>بياناتك على هذا الجهاز فقط. اربط حساب Google عشان تتزامن وتتأمن.</p>
+          <button type="button" onclick="closeUserProfileModal(); upgradeGuestToGoogle();"><i class="fa-brands fa-google"></i> ربط بـ Google</button>
         </div>
 
-        <!-- Clean Quick Toggles (Theme & Mode) -->
-        <div class="mt-4 space-y-2">
-          <div class="adaptive-modal-subcard flex items-center justify-between p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center text-xs">
-                <i id="themeIcon" class="fa-solid fa-sun"></i>
-              </div>
-              <div>
-                <div class="adaptive-modal-text text-xs font-black text-white">مظهر التطبيق</div>
-                <div id="profileThemeSubtitle" class="adaptive-modal-muted text-[10px] font-bold text-slate-400">الوضع الليلي الداكن</div>
-              </div>
-            </div>
-            <button onclick="toggleTheme(); updateProfileModalLabels();" class="adaptive-modal-btn px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-black text-white transition">
-              تبديل المظهر
-            </button>
-          </div>
-
-          <div class="adaptive-modal-subcard flex items-center justify-between p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-xl bg-cyan-500/15 text-cyan-500 flex items-center justify-center text-xs">
-                <i class="fa-solid fa-sliders"></i>
-              </div>
-              <div>
-                <div class="adaptive-modal-text text-xs font-black text-white">نوع الحساب والواجهة</div>
-                <div id="profileModeSubtitle" class="adaptive-modal-muted text-[10px] font-bold text-slate-400">التجارة والمحل / الشخصي</div>
-              </div>
-            </div>
-            <button onclick="toggleAppMode(); updateProfileModalLabels();" class="adaptive-modal-btn px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-black text-white transition">
-              تغيير الوضع
-            </button>
-          </div>
+        <h4 class="pf-h">إعدادات سريعة</h4>
+        <div class="pf-tiles">
+          <button type="button" class="pf-tile" style="--c:#f59e0b" onclick="toggleTheme(); updateProfileModalLabels();">
+            <span class="pf-tile-ic"><i id="themeIcon" class="fa-solid fa-sun"></i></span>
+            <span class="pf-tile-tx"><b>المظهر</b><small id="profileThemeSubtitle">الوضع الليلي</small></span>
+          </button>
+          <button type="button" class="pf-tile" style="--c:#06b6d4" onclick="toggleAppMode(); updateProfileModalLabels();">
+            <span class="pf-tile-ic"><i class="fa-solid fa-repeat"></i></span>
+            <span class="pf-tile-tx"><b>نوع الحساب</b><small id="profileModeSubtitle">المحل / شخصي</small></span>
+          </button>
+          <button type="button" class="pf-tile" style="--c:#10b981" onclick="closeUserProfileModal(); openBudgetModal();">
+            <span class="pf-tile-ic"><i class="fa-solid fa-bullseye"></i></span>
+            <span class="pf-tile-tx"><b>الميزانية</b><small>الشهرية وللفئات</small></span>
+          </button>
+          <button type="button" class="pf-tile" style="--c:#8b5cf6" onclick="closeUserProfileModal(); openBackupModal();">
+            <span class="pf-tile-ic"><i class="fa-solid fa-cloud-arrow-down"></i></span>
+            <span class="pf-tile-tx"><b>نسخة احتياطية</b><small>تنزيل واستعادة</small></span>
+          </button>
+          <button type="button" class="pf-tile" style="--c:#f97316" onclick="closeUserProfileModal(); scheduleAppTour(250, true);">
+            <span class="pf-tile-ic"><i class="fa-solid fa-route"></i></span>
+            <span class="pf-tile-tx"><b>الجولة التعريفية</b><small>إعادة الشرح</small></span>
+          </button>
+          <button type="button" id="profileImportTile" class="pf-tile" style="--c:#ec4899" hidden onclick="closeUserProfileModal(); openGuestImportModal();">
+            <span class="pf-tile-ic"><i class="fa-solid fa-file-import"></i></span>
+            <span class="pf-tile-tx"><b>بيانات الزائر</b><small>نقلها لحسابك</small></span>
+          </button>
         </div>
 
-        <!-- Logout Button -->
-        <button onclick="closeUserProfileModal(); scheduleAppTour(250, true);" class="w-full mt-4 py-3 rounded-2xl bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white border border-orange-500/30 font-black text-xs transition flex items-center justify-center gap-2">
-          <i class="fa-solid fa-route"></i> إعادة الجولة التعريفية
+        <button type="button" class="pf-logout" onclick="closeUserProfileModal(); logout();">
+          <i class="fa-solid fa-right-from-bracket"></i><span id="profileLogoutLabel">تسجيل الخروج</span>
         </button>
-        <button onclick="closeUserProfileModal(); logout();" class="w-full mt-4 py-3 rounded-2xl bg-rose-500/15 hover:bg-rose-600 text-rose-500 hover:text-white border border-rose-500/30 font-black text-xs transition flex items-center justify-center gap-2">
-          <i class="fa-solid fa-right-from-bracket"></i>
-          <span>تسجيل الخروج من الحساب</span>
-        </button>
-      </div>
+      </section>
     </div>
   </div>
+
+  <!-- نقل بيانات الزائر للحساب -->
+  <div id="guestImportModal" class="pf-root hidden" onclick="closeGuestImportModal(false)" role="dialog" aria-modal="true" aria-labelledby="gimTitle">
+    <div class="pf-card pf-dialog" onclick="event.stopPropagation()">
+      <div class="pf-grab" aria-hidden="true"></div>
+      <div class="gim-ic"><i class="fa-solid fa-file-import"></i></div>
+      <h3 id="gimTitle" class="gim-t">لقينا بيانات وضع الزائر على الجهاز ده</h3>
+      <ul id="gimCounts" class="gim-list"></ul>
+      <p class="gim-p">تحب تنقلها لحسابك؟ هتتدمج مع بيانات حسابك، ونسخة وضع الزائر هتفضل زي ما هي.</p>
+      <button type="button" class="gim-btn gim-btn-p" onclick="importGuestData()"><i class="fa-solid fa-check"></i> نقل البيانات لحسابي</button>
+      <button type="button" class="gim-btn" onclick="closeGuestImportModal(true)">لا، خليها منفصلة</button>
+      <small class="gim-s">تقدر تنقلها بعدين من الملف الشخصي.</small>
+    </div>
+  </div>
+
+  <!-- مؤشر الأوفلاين + مكان التنبيهات -->
+  <div id="a7OfflineBar" class="a7-offline" hidden role="status"><i class="fa-solid fa-plane"></i><span></span></div>
+  <div id="a7NoticeHost" class="a7n-host" aria-live="polite"></div>
 
   <!-- MODE ONBOARDING MODAL -->
   <div id="modeOnboardingModal" class="fixed inset-0 z-[450] hidden items-center justify-center p-4 bg-black/90 backdrop-blur-md">
@@ -1963,6 +1947,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20.2"></script>
+  <script src="app.js?v=20.3"></script>
 </body>
 </html>
