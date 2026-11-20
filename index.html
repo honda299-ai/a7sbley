@@ -36,7 +36,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20.3">
+  <link rel="stylesheet" href="styles.css?v=20.4">
 
   <!-- Driver.js for Elegant Tutorial -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
@@ -291,22 +291,40 @@
       </button>
     </nav>
 
-    <!-- Hero -->
-    <section class="hidden md:block relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 to-black text-white p-6 border border-dark-800 shadow-xl no-print">
-      <div class="relative z-10 flex items-center justify-between gap-4">
-        <div>
-          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-black">
-            <i class="fa-solid fa-fire"></i> Honda Financial Manager
-          </div>
-          <h2 class="text-2xl font-black mt-2">تحكّم في كل قرش.. ورصيد البركة يزيد!</h2>
+<!-- ===== DESKTOP HERO: شريحة الرصيد + الخزائن + الإجراءات ===== -->
+    <section id="desktopHero" class="hidden md:grid dk-hero no-print">
+      <div class="fintech-bank-card dk-card">
+        <div class="dk-card-top">
+          <div class="dk-brand"><img src="logo.png" alt="" class="dk-logo"><span>احسبلي</span></div>
+          <button type="button" onclick="togglePrivacyMode()" class="card-privacy-btn dk-eye" aria-label="إخفاء الأرقام">
+            <i id="privacyIconDk" class="fa-solid fa-eye text-orange-500"></i>
+          </button>
         </div>
-        <div class="flex gap-2">
-          <button onclick="openModal('charity')" data-feature="charity" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-sm">
-            <i class="fa-solid fa-hand-holding-heart"></i> خير
-          </button>
-          <button onclick="openModal('income')" class="px-4 py-2.5 rounded-xl bg-dark-800 text-emerald-400 border border-emerald-500/30 font-black text-sm">
-            <i class="fa-solid fa-arrow-down-left"></i> دخل
-          </button>
+        <div class="dk-chip" aria-hidden="true"></div>
+        <div class="dk-label"><span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span class="card-sub-text">الرصيد المتاح الآن</span></div>
+        <div class="dk-net-row"><span id="dkNet" class="card-main-val money-val dk-net">0</span><span class="dk-cur">ج.م</span></div>
+        <div class="card-divider dk-split">
+          <div><div class="dk-k ok"><i class="fa-solid fa-arrow-down-left"></i> دخل</div><div id="dkIncome" class="card-main-val money-val dk-v">0</div></div>
+          <div><div class="dk-k bad"><i class="fa-solid fa-arrow-up-right"></i> مصروف</div><div id="dkExpense" class="card-main-val money-val dk-v">0</div></div>
+          <div><div class="dk-k warn"><i class="fa-solid fa-hand-holding-heart"></i> الخير</div><div id="dkCharity" class="card-main-val money-val dk-v">0</div></div>
+        </div>
+      </div>
+
+      <div class="dk-side">
+        <div class="dk-side-h"><i class="fa-solid fa-vault"></i> الخزائن والمحافظ</div>
+        <div id="desktopWalletsStrip" class="dk-wallets"></div>
+        <button type="button" onclick="openChargeMachines()" class="business-only mc-card dk-mc">
+          <span class="mc-card-ic"><i class="fa-solid fa-bolt"></i></span>
+          <span class="mc-card-tx"><b>مكن الشحن</b><small class="js-mc-sub">اضغط لإضافة أول مكنة</small></span>
+          <span class="mc-card-bal"><b class="money-val js-mc-total">0</b><small>ج.م</small></span>
+        </button>
+        <div class="ft-action-grid dk-actions">
+          <button onclick="openModal('income')" class="ft-action-btn"><div class="ft-action-circle text-emerald-500"><i class="fa-solid fa-arrow-down-left"></i></div><span class="ft-action-label">إضافة دخل</span></button>
+          <button onclick="openModal('expense')" class="ft-action-btn"><div class="ft-action-circle text-rose-500"><i class="fa-solid fa-receipt"></i></div><span class="ft-action-label">مصروف</span></button>
+          <button onclick="openModal('charity')" data-feature="charity" class="ft-action-btn"><div class="ft-action-circle text-amber-500"><i class="fa-solid fa-hand-holding-heart"></i></div><span class="ft-action-label">باب الخير</span></button>
+          <button onclick="openBudgetModal()" class="personal-only ft-action-btn"><div class="ft-action-circle text-cyan-500"><i class="fa-solid fa-chart-pie"></i></div><span class="ft-action-label">الميزانية</span></button>
+          <button onclick="openModal('debt_receivable')" class="business-only ft-action-btn"><div class="ft-action-circle text-cyan-500"><i class="fa-solid fa-user-plus"></i></div><span class="ft-action-label">دين جديد</span></button>
+          <button onclick="openShiftSettlementModal()" class="business-only ft-action-btn"><div class="ft-action-circle text-orange-500"><i class="fa-solid fa-calendar-check"></i></div><span class="ft-action-label">تقفيل اليوم</span></button>
         </div>
       </div>
     </section>
@@ -382,6 +400,13 @@
         </div>
         <div id="mobileWalletsStrip" class="ft-wallets-strip"></div>
       </div>
+
+      <!-- مكن الشحن (موبايل) -->
+      <button type="button" onclick="openChargeMachines()" class="business-only mc-card">
+        <span class="mc-card-ic"><i class="fa-solid fa-bolt"></i></span>
+        <span class="mc-card-tx"><b>مكن الشحن</b><small class="js-mc-sub">اضغط لإضافة أول مكنة</small></span>
+        <span class="mc-card-bal"><b class="money-val js-mc-total">0</b><small>ج.م</small></span>
+      </button>
 
       <!-- 4. Debts 50/50 Cards (Business Mode Focus) -->
       <div class="business-only grid grid-cols-2 gap-2.5">
@@ -518,15 +543,6 @@
       <div id="insightBadge" class="w-full sm:w-auto text-center shrink-0 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-black">
         -
       </div>
-    </section>
-
-    <!-- Wallets (Desktop Only) -->
-    <section class="hidden md:block bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 p-3 no-print">
-      <div class="flex items-center gap-2 mb-3">
-        <i class="fa-solid fa-vault text-orange-500"></i>
-        <h3 class="text-xs font-black">أرصدة الخزينة</h3>
-      </div>
-      <div id="walletsContainer" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2"></div>
     </section>
 
     <!-- Debts + Budget (Desktop Only) -->
@@ -931,7 +947,7 @@
           <div>
             <label class="field-label">طريقة الدفع</label>
             <select id="formPaymentMethod" class="form-input">
-              <option value="كاش نقدي">كاش 💵</option>
+              <option value="نقدي">نقدي 💵</option>
               <option value="إنستاباي (InstaPay)">إنستاباي ⚡</option>
               <option value="فودافون كاش / محفظة">محفظة 📱</option>
               <option value="فيزا / بطاقة بنكية">فيزا 💳</option>
@@ -1165,46 +1181,95 @@
   </div>
 
   <!-- ADMIN MODAL -->
-  <div id="adminModal" class="fixed inset-0 z-[90] hidden items-center justify-center p-3">
-    <div class="fixed inset-0 bg-black/75" onclick="closeAdminPanel()"></div>
-    <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-2xl w-full border border-slate-200 dark:border-dark-750 modal-enter max-h-[92vh] flex flex-col">
-      <div class="p-4 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between shrink-0">
-        <h3 class="text-base font-black">لوحة المدير</h3>
-        <button onclick="closeAdminPanel()" class="w-9 h-9 rounded-xl text-slate-400 flex items-center justify-center">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
+  <!-- ===== لوحة تحكم المدير (V2) ===== -->
+  <div id="adminModal" class="adm-root hidden" role="dialog" aria-modal="true" aria-labelledby="admTitle">
+    <div class="adm-back" onclick="closeAdminPanel()"></div>
+    <div class="adm-shell">
+      <aside class="adm-nav">
+        <div class="adm-brand"><img src="logo.png" alt=""><div><b>لوحة التحكم</b><small>إدارة احسبلي</small></div></div>
+        <nav class="adm-tabs" role="tablist">
+          <button id="adminTabOverview" type="button" class="adm-tab on" role="tab" onclick="switchAdminTab('overview')"><i class="fa-solid fa-gauge-high"></i><span>نظرة عامة</span></button>
+          <button id="adminTabUsers" type="button" class="adm-tab" role="tab" onclick="switchAdminTab('users')"><i class="fa-solid fa-users"></i><span>المستخدمين</span></button>
+          <button id="adminTabRequests" type="button" class="adm-tab" role="tab" onclick="switchAdminTab('requests')"><i class="fa-solid fa-inbox"></i><span>الطلبات</span><em id="pendingReqBadge" class="adm-badge">0</em></button>
+          <button id="adminTabPerms" type="button" class="adm-tab" role="tab" onclick="switchAdminTab('permissions')"><i class="fa-solid fa-sliders"></i><span>الصلاحيات</span></button>
+        </nav>
+      </aside>
 
-      <div class="flex border-b border-slate-100 dark:border-dark-800 px-4 shrink-0">
-        <button id="adminTabUsers" onclick="switchAdminTab('users')" class="admin-tab active">
-          <i class="fa-solid fa-users"></i> المستخدمين
-        </button>
-        <button id="adminTabRequests" onclick="switchAdminTab('requests')" class="admin-tab">
-          <i class="fa-solid fa-clock-rotate-left text-amber-500"></i> طلبات العملاء <span id="pendingReqBadge" class="badge bg-amber-500/20 text-amber-500 ml-1">0</span>
-        </button>
+      <main class="adm-main">
+        <header class="adm-top">
+          <h3 id="admTitle">نظرة عامة</h3>
+          <div class="adm-top-acts">
+            <button id="admRefreshBtn" type="button" class="adm-ib" onclick="admRefresh()" aria-label="تحديث"><i class="fa-solid fa-rotate"></i></button>
+            <button type="button" class="adm-ib" onclick="closeAdminPanel()" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </header>
 
-        <button id="adminTabPerms" onclick="switchAdminTab('permissions')" class="admin-tab">
-          <i class="fa-solid fa-sliders"></i> الصلاحيات
-        </button>
-      </div>
+        <section id="adminPanelOverview" class="adm-panel"><div id="admOverview"></div></section>
 
-      <div id="adminPanelUsers" class="p-4 overflow-y-auto">
-        <input type="text" id="usersSearchInput" oninput="filterUsersList()" placeholder="ابحث..."
-               class="w-full text-sm pr-3 pl-3 py-2.5 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-800 mb-3">
-        <div id="usersList" class="space-y-2"></div>
-      </div>
+        <section id="adminPanelUsers" class="adm-panel" hidden>
+          <div class="adm-tools">
+            <div class="adm-search"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="usersSearchInput" oninput="filterUsersList()" placeholder="ابحث بالاسم أو الإيميل أو الهاتف أو UID" autocomplete="off"></div>
+            <select class="adm-select" onchange="admSetStatusFilter(this.value)" aria-label="الحالة">
+              <option value="all">كل الحالات</option><option value="active">نشط (7 أيام)</option><option value="month">نشط هذا الشهر</option><option value="idle">خامل</option><option value="suspended">موقوف</option>
+            </select>
+            <select class="adm-select" onchange="admSetSort(this.value)" aria-label="الترتيب">
+              <option value="lastLogin">آخر دخول</option><option value="created">الأحدث انضماماً</option><option value="name">الاسم</option>
+            </select>
+            <button type="button" class="adm-btn" onclick="admExportUsersCSV()"><i class="fa-solid fa-file-csv"></i> تصدير</button>
+          </div>
+          <div id="admRoleChips" class="adm-chips"></div>
+          <div id="usersSearchCount" class="adm-count"></div>
+          <div id="usersList" class="adm-list"></div>
+        </section>
 
-      <div id="adminPanelRequests" class="hidden p-4 overflow-y-auto space-y-3">
-        <div class="text-xs font-bold text-slate-400 mb-2">الطلبات المرسلة من صفحة العملاء والتي تنتظر موافقتك:</div>
-        <div id="adminRequestsList" class="space-y-2.5"></div>
-      </div>
+        <section id="adminPanelRequests" class="adm-panel" hidden>
+          <p class="adm-hint">الطلبات المرسلة من صفحة العملاء والتي تنتظر موافقتك:</p>
+          <div id="adminRequestsList" class="space-y-2.5"></div>
+        </section>
 
-      <div id="adminPanelPerms" class="hidden p-4 overflow-y-auto">
-        <div id="permsList" class="space-y-3"></div>
-        <button onclick="saveRolePermissions()" class="w-full mt-5 py-3 rounded-2xl bg-orange-500 text-white font-black text-sm">
-          <i class="fa-solid fa-save"></i> حفظ
-        </button>
-      </div>
+        <section id="adminPanelPerms" class="adm-panel" hidden>
+          <div id="permsList" class="space-y-3"></div>
+          <button onclick="saveRolePermissions()" class="adm-btn pri adm-save"><i class="fa-solid fa-floppy-disk"></i> حفظ الصلاحيات</button>
+        </section>
+      </main>
+
+      <!-- تفاصيل المستخدم -->
+      <aside id="admUserDrawer" class="adm-drawer" aria-label="تفاصيل المستخدم">
+        <div class="adm-d-top">
+          <button type="button" class="adm-ib" onclick="admCloseUser()" aria-label="رجوع"><i class="fa-solid fa-arrow-right"></i></button>
+          <b>تفاصيل المستخدم</b>
+        </div>
+        <div class="adm-d-scroll">
+          <div id="admDrawerHead" class="adm-d-head"></div>
+          <div id="admDrawerNote" class="adm-warn" hidden></div>
+
+          <h5 class="adm-d-h">معلومات الحساب</h5>
+          <div id="admDrawerInfo" class="adm-kvs"></div>
+
+          <h5 class="adm-d-h">التحكم في الحساب</h5>
+          <div class="adm-ctl">
+            <label class="adm-lbl">الدور</label>
+            <div class="adm-inline">
+              <select id="admRoleSelect" class="adm-select"></select>
+              <button id="admRoleSave" type="button" class="adm-btn pri" onclick="admSaveRole()">حفظ الدور</button>
+            </div>
+            <button id="admPermBtn" type="button" class="adm-btn wide" onclick="admOpenPerms()"><i class="fa-solid fa-sliders"></i> الصلاحيات المخصصة للمستخدم</button>
+            <div id="admReasonWrap">
+              <label class="adm-lbl">سبب الإيقاف (اختياري — بيظهر للمستخدم)</label>
+              <input id="admReason" type="text" maxlength="200" class="form-input" placeholder="مثال: مخالفة الاستخدام">
+            </div>
+            <button id="admSuspendBtn" type="button" class="adm-btn bad wide" onclick="admToggleSuspend()"></button>
+            <button id="admEmailCopy" type="button" class="adm-btn wide"><i class="fa-solid fa-copy"></i> نسخ الإيميل / الهاتف</button>
+          </div>
+
+          <h5 class="adm-d-h">ملاحظات خاصة <small>(لا يراها المستخدم)</small></h5>
+          <textarea id="admNote" class="form-input adm-note" rows="3" maxlength="1000" placeholder="اكتب أي ملاحظة عن هذا الحساب..." disabled></textarea>
+          <div class="adm-inline between"><small id="admNoteStatus" class="adm-mut"></small><button type="button" class="adm-btn" onclick="admSaveNote()">حفظ الملاحظة</button></div>
+
+          <h5 class="adm-d-h">سجل الإجراءات الإدارية</h5>
+          <div id="admActivity" class="adm-acts"></div>
+        </div>
+      </aside>
     </div>
   </div>
 
@@ -1213,7 +1278,7 @@
     <div class="fixed inset-0 bg-black/80" onclick="closeUserPermissionsModal()"></div>
     <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-lg w-full border border-slate-200 dark:border-dark-750 modal-enter max-h-[92vh] flex flex-col">
       <div class="p-4 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between shrink-0">
-        <h3 class="text-base font-black truncate" id="userPermTitle">الصلاحيات</h3>
+        <div class="min-w-0"><h3 class="text-base font-black truncate" id="userPermTitle">الصلاحيات</h3><p id="userPermEmail" class="adm-mut truncate"></p></div>
         <button onclick="closeUserPermissionsModal()" class="w-9 h-9 rounded-xl text-slate-400 flex items-center justify-center">
           <i class="fa-solid fa-xmark"></i>
         </button>
@@ -1523,7 +1588,7 @@
       </div>
       <div class="space-y-3">
         <div class="p-3 rounded-2xl bg-white/5 border border-white/10 text-xs space-y-1">
-          <div class="text-slate-400">الرصيد المتوقع في النظام (كاش):</div>
+          <div class="text-slate-400">الرصيد المتوقع في النظام (نقدي):</div>
           <div id="drawerExpected" class="text-lg font-black text-emerald-400">0.00 ج.م</div>
         </div>
         <div>
@@ -1912,7 +1977,75 @@
   <div id="a7OfflineBar" class="a7-offline" hidden role="status"><i class="fa-solid fa-plane"></i><span></span></div>
   <div id="a7NoticeHost" class="a7n-host" aria-live="polite"></div>
 
-  <!-- MODE ONBOARDING MODAL -->
+  <!-- ===== مكن الشحن ===== -->
+  <div id="machinesModal" class="pf-root hidden" onclick="closeChargeMachines()" role="dialog" aria-modal="true" aria-labelledby="mcTitle">
+    <div class="pf-card mc-modal" onclick="event.stopPropagation()">
+      <header class="mc-head">
+        <button type="button" id="mcBack" class="mc-ib" hidden onclick="mcShowList()" aria-label="رجوع"><i class="fa-solid fa-arrow-right"></i></button>
+        <div class="mc-title"><i class="fa-solid fa-bolt"></i><span id="mcTitle">مكن الشحن</span></div>
+        <button type="button" class="mc-ib" onclick="closeChargeMachines()" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button>
+      </header>
+
+      <div id="mcListView" class="mc-body">
+        <div class="mc-total"><small>إجمالي أرصدة المكن</small><b id="mcTotal" class="money-val">0</b><span id="mcCountLine"></span></div>
+        <div class="mc-add">
+          <div class="mc-add-h"><i class="fa-solid fa-plus"></i> إضافة مكنة جديدة</div>
+          <div class="mc-add-row">
+            <input id="mcNewName" type="text" maxlength="60" placeholder="اسم المكنة (مثال: مكنة فودافون 1)" class="form-input" autocomplete="off">
+            <input id="mcNewBal" type="number" inputmode="decimal" min="0" placeholder="الرصيد الحالي" class="form-input">
+            <button type="button" class="mc-btn" onclick="mcAddMachine()">إضافة</button>
+          </div>
+        </div>
+        <div id="mcList" class="mc-list"></div>
+        <div id="mcEmpty" class="mc-empty"><i class="fa-solid fa-bolt"></i><b>لسه مفيش مكن</b><span>أضف مكنة بالاسم والرصيد، وكل تعديل على الرصيد هيتسجل في سجل خاص بيها.</span></div>
+      </div>
+
+      <div id="mcDetailView" class="mc-body" hidden>
+        <div class="mc-d-card">
+          <small>الرصيد الحالي</small>
+          <div class="mc-d-bal"><b id="mcBalance" class="money-val">0</b><span>ج.م</span></div>
+          <div id="mcMeta" class="mc-d-meta"></div>
+          <div class="mc-d-name">
+            <input id="mcName" type="text" maxlength="60" class="form-input" aria-label="اسم المكنة">
+            <button type="button" class="mc-btn mc-btn-s" onclick="mcRenameCurrent()">حفظ الاسم</button>
+          </div>
+        </div>
+
+        <div class="mc-op">
+          <div class="mc-seg" role="tablist">
+            <button type="button" data-mode="add" class="on" onclick="mcSetMode('add')"><i class="fa-solid fa-circle-plus"></i> إضافة رصيد</button>
+            <button type="button" data-mode="sub" onclick="mcSetMode('sub')"><i class="fa-solid fa-circle-minus"></i> خصم</button>
+            <button type="button" data-mode="set" onclick="mcSetMode('set')"><i class="fa-solid fa-pen-to-square"></i> ضبط الرصيد</button>
+          </div>
+          <label id="mcAmountLabel" class="field-label">المبلغ المضاف</label>
+          <input id="mcAmount" type="number" inputmode="decimal" min="0" placeholder="0" class="form-input">
+          <label class="field-label mc-lbl2">ملاحظة (اختياري)</label>
+          <input id="mcNote" type="text" maxlength="120" placeholder="مثال: شحنت من الموزع" class="form-input">
+          <button type="button" class="mc-btn mc-btn-w" onclick="mcApplyOp()">تسجيل العملية</button>
+        </div>
+
+        <div class="mc-hist-h"><i class="fa-solid fa-clock-rotate-left"></i> سجل التعديلات <small id="mcHistCount"></small></div>
+        <div id="mcHistory" class="mc-hist"></div>
+
+        <button type="button" class="mc-del" onclick="mcDeleteCurrent()"><i class="fa-solid fa-trash-can"></i> حذف المكنة</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- حساب موقوف -->
+  <div id="suspendedScreen" class="sus-root" hidden role="alertdialog" aria-modal="true" aria-labelledby="susTitle">
+    <div class="sus-card">
+      <div class="sus-ic"><i class="fa-solid fa-user-lock"></i></div>
+      <h2 id="susTitle">تم إيقاف حسابك</h2>
+      <p id="susReason">تواصل مع الإدارة لمعرفة التفاصيل.</p>
+      <div class="sus-acts">
+        <button type="button" onclick="location.reload()">إعادة المحاولة</button>
+        <button type="button" class="out" onclick="hideSuspendedScreen(); auth.signOut();">تسجيل الخروج</button>
+      </div>
+    </div>
+  </div>
+
+<!-- MODE ONBOARDING MODAL -->
   <div id="modeOnboardingModal" class="fixed inset-0 z-[450] hidden items-center justify-center p-4 bg-black/90 backdrop-blur-md">
     <div class="adaptive-modal-card relative w-full max-w-md rounded-3xl bg-[#11131a] border border-orange-500/40 p-6 text-center text-white shadow-2xl modal-enter">
       <img src="logo.png" class="w-16 h-16 rounded-2xl mx-auto mb-3 border border-orange-500/30 object-contain" alt="احسبلي">
@@ -1947,6 +2080,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20.3"></script>
+  <script src="app.js?v=20.4"></script>
 </body>
 </html>

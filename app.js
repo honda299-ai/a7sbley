@@ -59,6 +59,8 @@ const AUDIT_KEY = 'ehsebli_audit_v1';
    فبيانات الزائر وبيانات كل حساب عمرهم ما يختلطوا.
    ========================================================= */
 let categoryBudgets = {};
+let chargeMachines = [];
+const CHARGE_KEY = 'ehsebli_charge_machines_v1';
 const CATBUDGET_KEY = 'ehsebli_catbudget_v1';
 function dataScope() { return (currentUser && currentUser.uid) ? String(currentUser.uid) : null; }
 function scopedKey(key, scope) { return key + '::' + (scope || dataScope()); }
@@ -230,7 +232,7 @@ function normalizeTransaction(t) {
     time: sanitizeString(t.time || formatTimeTo12Hour(currentInputTimeString()), 20),
     client: sanitizeString(t.client || '', 60),
     category: sanitizeString(t.category, 100),
-    paymentMethod: sanitizeString(t.paymentMethod || 'كاش نقدي', 50),
+    paymentMethod: sanitizeString(normalizePaymentMethod(t.paymentMethod), 50),
     reference: sanitizeString(t.reference || '', 50),
     notes: sanitizeString(t.notes || '', 200),
     receipt: t.receipt || null,
@@ -740,7 +742,7 @@ function renderPublicPortal(clientName, sourceTransactions) {
           <div class="font-bold text-slate-800 dark:text-slate-100">${escapeHTML(t.notes || t.category)}</div>
           <div class="text-[10px] text-slate-400 mt-0.5">${escapeHTML(typeName(t.type))} ${t.status === 'paid' ? '• مسدد بالكامل' : ''}</div>
         </td>
-        <td class="py-3 px-4 text-slate-500 dark:text-slate-400">${escapeHTML(t.paymentMethod || 'كاش')}</td>
+        <td class="py-3 px-4 text-slate-500 dark:text-slate-400">${payMethodHTML(t.paymentMethod)}</td>
         <td class="py-3 px-4 font-black ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">
           ${t.type === 'income' ? '+' : '-'}${money(t.amount)} ج.م
         </td>
@@ -979,6 +981,10 @@ async function loadUserRole(uid) {
     }
 
     const doc = await db.collection('users').doc(uid).get();
+    if (doc.exists && doc.data().disabled === true) {
+      showSuspendedScreen(doc.data().disabledReason);
+      return;
+    }
     if (doc.exists && doc.data().role && ROLES_META[doc.data().role]) {
       userRole = doc.data().role;
       currentUserPermissionsOverride = doc.data().permissionsOverride || null;
@@ -1023,136 +1029,18 @@ function getLoginMethod() {
 /* =========================================================
    ADMIN PANEL
    ========================================================= */
-function switchAdminTab(tab) {
-  adminActiveTab = tab;
-  const isUsers = tab === 'users';
-  const isReqs = tab === 'requests';
-  const isPerms = tab === 'permissions';
-  
-  const tabUsr = document.getElementById('adminTabUsers');
-  const tabReq = document.getElementById('adminTabRequests');
-  const tabPrm = document.getElementById('adminTabPerms');
-  
-  if (tabUsr) tabUsr.classList.toggle('active', isUsers);
-  if (tabReq) tabReq.classList.toggle('active', isReqs);
-  if (tabPrm) tabPrm.classList.toggle('active', isPerms);
-  
-  const panUsr = document.getElementById('adminPanelUsers');
-  const panReq = document.getElementById('adminPanelRequests');
-  const panPrm = document.getElementById('adminPanelPerms');
-  
-  if (panUsr) panUsr.classList.toggle('hidden', !isUsers);
-  if (panReq) panReq.classList.toggle('hidden', !isReqs);
-  if (panPrm) panPrm.classList.toggle('hidden', !isPerms);
-
-  if (isUsers) renderUsersList();
-  else if (isReqs) renderAdminRequests();
-  else if (isPerms) renderPermissionsEditor();
-}
-
 async function openAdminPanel() {
   if (userRole !== 'admin') { showToast('هذه الصفحة للمدير فقط', 'error'); return; }
   closeMenus();
   const modal = document.getElementById('adminModal');
   modal.classList.remove('hidden'); modal.classList.add('flex');
   await loadRolePermissions();
-  switchAdminTab('users');
+  switchAdminTab('overview');
 }
 
 function closeAdminPanel() {
   const modal = document.getElementById('adminModal');
   modal.classList.add('hidden'); modal.classList.remove('flex');
-}
-
-function filterUsersList() {
-  usersSearchQuery = (document.getElementById('usersSearchInput').value || '').trim().toLowerCase();
-  renderUsersList();
-}
-
-async function renderUsersList() {
-  const container = document.getElementById('usersList');
-  const searchCount = document.getElementById('usersSearchCount');
-  container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> جاري التحميل...</div>';
-  try {
-    const snap = await db.collection('users').get();
-    container.innerHTML = '';
-    if (snap.empty) {
-      container.innerHTML = '<div class="text-center py-4 text-xs text-slate-400">لا يوجد مستخدمين</div>';
-      if (searchCount) searchCount.textContent = '';
-      return;
-    }
-    let users = [];
-    snap.forEach(doc => {
-      const data = doc.data();
-      const emailLower = (data.email || '').toLowerCase().trim();
-      const nameLower = (data.displayName || '').toLowerCase().trim();
-      const phoneLower = (data.phoneNumber || '').toLowerCase().trim();
-      const isSuper = isSuperAdminEmail(emailLower);
-      const isMe = doc.id === currentUser.uid;
-      const roleKey = data.role || 'free';
-      const hasOverride = data.permissionsOverride && Object.keys(data.permissionsOverride).length > 0;
-      let priority = 3;
-      if (isSuper) priority = 0;
-      else if (roleKey === 'admin') priority = 1;
-      else if (isMe) priority = 2;
-      users.push({ doc, data, isSuper, isMe, roleKey, priority, emailLower, nameLower, phoneLower, hasOverride });
-    });
-    const q = usersSearchQuery;
-    if (q) users = users.filter(u => u.emailLower.includes(q) || u.nameLower.includes(q) || u.phoneLower.includes(q));
-    users.sort((a, b) => a.priority - b.priority);
-    if (searchCount) searchCount.textContent = q ? `${users.length} نتيجة` : `${users.length} مستخدم`;
-
-    if (!users.length) {
-      container.innerHTML = `<div class="text-center py-8 text-xs text-slate-400"><i class="fa-solid fa-magnifying-glass text-3xl mb-3 opacity-30"></i><p class="font-bold">لا توجد نتائج مطابقة</p></div>`;
-      return;
-    }
-
-    users.forEach(({ doc, data, isSuper, isMe, roleKey, hasOverride }) => {
-      const meta = ROLES_META[roleKey] || ROLES_META.free;
-      const card = document.createElement('div');
-      card.className = 'p-3 rounded-xl border flex items-center justify-between gap-2 ' + (
-        isSuper ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/40'
-                : 'border-slate-200 dark:border-dark-750 bg-slate-50/50 dark:bg-dark-850/50'
-      );
-      let lastLoginStr = 'لم يسجل بعد';
-      try {
-        const lastLogin = data.lastLoginAt && data.lastLoginAt.toDate ? data.lastLoginAt.toDate() : null;
-        if (lastLogin) lastLoginStr = `آخر دخول: ${lastLogin.toLocaleDateString('ar-EG')}`;
-      } catch(e) {}
-      const optionsHtml = Object.keys(ROLES_META).map(r =>
-        `<option value="${r}" ${roleKey === r ? 'selected' : ''}>${ROLES_META[r].name}</option>`
-      ).join('');
-      const disabled = isMe || isSuper;
-      const identifier = data.email ? escapeHTML(data.email) : (data.phoneNumber ? '📱 ' + escapeHTML(data.phoneNumber) : 'بدون معرّف');
-
-      card.innerHTML = `
-        <div class="min-w-0 flex-1">
-          <div class="text-xs font-black truncate flex items-center gap-1.5 flex-wrap">
-            ${isSuper ? '<i class="fa-solid fa-crown text-amber-500"></i>' : `<i class="fa-solid ${meta.icon}"></i>`}
-            <span class="truncate">${escapeHTML(data.displayName || 'بدون اسم')}</span>
-            ${isSuper ? '<span class="text-[9px] text-amber-500 font-black px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">👑 SUPER</span>' : ''}
-            ${hasOverride ? '<span class="text-[9px] text-cyan-500 font-black px-1.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/30">🎛️ خاص</span>' : ''}
-            ${isMe ? '<span class="text-[9px] text-orange-500 font-black">(أنت)</span>' : ''}
-          </div>
-          <div class="text-[10px] text-slate-400 truncate mt-0.5">${identifier}</div>
-          <div class="text-[9px] text-slate-500 mt-0.5">${lastLoginStr}</div>
-        </div>
-        <div class="flex items-center gap-1 shrink-0">
-          <select onchange="changeUserRole('${doc.id}', this.value)" ${disabled ? 'disabled' : ''}
-                  class="text-[10px] font-black rounded-lg px-2 py-1.5 border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}">
-            ${optionsHtml}
-          </select>
-          <button onclick="openUserPermissionsModal('${doc.id}')" title="صلاحيات مخصصة"
-                  class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition flex items-center justify-center">
-            <i class="fa-solid fa-sliders text-xs"></i>
-          </button>
-        </div>
-      `;
-      container.appendChild(card);
-    });
-  } catch (error) {
-    container.innerHTML = '<div class="text-center py-4 text-xs text-rose-500">خطأ في تحميل المستخدمين</div>';
-  }
 }
 
 async function changeUserRole(uid, newRole) {
@@ -1282,6 +1170,8 @@ function subscribeToUserDoc(uid) {
   userDocUnsubscribe = db.collection('users').doc(uid).onSnapshot(doc => {
     if (!doc.exists) return;
     const data = doc.data();
+    if (data.disabled === true && !isSuperAdmin) { showSuspendedScreen(data.disabledReason); return; }
+    if (window._accountSuspended) { location.reload(); return; }
     if (!isSuperAdmin && data.role && ROLES_META[data.role]) userRole = data.role;
     currentUserPermissionsOverride = data.permissionsOverride || null;
     applyRoleUI();
@@ -1397,6 +1287,7 @@ function loginAsGuest() {
   loadRecurring();
   loadAuditLog();
   loadCatBudgets();
+  loadChargeMachines();
   refreshAll();
   syncModeForCurrentUser();
   navigateSegmented('home');
@@ -1559,8 +1450,8 @@ const CATEGORIES = {
 };
 
 const DEMO_ITEMS = [
-  { id:'demo-1', type:'income', amount:1200, category:'خدمات سوفت وير وصيانة', client:'أحمد', paymentMethod:'كاش نقدي', notes:'إصلاح بوت لودر وفلاش 3 أجهزة', reference:'INV-1001', date:offsetDate(-1), time:'02:30 PM' },
-  { id:'demo-2', type:'charity', amount:150, category:'مساعدة محتاج وتفريج كربة', client:'', paymentMethod:'كاش نقدي', notes:'صدقة شكر', reference:'', date:offsetDate(-1), time:'03:15 PM' },
+  { id:'demo-1', type:'income', amount:1200, category:'خدمات سوفت وير وصيانة', client:'أحمد', paymentMethod:'نقدي', notes:'إصلاح بوت لودر وفلاش 3 أجهزة', reference:'INV-1001', date:offsetDate(-1), time:'02:30 PM' },
+  { id:'demo-2', type:'charity', amount:150, category:'مساعدة محتاج وتفريج كربة', client:'', paymentMethod:'نقدي', notes:'صدقة شكر', reference:'', date:offsetDate(-1), time:'03:15 PM' },
   { id:'demo-3', type:'expense', amount:380, category:'تفعيل وسيرفرات وكريدت', client:'موزع سيرفر محمد', paymentMethod:'إنستاباي (InstaPay)', notes:'تفعيل باقة دونجل', reference:'EXP-3001', date:offsetDate(-2), time:'05:40 PM' },
   { id:'demo-4', type:'income', amount:950, category:'شغل ريموت أونلاين', client:'محل المنصورة', paymentMethod:'إنستاباي (InstaPay)', notes:'خدمة ريموت', reference:'INV-1002', date:offsetDate(-2), time:'08:10 PM' },
   { id:'demo-5', type:'expense', amount:90, category:'أكل ومشروبات', client:'', paymentMethod:'فودافون كاش / محفظة', notes:'غداء', reference:'', date:offsetDate(-3), time:'01:00 PM' },
@@ -1695,6 +1586,7 @@ function handleUserSwitch(uid) {
   recurringExpenses = [];
   auditLogs = [];
   categoryBudgets = {};
+  chargeMachines = [];
   lastDeletedId = null;
   localStorage.setItem(LAST_UID_KEY, uid);
 }
@@ -1718,7 +1610,10 @@ function applySignedOutState() {
   recurringExpenses = [];
   auditLogs = [];
   categoryBudgets = {};
+  chargeMachines = [];
   if (typeof clearNotices === 'function') clearNotices();
+  if (typeof hideSuspendedScreen === 'function') hideSuspendedScreen();
+  if (typeof closeChargeMachines === 'function') closeChargeMachines();
 
   [() => userDocUnsubscribe, () => transactionsUnsubscribe, () => requestsUnsubscribe, () => cloudUserMetaUnsubscribe]
     .forEach(get => { try { const fn = get(); if (typeof fn === 'function') fn(); } catch (e) {} });
@@ -1947,6 +1842,7 @@ auth.onAuthStateChanged(async user => {
     }
 
     await loadUserRole(user.uid);
+    if (window._accountSuspended) return;
     await loadRolePermissions();
 
     loadAllLocal();
@@ -2113,6 +2009,9 @@ async function doSyncToCloud() {
       inventory: Array.isArray(inventoryItems) ? inventoryItems : [],
       recurring: Array.isArray(recurringExpenses) ? recurringExpenses : [],
       catBudgets: sanitizeCatBudgets(categoryBudgets),
+      chargeMachines: sanitizeMachines(chargeMachines),
+      txCount: transactions.filter(t => !t._deleted).length,
+      appVersion: '20.4',
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
 
@@ -2171,6 +2070,10 @@ async function loadCloudData(uid) {
         categoryBudgets = sanitizeCatBudgets(data.catBudgets);
         lsSet(CATBUDGET_KEY, JSON.stringify(categoryBudgets));
       }
+      if (Array.isArray(data.chargeMachines)) {
+        chargeMachines = sanitizeMachines(data.chargeMachines);
+        lsSet(CHARGE_KEY, JSON.stringify(chargeMachines));
+      }
     }
 
     transactions = mergeTransactions(mergeTransactions(transactions, cloudTx), legacyTx);
@@ -2218,6 +2121,16 @@ async function loadCloudData(uid) {
           categoryBudgets = incoming;
           lsSet(CATBUDGET_KEY, JSON.stringify(categoryBudgets));
           needRefresh = true;
+        }
+      }
+      if (Array.isArray(d.chargeMachines)) {
+        const inc = sanitizeMachines(d.chargeMachines);
+        if (JSON.stringify(inc) !== JSON.stringify(chargeMachines)) {
+          chargeMachines = inc;
+          lsSet(CHARGE_KEY, JSON.stringify(chargeMachines));
+          renderMachineSummaries();
+          if (typeof mcRenderList === 'function' && !_mcId) mcRenderList();
+          else if (_mcId && _mcFind()) mcRenderDetail();
         }
       }
       if (needRefresh) refreshAll();
@@ -2303,6 +2216,7 @@ function loadAllLocal() {
   loadRecurring();
   loadAuditLog();
   loadCatBudgets();
+  loadChargeMachines();
   checkOverdueDebtsAlert();
 }
 
@@ -2386,7 +2300,7 @@ function calculateMetrics(list = getPeriodTransactions()) {
   const wallets = {};
   list.forEach(t => {
     const amount = Number(t.amount) || 0;
-    const method = t.paymentMethod || 'كاش نقدي';
+    const method = normalizePaymentMethod(t.paymentMethod);
     if (t.type === 'income') { income += amount; wallets[method] = (wallets[method] || 0) + amount; }
     else if (t.type === 'expense') { expense += amount; wallets[method] = (wallets[method] || 0) - amount; }
     else if (t.type === 'charity') { charity += amount; wallets[method] = (wallets[method] || 0) - amount; }
@@ -2425,14 +2339,14 @@ function renderWalletsBreakdown(wallets) {
   const container = document.getElementById('walletsContainer');
   if (!container) return;
   container.innerHTML = '';
-  const defaultMethods = ['كاش نقدي', 'إنستاباي (InstaPay)', 'فودافون كاش / محفظة', 'فيزا / بطاقة بنكية'];
+  const defaultMethods = ['نقدي', 'إنستاباي (InstaPay)', 'فودافون كاش / محفظة', 'فيزا / بطاقة بنكية'];
   const allMethods = Array.from(new Set([...defaultMethods, ...Object.keys(wallets)]));
   allMethods.forEach(method => {
     const bal = wallets[method] || 0;
     const card = document.createElement('div');
     card.className = 'p-2.5 rounded-xl border border-slate-100 dark:border-dark-750 bg-slate-50 dark:bg-dark-850/60 flex flex-col justify-between';
     let icon = 'fa-wallet';
-    if (method.includes('كاش')) icon = 'fa-money-bill-1-wave';
+    if (isCashMethod(method)) icon = 'fa-hand-holding-dollar';
     else if (method.includes('إنستاباي')) icon = 'fa-bolt';
     else if (method.includes('محفظة')) icon = 'fa-mobile-screen-button';
     else if (method.includes('فيزا')) icon = 'fa-credit-card';
@@ -2520,7 +2434,7 @@ function renderTransactions() {
         ${item.client ? `<button onclick="openClientLedger('${escapeHTML(item.client)}')" class="inline-flex items-center gap-1 text-xs font-black text-orange-500 hover:underline"><i class="fa-solid fa-user-circle"></i> ${escapeHTML(item.client)}</button>` : '<span class="text-slate-400 text-[10px]">-</span>'}
       </td>
       <td class="py-3 px-4"><span class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-slate-300 font-bold text-[10px]">${escapeHTML(item.category)}</span></td>
-      <td class="py-3 px-4 text-slate-500 dark:text-slate-400 font-semibold">${escapeHTML(item.paymentMethod || 'كاش نقدي')}</td>
+      <td class="py-3 px-4 text-slate-500 dark:text-slate-400 font-semibold">${payMethodHTML(item.paymentMethod)}</td>
       <td class="py-3 px-4">
         <div class="font-bold text-slate-600 dark:text-slate-300 text-xs">${escapeHTML(item.date)}</div>
         <div class="text-[10px] text-orange-500 font-bold flex items-center gap-1 mt-0.5"><i class="fa-regular fa-clock"></i> ${escapeHTML(timeFormatted)}</div>
@@ -2754,7 +2668,7 @@ function openClientLedger(clientName) {
           <div class="font-bold">${escapeHTML(t.notes || t.category)}</div>
           <div class="text-[9px] text-slate-400">${escapeHTML(typeName(t.type))} ${t.status === 'paid' ? '• مسدد' : ''}</div>
         </td>
-        <td class="py-2.5 px-3 text-slate-400 font-semibold">${escapeHTML(t.paymentMethod || 'كاش')}</td>
+        <td class="py-2.5 px-3 text-slate-400 font-semibold">${payMethodHTML(t.paymentMethod)}</td>
         <td class="py-2.5 px-3 font-black ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">
           ${t.type === 'income' ? '+' : '-'}${money(t.amount)} ج.م
         </td>
@@ -2804,7 +2718,7 @@ function shareViaWhatsApp(id) {
 📌 *البيان:* ${item.notes || item.category}
 💰 *المبلغ:* ${money(item.amount)} ج.م
 📅 *التاريخ:* ${item.date} ${timeStr ? `(${timeStr})` : ''}
-💳 *طريقة الدفع:* ${item.paymentMethod || 'كاش'}
+💳 *طريقة الدفع:* ${normalizePaymentMethod(item.paymentMethod)}
 ${item.reference ? `🔖 *المرجع:* ${item.reference}\n` : ''}----------------------------------------
 شكراً لتعاملكم معنا ✨`;
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
@@ -2894,7 +2808,7 @@ function openModal(type = 'expense', id = null) {
     document.getElementById('formTime').value = format12To24(item.time);
     document.getElementById('formClient').value = item.client || '';
     document.getElementById('formCategory').value = item.category;
-    document.getElementById('formPaymentMethod').value = item.paymentMethod || 'كاش نقدي';
+    document.getElementById('formPaymentMethod').value = normalizePaymentMethod(item.paymentMethod);
     document.getElementById('formReference').value = item.reference || '';
     document.getElementById('formNotes').value = item.notes || '';
     if (dueDateInput) dueDateInput.value = item.dueDate || '';
@@ -3156,6 +3070,7 @@ function downloadBackup() {
     inventory: inventoryItems,
     recurring: recurringExpenses,
     categoryBudgets: sanitizeCatBudgets(categoryBudgets),
+    chargeMachines: sanitizeMachines(chargeMachines),
     count: transactions.length
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
@@ -3186,6 +3101,7 @@ function restoreBackup(event) {
         if (backup.budget !== undefined) lsSet(BUDGET_KEY, Number(backup.budget) || 0);
         if (Array.isArray(backup.inventory)) { inventoryItems = backup.inventory; lsSet(INVENTORY_KEY, JSON.stringify(inventoryItems)); }
         if (Array.isArray(backup.recurring)) { recurringExpenses = backup.recurring; lsSet(RECURRING_KEY, JSON.stringify(recurringExpenses)); }
+        if (Array.isArray(backup.chargeMachines)) { chargeMachines = sanitizeMachines(backup.chargeMachines); lsSet(CHARGE_KEY, JSON.stringify(chargeMachines)); }
         if (backup.categoryBudgets && typeof backup.categoryBudgets === 'object') { categoryBudgets = sanitizeCatBudgets(backup.categoryBudgets); lsSet(CATBUDGET_KEY, JSON.stringify(categoryBudgets)); }
         saveData({ force: true });
         refreshAll();
@@ -3326,7 +3242,7 @@ function renderReportPreview() {
             <td style="padding:6px 8px; border:1px solid #e2e8f0;">${escapeHTML(t.notes || t.category)}</td>
             <td style="padding:6px 8px; border:1px solid #e2e8f0;">${escapeHTML(t.client || '-')}</td>
             <td style="padding:6px 8px; border:1px solid #e2e8f0;">${escapeHTML(t.category || '')}</td>
-            <td style="padding:6px 8px; border:1px solid #e2e8f0;">${escapeHTML(t.paymentMethod || 'كاش')}</td>
+            <td style="padding:6px 8px; border:1px solid #e2e8f0;">${escapeHTML(normalizePaymentMethod(t.paymentMethod))}</td>
             <td style="padding:6px 8px; border:1px solid #e2e8f0; font-weight:900; color:${t.type==='income'?'#10b981':'#f43f5e'};">
               ${t.type==='income'?'+':'-'}${money(t.amount)} ج.م
             </td>
@@ -3894,7 +3810,7 @@ function exportToExcel() {
     "المدفوع": Number(t.paidAmount) || 0,
     "العميل": t.client || '-',
     "التصنيف": t.category || '-',
-    "طريقة الدفع": t.paymentMethod || 'كاش نقدي',
+    "طريقة الدفع": normalizePaymentMethod(t.paymentMethod),
     "التاريخ": t.date,
     "الوقت": t.time || '',
     "تاريخ الاستحقاق": t.dueDate || '-',
@@ -4083,7 +3999,7 @@ function exportClientLedgerPDF() {
             <td style="padding:8px 10px; border:1px solid #e2e8f0; font-weight:bold;">${escapeHTML(t.date)}</td>
             <td style="padding:8px 10px; border:1px solid #e2e8f0;">${escapeHTML(typeName(t.type))}</td>
             <td style="padding:8px 10px; border:1px solid #e2e8f0;">${escapeHTML(t.notes || t.category)}</td>
-            <td style="padding:8px 10px; border:1px solid #e2e8f0;">${escapeHTML(t.paymentMethod || 'كاش')}</td>
+            <td style="padding:8px 10px; border:1px solid #e2e8f0;">${escapeHTML(normalizePaymentMethod(t.paymentMethod))}</td>
             <td style="padding:8px 10px; border:1px solid #e2e8f0; font-weight:900; color:${t.type==='income'?'#10b981':'#f43f5e'};">
               ${money(t.amount)} ج.م
             </td>
@@ -5069,7 +4985,7 @@ function renderRecurringList() {
 function openDrawerModal() {
   closeMenus();
   const metrics = calculateMetrics();
-  const cashWallet = metrics.wallets['كاش نقدي'] || 0;
+  const cashWallet = metrics.wallets['نقدي'] || 0;
   document.getElementById('drawerExpected').textContent = money(cashWallet) + ' ج.م';
   document.getElementById('drawerActual').value = '';
   document.getElementById('drawerDiff').textContent = '0.00 ج.م';
@@ -5082,7 +4998,7 @@ function closeDrawerModal() {
 }
 function calculateDrawerDiff() {
   const metrics = calculateMetrics();
-  const expected = metrics.wallets['كاش نقدي'] || 0;
+  const expected = metrics.wallets['نقدي'] || 0;
   const actual = Number(document.getElementById('drawerActual').value) || 0;
   const diff = actual - expected;
   const diffEl = document.getElementById('drawerDiff');
@@ -5329,12 +5245,12 @@ updateMetrics = function() {
   const strip = document.getElementById('mobileWalletsStrip');
   if (strip) {
     strip.innerHTML = '';
-    const defaultMethods = ['كاش نقدي', 'إنستاباي (InstaPay)', 'فودافون كاش / محفظة', 'فيزا / بطاقة بنكية'];
+    const defaultMethods = ['نقدي', 'إنستاباي (InstaPay)', 'فودافون كاش / محفظة', 'فيزا / بطاقة بنكية'];
     const allMethods = Array.from(new Set([...defaultMethods, ...Object.keys(metrics.wallets)]));
     allMethods.forEach(method => {
       const bal = metrics.wallets[method] || 0;
       let icon = 'fa-wallet';
-      if (method.includes('كاش')) icon = 'fa-money-bill-1-wave';
+      if (isCashMethod(method)) icon = 'fa-hand-holding-dollar';
       else if (method.includes('إنستاباي')) icon = 'fa-bolt';
       else if (method.includes('محفظة')) icon = 'fa-mobile-screen-button';
       else if (method.includes('فيزا')) icon = 'fa-credit-card';
@@ -5373,7 +5289,7 @@ function buildFeedCardHTML(item) {
           ${escapeHTML(item.notes || item.category || 'عملية')}
         </div>
         <div class="text-[10px] text-slate-400 font-bold mt-0.5 truncate">
-          ${item.client ? `<span class="text-orange-400">${escapeHTML(item.client)}</span> • ` : ''}${escapeHTML(item.paymentMethod || 'كاش')} • ${escapeHTML(item.date)}
+          ${item.client ? `<span class="text-orange-400">${escapeHTML(item.client)}</span> • ` : ''}${payMethodHTML(item.paymentMethod)} • ${escapeHTML(item.date)}
         </div>
       </div>
     </div>
@@ -5482,7 +5398,7 @@ renderTransactions = function() {
           ${item.client ? `<button onclick="openClientLedger('${escapeHTML(item.client)}')" class="inline-flex items-center gap-1 text-xs font-black text-orange-500 hover:underline"><i class="fa-solid fa-user-circle"></i> ${escapeHTML(item.client)}</button>` : '<span class="text-slate-400 text-[10px]">-</span>'}
         </td>
         <td class="py-3 px-4"><span class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-slate-300 font-bold text-[10px]">${escapeHTML(item.category)}</span></td>
-        <td class="py-3 px-4 text-slate-500 dark:text-slate-400 font-semibold">${escapeHTML(item.paymentMethod || 'كاش نقدي')}</td>
+        <td class="py-3 px-4 text-slate-500 dark:text-slate-400 font-semibold">${payMethodHTML(item.paymentMethod)}</td>
         <td class="py-3 px-4">
           <div class="font-bold text-slate-600 dark:text-slate-300 text-xs">${escapeHTML(item.date)}</div>
           <div class="text-[10px] text-orange-500 font-bold mt-0.5">${escapeHTML(timeFormatted)}</div>
@@ -6102,12 +6018,13 @@ function readGuestScope() {
   return {
     tx, inv: Array.isArray(inv) ? inv : [], rec: Array.isArray(rec) ? rec : [],
     budget: Number(localStorage.getItem(scopedKey(BUDGET_KEY, GUEST_UID)) || 0),
-    cat: sanitizeCatBudgets(rd(CATBUDGET_KEY, {}))
+    cat: sanitizeCatBudgets(rd(CATBUDGET_KEY, {})),
+    machines: sanitizeMachines(rd(CHARGE_KEY, []))
   };
 }
 function guestHasData() {
   const g = readGuestScope();
-  return g.tx.some(t => !t._deleted) || g.inv.length > 0 || g.rec.length > 0 || g.budget > 0 || Object.keys(g.cat).length > 0;
+  return g.tx.some(t => !t._deleted) || g.inv.length > 0 || g.rec.length > 0 || g.machines.length > 0 || g.budget > 0 || Object.keys(g.cat).length > 0;
 }
 function openGuestImportModal() {
   if (!isRealCloudUser()) return;
@@ -6115,7 +6032,7 @@ function openGuestImportModal() {
   const list = document.getElementById('gimCounts');
   if (list) {
     list.innerHTML = '';
-    const items = [[g.tx.filter(t => !t._deleted).length, 'عملية مالية'], [g.inv.length, 'صنف في المخزن'], [g.rec.length, 'مصروف متكرر']].filter(x => x[0] > 0);
+    const items = [[g.tx.filter(t => !t._deleted).length, 'عملية مالية'], [g.inv.length, 'صنف في المخزن'], [g.rec.length, 'مصروف متكرر'], [g.machines.length, 'مكنة شحن']].filter(x => x[0] > 0);
     if (g.budget > 0) items.push(['✓', 'ميزانية شهرية']);
     items.forEach(([n, label]) => {
       const li = document.createElement('li');
@@ -6148,6 +6065,10 @@ function importGuestData() {
   g.rec.forEach(r => { if (r && !recIds.has(keyOf(r))) recurringExpenses.push(r); });
   if (!getBudget() && g.budget > 0) lsSet(BUDGET_KEY, g.budget);
   categoryBudgets = sanitizeCatBudgets({ ...g.cat, ...categoryBudgets });
+  const mIds = new Set(chargeMachines.map(m => m.id));
+  g.machines.forEach(m => { if (!mIds.has(m.id)) chargeMachines.push(m); });
+  chargeMachines = sanitizeMachines(chargeMachines);
+  lsSet(CHARGE_KEY, JSON.stringify(chargeMachines));
   lsSet(INVENTORY_KEY, JSON.stringify(inventoryItems));
   lsSet(RECURRING_KEY, JSON.stringify(recurringExpenses));
   lsSet(CATBUDGET_KEY, JSON.stringify(categoryBudgets));
@@ -6254,4 +6175,739 @@ document.addEventListener('keydown', e => {
   if (p && !p.classList.contains('hidden')) closeUserProfileModal();
   const g = document.getElementById('guestImportModal');
   if (g && !g.classList.contains('hidden')) closeGuestImportModal(false);
+});
+
+/* =========================================================
+   V20.4 — "نقدي"، شريحة الرصيد للكمبيوتر، مكن الشحن، لوحة تحكم المدير
+   ========================================================= */
+
+/* ---------- طرق الدفع: توحيد "كاش نقدي" → "نقدي" ---------- */
+function normalizePaymentMethod(m) {
+  const v = String(m || '').trim();
+  if (!v || v === 'كاش نقدي' || v === 'كاش' || v === 'نقدي') return 'نقدي';
+  return v;
+}
+function isCashMethod(m) { return normalizePaymentMethod(m) === 'نقدي'; }
+// في الجداول: أيقونة "يد ماسكة فلوس" بجانب كلمة نقدي
+function payMethodHTML(m) {
+  const v = normalizePaymentMethod(m);
+  return v === 'نقدي'
+    ? '<i class="fa-solid fa-hand-holding-dollar pay-cash-ic"></i> نقدي'
+    : escapeHTML(v);
+}
+function walletIconFor(method) {
+  if (isCashMethod(method)) return 'fa-hand-holding-dollar';
+  if (String(method).includes('إنستاباي')) return 'fa-bolt';
+  if (String(method).includes('محفظة')) return 'fa-mobile-screen-button';
+  if (String(method).includes('فيزا')) return 'fa-credit-card';
+  return 'fa-wallet';
+}
+
+/* ---------- شريحة الرصيد على الكمبيوتر ---------- */
+function renderDesktopHero() {
+  const hero = document.getElementById('desktopHero');
+  if (!hero) return;
+  const m = calculateMetrics();
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set('dkNet', money(m.available)); set('dkIncome', money(m.income));
+  set('dkExpense', money(m.expense)); set('dkCharity', money(m.charity));
+  const net = document.getElementById('dkNet');
+  if (net) net.classList.toggle('dk-neg', m.available < 0);
+  const strip = document.getElementById('desktopWalletsStrip');
+  if (!strip) return;
+  strip.innerHTML = '';
+  const defaults = ['نقدي', 'إنستاباي (InstaPay)', 'فودافون كاش / محفظة', 'فيزا / بطاقة بنكية'];
+  Array.from(new Set([...defaults, ...Object.keys(m.wallets)])).forEach(method => {
+    const bal = m.wallets[method] || 0;
+    const chip = document.createElement('div');
+    chip.className = 'ft-wallet-chip' + (isCashMethod(method) ? ' is-cash' : '');
+    chip.innerHTML = `
+      <div class="flex items-center gap-1.5 text-[11px] font-bold text-slate-400">
+        <i class="fa-solid ${walletIconFor(method)} text-orange-400"></i>
+        <span class="truncate">${escapeHTML(method.split(' ')[0])}</span>
+      </div>
+      <div class="money-val text-base font-black mt-1.5 ${bal >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-400'}">
+        ${money(bal)} <span class="text-[10px] text-slate-400">ج.م</span>
+      </div>`;
+    strip.appendChild(chip);
+  });
+}
+(function hookMetricsForV204() {
+  const orig = window.updateMetrics;
+  window.updateMetrics = function () {
+    const r = orig.apply(this, arguments);
+    try { renderDesktopHero(); renderMachineSummaries(); } catch (e) { console.warn(e); }
+    return r;
+  };
+  const origPriv = window.applyPrivacyModeUI;
+  window.applyPrivacyModeUI = function () {
+    const r = origPriv.apply(this, arguments);
+    const icon = document.getElementById('privacyIconDk');
+    if (icon) icon.className = isPrivacyMode ? 'fa-solid fa-eye-slash text-rose-500' : 'fa-solid fa-eye text-orange-500';
+    return r;
+  };
+})();
+
+/* ---------- مكن الشحن ---------- */
+const MC_MAX_MACHINES = 25;
+const MC_MAX_HISTORY = 60;
+let _mcId = null;
+let _mcMode = 'add';
+
+function _mcNum(v) { const n = Number(v); return isFinite(n) ? Math.round(Math.max(-1e9, Math.min(1e9, n)) * 100) / 100 : 0; }
+function _mcHid() { return 'h-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function sanitizeMachines(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.slice(0, MC_MAX_MACHINES).map(m => {
+    if (!m || typeof m !== 'object') return null;
+    const history = (Array.isArray(m.history) ? m.history : []).slice(0, MC_MAX_HISTORY).map(e => ({
+      id: String((e && e.id) || _mcHid()).slice(0, 40),
+      ts: Number(e && e.ts) || 0,
+      type: ['create', 'add', 'sub', 'set', 'rename'].includes(e && e.type) ? e.type : 'set',
+      delta: _mcNum(e && e.delta), before: _mcNum(e && e.before), after: _mcNum(e && e.after),
+      note: sanitizeString((e && e.note) || '', 120)
+    })).filter(e => e.ts > 0);
+    return {
+      id: String(m.id || ('mc-' + Date.now().toString(36))).slice(0, 40),
+      name: sanitizeString(m.name || 'مكنة', 60) || 'مكنة',
+      balance: _mcNum(m.balance),
+      createdAt: Number(m.createdAt) || Date.now(),
+      _updatedAt: Number(m._updatedAt) || Date.now(),
+      history
+    };
+  }).filter(Boolean);
+}
+function loadChargeMachines() { chargeMachines = sanitizeMachines(_safeJSON(lsGet(CHARGE_KEY), [])); }
+function saveChargeMachines() {
+  lsSet(CHARGE_KEY, JSON.stringify(chargeMachines));
+  if (isRealCloudUser()) syncToCloud();
+  renderMachineSummaries();
+}
+function mcTotal() { return _mcNum(chargeMachines.reduce((s, m) => s + m.balance, 0)); }
+function _mcCountLabel(n) { return n === 1 ? 'مكنة واحدة' : n === 2 ? 'مكنتين' : (n >= 3 && n <= 10) ? n + ' مكن' : n + ' مكنة'; }
+function _mcFmtDate(ts) {
+  try { return new Date(ts).toLocaleString('ar-EG', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); }
+  catch (e) { return ''; }
+}
+function renderMachineSummaries() {
+  const n = chargeMachines.length;
+  document.querySelectorAll('.js-mc-total').forEach(e => { e.textContent = money(mcTotal()); });
+  document.querySelectorAll('.js-mc-sub').forEach(e => { e.textContent = n ? _mcCountLabel(n) : 'اضغط لإضافة أول مكنة'; });
+}
+function _mcFind() { return chargeMachines.find(m => m.id === _mcId) || null; }
+
+function openChargeMachines() {
+  if (!requireAuth()) return;
+  if (typeof closeMenus === 'function') closeMenus();
+  mcShowList();
+  const m = document.getElementById('machinesModal');
+  m.classList.remove('hidden'); m.classList.add('flex');
+}
+function closeChargeMachines() {
+  const m = document.getElementById('machinesModal');
+  if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+  _mcId = null;
+}
+function mcShowList() {
+  _mcId = null;
+  document.getElementById('mcListView').hidden = false;
+  document.getElementById('mcDetailView').hidden = true;
+  document.getElementById('mcBack').hidden = true;
+  document.getElementById('mcTitle').textContent = 'مكن الشحن';
+  mcRenderList();
+}
+function mcRenderList() {
+  document.getElementById('mcTotal').textContent = money(mcTotal());
+  document.getElementById('mcCountLine').textContent = chargeMachines.length ? _mcCountLabel(chargeMachines.length) : 'لا توجد مكن بعد';
+  const list = document.getElementById('mcList');
+  const empty = document.getElementById('mcEmpty');
+  list.replaceChildren();
+  empty.hidden = chargeMachines.length > 0;
+  chargeMachines.forEach(m => {
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'mc-item';
+    btn.addEventListener('click', () => mcOpenDetail(m.id));
+    const last = m.history[0] ? _mcFmtDate(m.history[0].ts) : _mcFmtDate(m.createdAt);
+    btn.innerHTML = `<span class="mc-item-ic"><i class="fa-solid fa-bolt"></i></span>
+      <span class="mc-item-tx"><b></b><small>آخر تحديث: ${escapeHTML(last)}</small></span>
+      <span class="mc-item-bal money-val ${m.balance < 0 ? 'neg' : ''}">${money(m.balance)}</span>
+      <i class="fa-solid fa-chevron-left mc-item-go"></i>`;
+    btn.querySelector('b').textContent = m.name;
+    list.appendChild(btn);
+  });
+}
+function mcAddMachine() {
+  const nameEl = document.getElementById('mcNewName');
+  const balEl = document.getElementById('mcNewBal');
+  const name = sanitizeString(nameEl.value, 60);
+  if (!name) { showToast('اكتب اسم المكنة', 'error'); nameEl.focus(); return; }
+  if (chargeMachines.length >= MC_MAX_MACHINES) { showToast(`وصلت للحد الأقصى (${MC_MAX_MACHINES} مكنة)`, 'error'); return; }
+  if (chargeMachines.some(m => m.name === name)) { showToast('فيه مكنة بنفس الاسم', 'error'); return; }
+  const bal = balEl.value === '' ? 0 : _mcNum(balEl.value);
+  const now = Date.now();
+  chargeMachines.push({
+    id: 'mc-' + now.toString(36) + Math.random().toString(36).slice(2, 5),
+    name, balance: bal, createdAt: now, _updatedAt: now,
+    history: [{ id: _mcHid(), ts: now, type: 'create', delta: bal, before: 0, after: bal, note: '' }]
+  });
+  saveChargeMachines();
+  nameEl.value = ''; balEl.value = '';
+  mcRenderList();
+  showToast('تمت إضافة المكنة ✓', 'success');
+}
+function mcOpenDetail(id) {
+  _mcId = id;
+  if (!_mcFind()) { mcShowList(); return; }
+  document.getElementById('mcListView').hidden = true;
+  document.getElementById('mcDetailView').hidden = false;
+  document.getElementById('mcBack').hidden = false;
+  _mcMode = 'add';
+  document.getElementById('mcAmount').value = '';
+  document.getElementById('mcNote').value = '';
+  mcRenderDetail();
+}
+function mcSetMode(mode) {
+  _mcMode = mode;
+  document.querySelectorAll('.mc-seg button').forEach(b => b.classList.toggle('on', b.getAttribute('data-mode') === mode));
+  const lbl = document.getElementById('mcAmountLabel');
+  if (lbl) lbl.textContent = mode === 'set' ? 'الرصيد الجديد (الرقم النهائي)' : (mode === 'add' ? 'المبلغ المضاف' : 'المبلغ المخصوم');
+}
+function mcRenderDetail() {
+  const m = _mcFind();
+  if (!m) return;
+  document.getElementById('mcTitle').textContent = m.name;
+  document.getElementById('mcName').value = m.name;
+  const bal = document.getElementById('mcBalance');
+  bal.textContent = money(m.balance);
+  bal.classList.toggle('neg', m.balance < 0);
+  document.getElementById('mcMeta').textContent = 'أُنشئت ' + _mcFmtDate(m.createdAt);
+  mcSetMode(_mcMode);
+  const host = document.getElementById('mcHistory');
+  host.replaceChildren();
+  document.getElementById('mcHistCount').textContent = m.history.length ? `(${m.history.length})` : '';
+  if (!m.history.length) {
+    const e = document.createElement('div'); e.className = 'mc-hist-empty'; e.textContent = 'لا توجد تعديلات بعد'; host.appendChild(e);
+    return;
+  }
+  m.history.forEach(e => host.appendChild(_mcHistRow(e)));
+}
+function _mcHistRow(e) {
+  const meta = {
+    create: ['fa-star', 'إنشاء المكنة'],
+    add: ['fa-circle-plus', 'إضافة رصيد'],
+    sub: ['fa-circle-minus', 'خصم من الرصيد'],
+    set: ['fa-pen-to-square', e.delta >= 0 ? 'تعديل الرصيد (زيادة)' : 'تعديل الرصيد (نقص)'],
+    rename: ['fa-tag', 'تغيير الاسم']
+  }[e.type];
+  const row = document.createElement('div');
+  row.className = 'mc-h mc-h-' + e.type;
+  const ic = document.createElement('span'); ic.className = 'mc-h-ic'; ic.innerHTML = `<i class="fa-solid ${meta[0]}"></i>`;
+  const body = document.createElement('div'); body.className = 'mc-h-body';
+  const t = document.createElement('b'); t.textContent = meta[1];
+  const sub = document.createElement('small');
+  let line = _mcFmtDate(e.ts);
+  if (e.type === 'rename') line += ' • ' + e.note;
+  else if (e.type !== 'create') line += ` • من ${money(e.before)} إلى ${money(e.after)}`;
+  else line += ` • برصيد افتتاحي ${money(e.after)}`;
+  if (e.type !== 'rename' && e.note) line += ' • ' + e.note;
+  sub.textContent = line;
+  body.append(t, sub);
+  const chip = document.createElement('span');
+  chip.className = 'mc-h-delta ' + (e.delta > 0 ? 'up' : e.delta < 0 ? 'down' : 'zero');
+  chip.textContent = e.type === 'rename' ? '—' : (e.delta > 0 ? '+' : e.delta < 0 ? '−' : '') + money(Math.abs(e.delta));
+  row.append(ic, body, chip);
+  return row;
+}
+function mcApplyOp() {
+  const m = _mcFind(); if (!m) return;
+  const raw = document.getElementById('mcAmount').value;
+  const amt = Number(raw);
+  if (raw === '' || !isFinite(amt) || amt < 0 || amt > 1e9 || (_mcMode !== 'set' && amt === 0)) {
+    showToast('اكتب مبلغ صحيح', 'error'); return;
+  }
+  const before = m.balance;
+  const after = _mcNum(_mcMode === 'add' ? before + amt : _mcMode === 'sub' ? before - amt : amt);
+  const delta = _mcNum(after - before);
+  if (_mcMode === 'set' && delta === 0) { showToast('ده نفس الرصيد الحالي', 'info'); return; }
+  const now = Date.now();
+  m.balance = after; m._updatedAt = now;
+  m.history.unshift({ id: _mcHid(), ts: now, type: _mcMode, delta, before, after, note: sanitizeString(document.getElementById('mcNote').value, 120) });
+  if (m.history.length > MC_MAX_HISTORY) m.history.length = MC_MAX_HISTORY;
+  saveChargeMachines();
+  document.getElementById('mcAmount').value = ''; document.getElementById('mcNote').value = '';
+  mcRenderDetail();
+  showToast(_mcMode === 'set' ? 'تم تعديل الرصيد وتسجيله في السجل ✓' : (_mcMode === 'add' ? 'تمت الإضافة ✓' : 'تم الخصم ✓'), 'success');
+}
+function mcRenameCurrent() {
+  const m = _mcFind(); if (!m) return;
+  const name = sanitizeString(document.getElementById('mcName').value, 60);
+  if (!name || name === m.name) { document.getElementById('mcName').value = m.name; return; }
+  if (chargeMachines.some(x => x.id !== m.id && x.name === name)) { showToast('فيه مكنة بنفس الاسم', 'error'); return; }
+  const now = Date.now();
+  m.history.unshift({ id: _mcHid(), ts: now, type: 'rename', delta: 0, before: m.balance, after: m.balance, note: `من «${m.name}» إلى «${name}»` });
+  if (m.history.length > MC_MAX_HISTORY) m.history.length = MC_MAX_HISTORY;
+  m.name = name; m._updatedAt = now;
+  saveChargeMachines(); mcRenderDetail();
+  showToast('تم تغيير الاسم ✓', 'success');
+}
+function mcDeleteCurrent() {
+  const m = _mcFind(); if (!m) return;
+  openConfirm('حذف المكنة؟', `هتتحذف المكنة <b>${escapeHTML(m.name)}</b> وسجلها بالكامل ومش هتقدر ترجعها.`, () => {
+    chargeMachines = chargeMachines.filter(x => x.id !== m.id);
+    saveChargeMachines(); mcShowList();
+    showToast('تم حذف المكنة', 'info');
+  });
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const mm = document.getElementById('machinesModal');
+    if (mm && !mm.classList.contains('hidden') && !(document.getElementById('confirmModal') && !document.getElementById('confirmModal').classList.contains('hidden'))) {
+      if (_mcId) mcShowList(); else closeChargeMachines();
+    }
+  }
+  if (e.key === 'Enter' && e.target && e.target.id) {
+    if (e.target.id === 'mcNewName' || e.target.id === 'mcNewBal') { e.preventDefault(); mcAddMachine(); }
+    else if (e.target.id === 'mcAmount' || e.target.id === 'mcNote') { e.preventDefault(); mcApplyOp(); }
+    else if (e.target.id === 'mcName') { e.preventDefault(); mcRenameCurrent(); }
+  }
+});
+
+/* ---------- حالة الحساب الموقوف ---------- */
+function showSuspendedScreen(reason) {
+  window._accountSuspended = true;
+  const el = document.getElementById('suspendedScreen');
+  const r = document.getElementById('susReason');
+  if (r) r.textContent = reason ? ('السبب: ' + reason) : 'تواصل مع الإدارة لمعرفة التفاصيل.';
+  if (el) el.hidden = false;
+  if (typeof hideLoginWall === 'function') hideLoginWall();
+}
+function hideSuspendedScreen() {
+  window._accountSuspended = false;
+  const el = document.getElementById('suspendedScreen');
+  if (el) el.hidden = true;
+}
+
+/* =========================================================
+   لوحة تحكم المدير (V2): نظرة عامة + مستخدمين + تفاصيل المستخدم
+   ========================================================= */
+let admUsers = [];
+let admUsersLoaded = false;
+let admUsersStale = true;
+let admRoleFilter = 'all';
+let admStatusFilter = 'all';
+let admSort = 'lastLogin';
+let admShown = 80;
+let admCurrentUid = null;
+
+const ADM_TABS = ['overview', 'users', 'requests', 'permissions'];
+const ADM_TAB_IDS = { overview: ['adminTabOverview', 'adminPanelOverview'], users: ['adminTabUsers', 'adminPanelUsers'],
+  requests: ['adminTabRequests', 'adminPanelRequests'], permissions: ['adminTabPerms', 'adminPanelPerms'] };
+const ADM_TAB_TITLES = { overview: 'نظرة عامة', users: 'المستخدمين', requests: 'طلبات العملاء', permissions: 'صلاحيات الأدوار' };
+
+function _admDate(v) { try { return v && v.toDate ? v.toDate() : (v instanceof Date ? v : null); } catch (e) { return null; } }
+function _admFmt(d) { return d ? d.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'; }
+function _admFmtFull(d) { return d ? d.toLocaleString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'; }
+function _admAgo(d) {
+  if (!d) return 'لم يسجل دخول';
+  const days = Math.floor((Date.now() - d.getTime()) / 864e5);
+  if (days <= 0) return 'النهاردة';
+  if (days === 1) return 'امبارح';
+  if (days < 30) return `من ${days} يوم`;
+  if (days < 365) return `من ${Math.floor(days / 30)} شهر`;
+  return `من ${Math.floor(days / 365)} سنة`;
+}
+function _admEl(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+async function admEnsureUsers(force) {
+  if (admUsersLoaded && !admUsersStale && !force) return;
+  const snap = await db.collection('users').get();
+  admUsers = snap.docs.map(doc => {
+    const data = doc.data() || {};
+    const email = (data.email || '').toLowerCase().trim();
+    const role = ROLES_META[data.role] ? data.role : 'free';
+    return {
+      id: doc.id, data, email, role,
+      name: data.displayName || '', phone: data.phoneNumber || '',
+      isSuper: isSuperAdminEmail(email) || data.isSuperAdmin === true,
+      disabled: data.disabled === true,
+      created: _admDate(data.createdAt), lastLogin: _admDate(data.lastLoginAt), synced: _admDate(data.updatedAt),
+      hasOverride: !!(data.permissionsOverride && Object.keys(data.permissionsOverride).length)
+    };
+  });
+  admUsersLoaded = true; admUsersStale = false;
+}
+function _admStatus(u) {
+  if (u.disabled) return 'suspended';
+  if (!u.lastLogin) return 'idle';
+  const days = (Date.now() - u.lastLogin.getTime()) / 864e5;
+  return days <= 7 ? 'active' : (days <= 30 ? 'month' : 'idle');
+}
+const ADM_STATUS_META = {
+  active: ['نشط', 'ok'], month: ['نشط هذا الشهر', 'info'], idle: ['خامل', 'mut'], suspended: ['موقوف', 'bad']
+};
+
+function switchAdminTab(tab) {
+  if (!ADM_TABS.includes(tab)) tab = 'overview';
+  adminActiveTab = tab;
+  ADM_TABS.forEach(t => {
+    const [bId, pId] = ADM_TAB_IDS[t];
+    const b = document.getElementById(bId), p = document.getElementById(pId);
+    if (b) { b.classList.toggle('on', t === tab); b.setAttribute('aria-selected', t === tab ? 'true' : 'false'); }
+    if (p) p.hidden = t !== tab;
+  });
+  const title = document.getElementById('admTitle');
+  if (title) title.textContent = ADM_TAB_TITLES[tab];
+  admCloseUser();
+  if (tab === 'overview') renderAdminOverview();
+  else if (tab === 'users') renderUsersList();
+  else if (tab === 'requests') renderAdminRequests();
+  else if (tab === 'permissions') renderPermissionsEditor();
+}
+async function admRefresh() {
+  admUsersStale = true;
+  const b = document.getElementById('admRefreshBtn');
+  if (b) b.classList.add('spin');
+  try { switchAdminTab(adminActiveTab); } finally { setTimeout(() => b && b.classList.remove('spin'), 700); }
+}
+
+async function renderAdminOverview() {
+  const host = document.getElementById('admOverview');
+  host.replaceChildren(_admEl('div', 'adm-loading', 'جاري التحميل...'));
+  try { await admEnsureUsers(); } catch (e) { host.replaceChildren(_admEl('div', 'adm-loading err', 'تعذر تحميل البيانات (تأكد من صلاحيات المدير)')); return; }
+  const now = Date.now(), DAY = 864e5;
+  const total = admUsers.length;
+  const active7 = admUsers.filter(u => u.lastLogin && now - u.lastLogin.getTime() <= 7 * DAY).length;
+  const new7 = admUsers.filter(u => u.created && now - u.created.getTime() <= 7 * DAY).length;
+  const suspended = admUsers.filter(u => u.disabled).length;
+  const pendingBadge = document.getElementById('pendingReqBadge');
+  const pending = pendingBadge ? Number(pendingBadge.textContent) || 0 : 0;
+
+  host.replaceChildren();
+  const stats = _admEl('div', 'adm-stats');
+  [['fa-users', 'إجمالي المستخدمين', total, '#06b6d4'], ['fa-bolt', 'نشطين آخر 7 أيام', active7, '#10b981'],
+   ['fa-user-plus', 'انضموا آخر 7 أيام', new7, '#f97316'], ['fa-user-lock', 'حسابات موقوفة', suspended, '#f43f5e'],
+   ['fa-clock-rotate-left', 'طلبات عملاء معلقة', pending, '#f59e0b']].forEach(([ic, label, val, c]) => {
+    const card = _admEl('div', 'adm-stat'); card.style.setProperty('--c', c);
+    card.innerHTML = `<span class="adm-stat-ic"><i class="fa-solid ${ic}"></i></span><div><b></b><small></small></div>`;
+    card.querySelector('b').textContent = val; card.querySelector('small').textContent = label;
+    stats.appendChild(card);
+  });
+  host.appendChild(stats);
+
+  const grid = _admEl('div', 'adm-grid2');
+  // توزيع الأدوار
+  const roles = _admEl('div', 'adm-card'); roles.appendChild(_admEl('h4', 'adm-h', 'توزيع الأدوار'));
+  Object.keys(ROLES_META).forEach(r => {
+    const n = admUsers.filter(u => u.role === r).length; if (!n && r !== 'free') return;
+    const row = _admEl('div', 'adm-bar-row');
+    const pct = total ? Math.round((n / total) * 100) : 0;
+    row.innerHTML = `<span class="adm-bar-l"></span><div class="adm-bar"><i style="width:${pct}%"></i></div><span class="adm-bar-n">${n}</span>`;
+    row.querySelector('.adm-bar-l').textContent = ROLES_META[r].name;
+    roles.appendChild(row);
+  });
+  grid.appendChild(roles);
+  // التسجيلات آخر 14 يوم
+  const chart = _admEl('div', 'adm-card'); chart.appendChild(_admEl('h4', 'adm-h', 'التسجيلات الجديدة (آخر 14 يوم)'));
+  const days = []; for (let i = 13; i >= 0; i--) { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i); days.push(d); }
+  const counts = days.map(d => admUsers.filter(u => u.created && u.created >= d && u.created < new Date(d.getTime() + DAY)).length);
+  const max = Math.max(1, ...counts);
+  const bars = _admEl('div', 'adm-spark');
+  counts.forEach((n, i) => {
+    const b = _admEl('div', 'adm-spark-b'); b.title = `${days[i].toLocaleDateString('ar-EG')}: ${n}`;
+    b.innerHTML = `<i style="height:${Math.max(4, (n / max) * 100)}%"></i><small>${days[i].getDate()}</small>`;
+    bars.appendChild(b);
+  });
+  chart.appendChild(bars); grid.appendChild(chart);
+  host.appendChild(grid);
+
+  const recent = _admEl('div', 'adm-card'); recent.appendChild(_admEl('h4', 'adm-h', 'آخر المنضمين'));
+  const latest = admUsers.filter(u => u.created).sort((a, b) => b.created - a.created).slice(0, 6);
+  if (!latest.length) recent.appendChild(_admEl('div', 'adm-empty', 'لا توجد بيانات تسجيل'));
+  latest.forEach(u => recent.appendChild(_admUserRow(u, true)));
+  host.appendChild(recent);
+}
+
+function _admAvatar(u) {
+  const a = _admEl('span', 'adm-av' + (u.isSuper ? ' super' : ''));
+  const ch = (u.name || u.email || u.phone || '?').trim().charAt(0).toUpperCase();
+  a.textContent = ch || '?';
+  return a;
+}
+function _admUserRow(u, compact) {
+  const row = _admEl('button', 'adm-row' + (compact ? ' compact' : '') + (u.disabled ? ' off' : ''));
+  row.type = 'button';
+  row.addEventListener('click', () => admOpenUser(u.id));
+  const main = _admEl('div', 'adm-row-main');
+  const name = _admEl('div', 'adm-row-name');
+  name.append(_admEl('span', '', u.name || 'بدون اسم'));
+  if (u.isSuper) name.append(_admEl('em', 'adm-tag gold', 'Super'));
+  if (u.hasOverride) name.append(_admEl('em', 'adm-tag cyan', 'صلاحيات خاصة'));
+  if (u.id === (currentUser && currentUser.uid)) name.append(_admEl('em', 'adm-tag', 'أنت'));
+  main.append(name, _admEl('small', '', u.email || (u.phone ? '📱 ' + u.phone : 'بدون معرّف')));
+  row.append(_admAvatar(u), main);
+  if (!compact) {
+    const role = _admEl('span', 'adm-role r-' + u.role, ROLES_META[u.role].name);
+    const [stTxt, stCls] = ADM_STATUS_META[_admStatus(u)];
+    const st = _admEl('span', 'adm-st st-' + stCls, stTxt);
+    const last = _admEl('span', 'adm-last', _admAgo(u.lastLogin));
+    row.append(role, st, last);
+  } else {
+    row.append(_admEl('span', 'adm-last', _admFmt(u.created)));
+  }
+  row.append(Object.assign(document.createElement('i'), { className: 'fa-solid fa-chevron-left adm-go' }));
+  return row;
+}
+
+async function renderUsersList() {
+  const container = document.getElementById('usersList');
+  const count = document.getElementById('usersSearchCount');
+  container.replaceChildren(_admEl('div', 'adm-loading', 'جاري التحميل...'));
+  try { await admEnsureUsers(); }
+  catch (e) { container.replaceChildren(_admEl('div', 'adm-loading err', 'خطأ في تحميل المستخدمين')); return; }
+  const q = ((document.getElementById('usersSearchInput') || {}).value || '').trim().toLowerCase();
+  let list = admUsers.filter(u => {
+    if (admRoleFilter !== 'all' && u.role !== admRoleFilter) return false;
+    if (admStatusFilter !== 'all' && _admStatus(u) !== admStatusFilter) return false;
+    if (!q) return true;
+    return u.email.includes(q) || u.name.toLowerCase().includes(q) || u.phone.toLowerCase().includes(q) || u.id.toLowerCase().includes(q);
+  });
+  const key = { lastLogin: u => -(u.lastLogin ? u.lastLogin.getTime() : 0), created: u => -(u.created ? u.created.getTime() : 0),
+    name: u => (u.name || u.email || '').toLowerCase() }[admSort];
+  list.sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : 0; });
+  list.sort((a, b) => (b.isSuper - a.isSuper));
+  if (count) count.textContent = `${list.length} من ${admUsers.length} مستخدم`;
+  // شرائح الفلتر
+  const chips = document.getElementById('admRoleChips');
+  if (chips) {
+    chips.replaceChildren();
+    [['all', 'الكل']].concat(Object.keys(ROLES_META).map(r => [r, ROLES_META[r].name])).forEach(([k, label]) => {
+      const n = k === 'all' ? admUsers.length : admUsers.filter(u => u.role === k).length;
+      const b = _admEl('button', 'adm-chip' + (admRoleFilter === k ? ' on' : ''), `${label} ${n}`);
+      b.type = 'button'; b.addEventListener('click', () => { admRoleFilter = k; admShown = 80; renderUsersList(); });
+      chips.appendChild(b);
+    });
+  }
+  container.replaceChildren();
+  if (!list.length) { container.appendChild(_admEl('div', 'adm-empty', 'لا توجد نتائج مطابقة')); return; }
+  list.slice(0, admShown).forEach(u => container.appendChild(_admUserRow(u, false)));
+  if (list.length > admShown) {
+    const more = _admEl('button', 'adm-more', `عرض المزيد (${list.length - admShown})`);
+    more.type = 'button'; more.addEventListener('click', () => { admShown += 80; renderUsersList(); });
+    container.appendChild(more);
+  }
+}
+function filterUsersList() { admShown = 80; renderUsersList(); }
+function admSetStatusFilter(v) { admStatusFilter = v; admShown = 80; renderUsersList(); }
+function admSetSort(v) { admSort = v; renderUsersList(); }
+
+function admExportUsersCSV() {
+  if (!admUsers.length) { showToast('لا توجد بيانات', 'error'); return; }
+  const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const rows = [['الاسم', 'البريد', 'الهاتف', 'الدور', 'الحالة', 'تاريخ الإنشاء', 'آخر دخول', 'UID']]
+    .concat(admUsers.map(u => [u.name, u.email, u.phone, ROLES_META[u.role].name, ADM_STATUS_META[_admStatus(u)][0], _admFmt(u.created), _admFmt(u.lastLogin), u.id]));
+  const blob = new Blob(['\uFEFF' + rows.map(r => r.map(esc).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `users_${todayString()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/* ---------- تفاصيل المستخدم ---------- */
+async function admLog(action, uid, details) {
+  try {
+    await db.collection('admin_audit').add({
+      action, uid, by: currentUser.uid, byEmail: currentUser.email || '', details: details || {},
+      ts: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (e) { console.warn('admin audit not saved (update firestore.rules):', e.code || e.message); }
+}
+function admCloseUser() {
+  admCurrentUid = null;
+  const d = document.getElementById('admUserDrawer');
+  if (d) d.classList.remove('open');
+  const m = document.getElementById('adminModal'); if (m) m.classList.remove('drawer-open');
+}
+async function admOpenUser(uid) {
+  admCurrentUid = uid;
+  try { await admEnsureUsers(); } catch (e) {}
+  const u = admUsers.find(x => x.id === uid);
+  if (!u) { showToast('المستخدم غير موجود', 'error'); return; }
+  const d = document.getElementById('admUserDrawer');
+  d.classList.add('open');
+  document.getElementById('adminModal').classList.add('drawer-open');
+  admRenderDrawer(u);
+  admLoadNote(uid); admLoadActivity(uid);
+}
+function admRenderDrawer(u) {
+  const me = currentUser && u.id === currentUser.uid;
+  const locked = me || u.isSuper;                       // مفيش تعديل على نفسك أو على Super Admin
+  const adminLock = u.role === 'admin' && !isSuperAdmin; // الأدمن العادي مايعدّلش أدمن تاني
+  const head = document.getElementById('admDrawerHead');
+  head.replaceChildren();
+  const av = _admAvatar(u); av.classList.add('lg');
+  const who = _admEl('div', 'adm-d-who');
+  who.append(_admEl('b', '', u.name || 'بدون اسم'), _admEl('small', '', u.email || u.phone || 'بدون معرّف'));
+  const [stTxt, stCls] = ADM_STATUS_META[_admStatus(u)];
+  const pills = _admEl('div', 'adm-d-pills');
+  pills.append(_admEl('span', 'adm-role r-' + u.role, ROLES_META[u.role].name), _admEl('span', 'adm-st st-' + stCls, stTxt));
+  if (u.isSuper) pills.append(_admEl('em', 'adm-tag gold', 'Super Admin'));
+  who.appendChild(pills);
+  head.append(av, who);
+
+  const info = document.getElementById('admDrawerInfo');
+  info.replaceChildren();
+  const dd = u.data;
+  const loginMethod = { google: 'Google', email: 'بريد وكلمة مرور', phone: 'رقم الهاتف' }[dd.loginMethod] || '—';
+  const cnt = v => Array.isArray(v) ? v.length : '—';
+  [['تاريخ الإنشاء', _admFmt(u.created)], ['آخر دخول', _admFmtFull(u.lastLogin) + (u.lastLogin ? ` (${_admAgo(u.lastLogin)})` : '')],
+   ['آخر مزامنة', _admFmtFull(u.synced)], ['طريقة الدخول', loginMethod],
+   ['عدد العمليات', typeof dd.txCount === 'number' ? dd.txCount : '—'], ['أصناف المخزن', cnt(dd.inventory)],
+   ['مكن الشحن', cnt(dd.chargeMachines)], ['ميزانية شهرية', dd.budget ? money(dd.budget) + ' ج.م' : '—']
+  ].forEach(([k, v]) => { const c = _admEl('div', 'adm-kv'); c.append(_admEl('small', '', k), _admEl('b', '', String(v))); info.appendChild(c); });
+  const uidRow = _admEl('div', 'adm-kv wide');
+  const uidB = _admEl('b', 'mono', u.id);
+  const cp = _admEl('button', 'adm-mini', 'نسخ'); cp.type = 'button'; cp.addEventListener('click', () => admCopy(u.id));
+  uidRow.append(_admEl('small', '', 'UID'), uidB, cp); info.appendChild(uidRow);
+
+  // التحكم
+  const roleSel = document.getElementById('admRoleSelect');
+  roleSel.replaceChildren();
+  Object.keys(ROLES_META).forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = ROLES_META[r].name; if (r === u.role) o.selected = true; roleSel.appendChild(o); });
+  roleSel.disabled = locked || adminLock;
+  document.getElementById('admRoleSave').disabled = locked || adminLock;
+  document.getElementById('admPermBtn').disabled = locked || adminLock;
+  const sus = document.getElementById('admSuspendBtn');
+  sus.disabled = locked || adminLock;
+  sus.className = 'adm-btn ' + (u.disabled ? 'ok' : 'bad');
+  sus.innerHTML = u.disabled ? '<i class="fa-solid fa-lock-open"></i> إعادة تفعيل الحساب' : '<i class="fa-solid fa-user-lock"></i> إيقاف الحساب';
+  const reasonWrap = document.getElementById('admReasonWrap');
+  reasonWrap.hidden = u.disabled || locked;
+  document.getElementById('admReason').value = '';
+  const warn = document.getElementById('admDrawerNote');
+  warn.hidden = !(locked || adminLock);
+  warn.textContent = me ? 'ده حسابك — مش ممكن تعدّل دورك أو توقف نفسك.' : u.isSuper ? 'Super Admin محمي من أي تعديل.' : 'الأدمن العادي ما يقدرش يعدّل أدمن تاني.';
+  if (u.disabled && dd.disabledReason) {
+    warn.hidden = false; warn.textContent = 'سبب الإيقاف: ' + dd.disabledReason;
+  }
+  document.getElementById('admEmailCopy').onclick = () => admCopy(u.email || u.phone || u.id);
+}
+function admCopy(text) {
+  const done = () => showToast('تم النسخ ✓', 'success');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => showToast('تعذر النسخ', 'error'));
+  else { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); done(); } catch (e) { showToast('تعذر النسخ', 'error'); } t.remove(); }
+}
+async function admSaveRole() {
+  const u = admUsers.find(x => x.id === admCurrentUid); if (!u) return;
+  const next = document.getElementById('admRoleSelect').value;
+  if (next === u.role) { showToast('الدور زي ما هو', 'info'); return; }
+  await changeUserRole(u.id, next);
+}
+function admOpenPerms() { if (admCurrentUid) openUserPermissionsModal(admCurrentUid); }
+function admToggleSuspend() {
+  const u = admUsers.find(x => x.id === admCurrentUid); if (!u) return;
+  if (u.isSuper || u.id === currentUser.uid) return;
+  const reactivating = u.disabled;
+  const reason = sanitizeString(document.getElementById('admReason').value, 200);
+  openConfirm(reactivating ? 'إعادة تفعيل الحساب؟' : 'إيقاف الحساب؟',
+    reactivating ? `هيرجع <b>${escapeHTML(u.name || u.email || 'المستخدم')}</b> يقدر يستخدم التطبيق تاني.`
+                 : `<b>${escapeHTML(u.name || u.email || 'المستخدم')}</b> هيتمنع من استخدام التطبيق لحد ما تفعّله تاني.`,
+    async () => {
+      try {
+        const patch = reactivating
+          ? { disabled: false, disabledReason: null, disabledAt: null, disabledBy: null }
+          : { disabled: true, disabledReason: reason || null, disabledAt: firebase.firestore.FieldValue.serverTimestamp(), disabledBy: currentUser.uid };
+        await db.collection('users').doc(u.id).update(patch);
+        admLog(reactivating ? 'unsuspend' : 'suspend', u.id, { reason: reason || '' });
+        admUsersStale = true;
+        showToast(reactivating ? 'تمت إعادة تفعيل الحساب ✓' : 'تم إيقاف الحساب ✓', 'success');
+        await admEnsureUsers(true);
+        const fresh = admUsers.find(x => x.id === u.id); if (fresh) admRenderDrawer(fresh);
+        admLoadActivity(u.id);
+        if (adminActiveTab === 'users') renderUsersList(); else if (adminActiveTab === 'overview') renderAdminOverview();
+      } catch (e) { showToast('فشل تنفيذ العملية', 'error'); }
+    });
+}
+async function admLoadNote(uid) {
+  const ta = document.getElementById('admNote'); ta.value = ''; ta.disabled = true;
+  document.getElementById('admNoteStatus').textContent = '';
+  try {
+    const doc = await db.collection('admin_notes').doc(uid).get();
+    if (admCurrentUid !== uid) return;
+    ta.value = doc.exists ? (doc.data().text || '') : '';
+    ta.disabled = false;
+  } catch (e) {
+    document.getElementById('admNoteStatus').textContent = 'الملاحظات محتاجة تحديث قواعد Firestore (انظر firestore.rules)';
+  }
+}
+async function admSaveNote() {
+  const uid = admCurrentUid; if (!uid) return;
+  const text = sanitizeString(document.getElementById('admNote').value, 1000);
+  const st = document.getElementById('admNoteStatus');
+  try {
+    await db.collection('admin_notes').doc(uid).set({ text, by: currentUser.uid, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    st.textContent = 'تم الحفظ ✓';
+    admLog('note', uid, {});
+  } catch (e) { st.textContent = 'تعذر الحفظ — حدّث قواعد Firestore'; }
+}
+const ADM_ACTION_LABELS = { role_change: 'تغيير الدور', suspend: 'إيقاف الحساب', unsuspend: 'إعادة تفعيل', permissions: 'تعديل الصلاحيات', note: 'تحديث الملاحظة' };
+async function admLoadActivity(uid) {
+  const host = document.getElementById('admActivity');
+  host.replaceChildren(_admEl('div', 'adm-loading', 'جاري التحميل...'));
+  try {
+    const snap = await db.collection('admin_audit').where('uid', '==', uid).limit(40).get();
+    if (admCurrentUid !== uid) return;
+    const items = snap.docs.map(d => d.data()).sort((a, b) => ((b.ts && b.ts.seconds) || 0) - ((a.ts && a.ts.seconds) || 0)).slice(0, 15);
+    host.replaceChildren();
+    if (!items.length) { host.appendChild(_admEl('div', 'adm-empty', 'لا توجد إجراءات إدارية مسجلة')); return; }
+    items.forEach(it => {
+      const row = _admEl('div', 'adm-act');
+      let extra = '';
+      if (it.action === 'role_change' && it.details) extra = ` (${(ROLES_META[it.details.from] || {}).name || '—'} ← ${(ROLES_META[it.details.to] || {}).name || '—'})`;
+      if ((it.action === 'suspend') && it.details && it.details.reason) extra = ` — ${it.details.reason}`;
+      row.append(_admEl('b', '', (ADM_ACTION_LABELS[it.action] || it.action) + extra),
+        _admEl('small', '', `${_admFmtFull(_admDate(it.ts))} • ${it.byEmail || ''}`));
+      host.appendChild(row);
+    });
+  } catch (e) { host.replaceChildren(_admEl('div', 'adm-empty', 'سجل الإجراءات محتاج تحديث قواعد Firestore')); }
+}
+
+(function hookAdminActions() {
+  const origRole = window.changeUserRole;
+  window.changeUserRole = async function (uid, newRole) {
+    const before = (admUsers.find(x => x.id === uid) || {}).role;
+    await origRole.apply(this, arguments);
+    try {
+      const doc = await db.collection('users').doc(uid).get();
+      if (doc.exists && doc.data().role === newRole && before !== newRole) { admLog('role_change', uid, { from: before || 'free', to: newRole }); }
+    } catch (e) {}
+    admUsersStale = true;
+    try {
+      await admEnsureUsers(true);
+      const fresh = admUsers.find(x => x.id === uid);
+      if (fresh && admCurrentUid === uid) { admRenderDrawer(fresh); admLoadActivity(uid); }
+      if (adminActiveTab === 'users') renderUsersList();
+    } catch (e) {}
+  };
+  const origSavePerms = window.saveUserPermissionsOverride;
+  window.saveUserPermissionsOverride = async function () {
+    const uid = editingUserPermissions && editingUserPermissions.uid;
+    await origSavePerms.apply(this, arguments);
+    if (uid) { admLog('permissions', uid, {}); admUsersStale = true; try { await admEnsureUsers(true); const f = admUsers.find(x => x.id === uid); if (f && admCurrentUid === uid) admRenderDrawer(f); } catch (e) {} }
+  };
+  const origOpen = window.openAdminPanel;
+  window.openAdminPanel = async function () {
+    admUsersStale = true; admRoleFilter = 'all'; admStatusFilter = 'all'; admShown = 80;
+    const si = document.getElementById('usersSearchInput'); if (si) si.value = '';
+    return origOpen.apply(this, arguments);
+  };
+  const origClose = window.closeAdminPanel;
+  window.closeAdminPanel = function () { admCloseUser(); return origClose.apply(this, arguments); };
+})();
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const m = document.getElementById('adminModal');
+  if (!m || m.classList.contains('hidden')) return;
+  const perm = document.getElementById('userPermissionsModal');
+  if (perm && !perm.classList.contains('hidden')) return;
+  const conf = document.getElementById('confirmModal');
+  if (conf && !conf.classList.contains('hidden')) return;
+  if (admCurrentUid) admCloseUser(); else closeAdminPanel();
 });

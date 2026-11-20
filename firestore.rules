@@ -22,7 +22,13 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'free') == 'admin');
     }
     function protectedKeys() {
-      return ['role', 'isSuperAdmin', 'permissionsOverride', 'roleUpdatedAt', 'roleUpdatedBy'];
+      return ['role', 'isSuperAdmin', 'permissionsOverride', 'roleUpdatedAt', 'roleUpdatedBy',
+              'disabled', 'disabledReason', 'disabledAt', 'disabledBy'];
+    }
+    // حساب موقوف من الإدارة
+    function isDisabled(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId))
+        && get(/databases/$(database)/documents/users/$(userId)).data.get('disabled', false) == true;
     }
     function isStr(v, maxLen) {
       return v is string && v.size() <= maxLen;
@@ -60,6 +66,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ---------- ملاحظات المدير وسجل الإجراءات (للمديرين فقط) ----------
+    match /admin_notes/{uid} {
+      allow read, write: if isAdmin();
+    }
+    match /admin_audit/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.by == request.auth.uid;
+      allow update, delete: if false;
+    }
+
     // ---------- Users ----------
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
@@ -70,10 +86,12 @@ service cloud.firestore {
         && request.resource.data.get('role', 'free') == 'free'
         && request.resource.data.get('isSuperAdmin', false) == false
         && !('permissionsOverride' in request.resource.data)
+        && !('disabled' in request.resource.data)
       );
 
       allow update: if isAdmin() || (
         isOwner(userId)
+        && !isDisabled(userId)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedKeys())
       );
 
@@ -82,7 +100,7 @@ service cloud.firestore {
       // Private subcollections (explicit on purpose: a recursive wildcard here would
       // also match the user document itself and bypass the protected-keys rule above)
       match /transactions/{txId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) && !isDisabled(userId);
       }
       match /portal_index/{hashId} {
         allow read, write: if isOwner(userId);
