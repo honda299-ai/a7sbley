@@ -1329,12 +1329,16 @@ function switchLoginMethod(method) {
 
 function loginAsGuest() {
   currentUser = {
-    uid: 'guest-user-' + Date.now(),
+    uid: 'guest-local-user', // تثبيت الـ UID للزائر عشان ميتمسحش بالغلط مع كل Refresh
     displayName: 'زائر (Guest)',
     email: 'guest@a7sbley.local',
     isAnonymous: true,
     providerData: [{ providerId: 'guest' }]
   };
+  
+  // لازم ننادي دي عشان تمسح بيانات الحساب اللي كان متعلم قبله لو فيه
+  handleUserSwitch(currentUser.uid); 
+  
   showToast('مرحباً بك في وضع الزائر 👋', 'success');
   hideLoginWall();
   const userProfile = document.getElementById('userProfile');
@@ -1354,6 +1358,7 @@ function loginAsGuest() {
   navigateSegmented('home');
   applyRoleUI();
   updatePinUI();
+  setTimeout(startAppTour, 800);
 }
 
 function setEmailMode(mode) {
@@ -1650,7 +1655,118 @@ function handleUserSwitch(uid) {
 /* =========================================================
    AUTH STATE
    ========================================================= */
+
+/* =========================================================
+   FIRST TIME TUTORIAL (ONBOARDING TOUR) - ROBUST V3
+   ========================================================= */
+function startAppTour() {
+  // التأكد من وجود المكتبة الأول
+  if (!window.driver || !window.driver.js) {
+    console.warn("Driver.js not found!");
+    return;
+  }
+  
+  const isTourDone = localStorage.getItem('a7sbley_tour_done_v4');
+  if (isTourDone) return; // خلاص عملها قبل كده
+
+  const isMobile = window.innerWidth < 768;
+  const driver = window.driver.js.driver;
+  
+  const steps = [];
+
+  // الخطوة 1: ترحيب عام على الهيدر
+  steps.push({
+    element: '#appHeader',
+    popover: {
+      title: 'أهلاً بك في احسبلي! 👋',
+      description: 'نظامك المالي الشامل للتحكم في حساباتك وديونك بكل بساطة.',
+      side: "bottom", align: 'center'
+    }
+  });
+
+  // الخطوة 2: زر التبديل
+  const modeBtn = document.getElementById('modeSwitcherBtn');
+  if (modeBtn && modeBtn.offsetParent !== null) {
+    steps.push({
+      element: '#modeSwitcherBtn',
+      popover: {
+        title: 'شخصي ولا شغل؟ 🏪/👤',
+        description: 'بضغطة هنا تفصل بين حسابات المحل (ديون ومخزن) وحساباتك الشخصية.',
+        side: "bottom", align: 'center'
+      }
+    });
+  }
+
+  if (isMobile) {
+    // خطوات الموبايل
+    steps.push({
+      element: '.fintech-bank-card',
+      popover: {
+        title: 'خزنتك ورصيدك 💰',
+        description: 'شوف رصيدك الكلي اللي في إيدك بعد الخصم والإضافات في كارت واحد.',
+        side: "bottom", align: 'center'
+      }
+    });
+    steps.push({
+      element: '.ft-action-grid',
+      popover: {
+        title: 'الإضافة السريعة ⚡',
+        description: 'سجل دخلك أو مصروفاتك بسرعة جداً من هنا.',
+        side: "top", align: 'center'
+      }
+    });
+    steps.push({
+      element: '#mobileBottomNav',
+      popover: {
+        title: 'التنقل السريع 🔄',
+        description: 'اتنقل بين المعاملات، الديون، والعملاء من الشريط الثابت ده.',
+        side: "top", align: 'center'
+      }
+    });
+  } else {
+    // خطوات الكمبيوتر
+    steps.push({
+      element: '#statNet',
+      popover: {
+        title: 'الرصيد المتاح 💰',
+        description: 'صافي رصيدك بيظهر هنا مباشرة بناءً على الإيرادات والمصروفات.',
+        side: "bottom", align: 'start'
+      }
+    });
+    steps.push({
+      element: '#mobileBottomNav',
+      popover: {
+        title: 'القائمة التفاعلية 🖱️',
+        description: 'هتلاقي هنا كل أقسام التطبيق والإعدادات. القائمة بتفتح لوحدها لما تقرب الماوس منها.',
+        side: "right", align: 'start'
+      }
+    });
+  }
+
+  const driverObj = driver({
+    showProgress: true,
+    nextBtnText: 'التالي ➔',
+    prevBtnText: '⬅️ السابق',
+    doneBtnText: 'فهمت، يلا نبدأ! 🚀',
+    progressText: 'خطوة {{current}} من {{total}}',
+    allowClose: false,
+    steps: steps,
+    onDestroyStarted: () => {
+      localStorage.setItem('a7sbley_tour_done_v4', 'true');
+      driverObj.destroy();
+      if (typeof confetti === 'function') confetti({ particleCount: 100, spread: 80, origin: { y: .6 } });
+    }
+  });
+
+  // نفتح الشاشة الرئيسية الأول عشان كل العناصر تبان صح
+  navigateSegmented('home');
+  setTimeout(() => {
+    driverObj.drive();
+  }, 1000); // استنى ثانية عشان الواجهة ترسم نفسها صح
+}
+
 auth.onAuthStateChanged(async user => {
+  // الكود القديم لـ auth
   if (window.isPortalModeActive || new URLSearchParams(window.location.search).has('client')) return;
   if (isPortalModeActive) return;
   hideAuthLoading();
@@ -1682,10 +1798,6 @@ auth.onAuthStateChanged(async user => {
       footerSync.innerHTML = `<i class="fa-solid fa-cloud-check text-emerald-500"></i> متصل بالسحاب (${escapeHTML(userIdentifier)})`;
     }
 
-    // مزامنة قفل الـ PIN من السحابة وإظهار القفل قبل عرض أي بيانات
-    await syncPinFromCloud(user.uid);
-    if (getPin()) showPinLock();
-
     await loadUserRole(user.uid);
     await loadRolePermissions();
 
@@ -1698,11 +1810,14 @@ auth.onAuthStateChanged(async user => {
     updatePinUI();
     updateNotificationUI(localStorage.getItem('ehsebli_notif_enabled') === 'true');
 
-    // Process pending share target if exists
     checkPendingShare();
 
     loadCloudData(user.uid).finally(() => {
-      if (!getPin()) hidePinLock();
+      if (getPin()) showPinLock();
+      else hidePinLock();
+      
+      // تشغيل التوتوريال بعد ما كل حاجة تحمل
+      setTimeout(startAppTour, 1500);
     });
   } else {
     currentUser = null;
@@ -1710,17 +1825,24 @@ auth.onAuthStateChanged(async user => {
     isSuperAdmin = false;
     currentUserPermissionsOverride = null;
     rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+    
+    transactions = [];
+    inventoryItems = [];
+    recurringExpenses = [];
+    localStorage.removeItem(LAST_UID_KEY);
+
     if (userDocUnsubscribe) { try { userDocUnsubscribe(); } catch(e) {} userDocUnsubscribe = null; }
     if (transactionsUnsubscribe) { try { transactionsUnsubscribe(); } catch(e) {} transactionsUnsubscribe = null; }
     if (requestsUnsubscribe) { try { requestsUnsubscribe(); } catch(e) {} requestsUnsubscribe = null; }
     cloudSnapshot.clear(); portalIndex.clear(); portalPayloadCache.clear();
     hidePinLock();
     showLoginWall();
-    footerSync.innerHTML = `<i class="fa-solid fa-database text-amber-500"></i> سجّل الدخول للمزامنة`;
+    if(footerSync) footerSync.innerHTML = `<i class="fa-solid fa-database text-amber-500"></i> سجّل الدخول للمزامنة`;
     loadAllLocal();
     applyRoleUI();
   }
 });
+
 
 function logout() {
   if (!currentUser) return;
@@ -5559,94 +5681,5 @@ auth.onAuthStateChanged(user => {
         modal.classList.add('flex');
       }
     }, 650);
-  }
-});
-
-/* =========================================================
-   FIRST TIME TUTORIAL (ONBOARDING TOUR)
-   ========================================================= */
-function startAppTour() {
-  const isTourDone = localStorage.getItem('a7sbley_tour_done');
-  if (isTourDone) return; // تم الجولة مسبقاً
-
-  // تعريف الجولة باستخدام Driver.js
-  const driver = window.driver.js.driver;
-  const driverObj = driver({
-    showProgress: true,
-    nextBtnText: 'التالي ➔',
-    prevBtnText: '⬅️ السابق',
-    doneBtnText: 'فهمت، يلا نبدأ! 🚀',
-    progressText: 'خطوة {{current}} من {{total}}',
-    allowClose: false,
-    steps: [
-      {
-        element: '#headerUserGreeting',
-        popover: {
-          title: 'أهلاً بك في احسبلي! 👋',
-          description: 'تطبيقك المالي الشامل اللي هيساعدك تتحكم في حساباتك وديونك بكل سهولة وبطريقة شيك.',
-          side: "bottom",
-          align: 'start'
-        }
-      },
-      {
-        element: '#modeSwitcherBtn',
-        popover: {
-          title: 'افصل بين الشغل والشخصي 🏪/👤',
-          description: 'من هنا تقدر تبدل بين "وضع المحل" (للديون والعملاء والمخزن) و "الوضع الشخصي" (للمصاريف الخاصة والراتب).',
-          side: "bottom"
-        }
-      },
-      {
-        element: '.fintech-bank-card',
-        popover: {
-          title: 'خزنتك ورصيدك الصافي 💰',
-          description: 'في الكارت ده هتشوف رصيدك الكلي اللي في إيدك بعد خصم المصروفات.',
-          side: "bottom"
-        }
-      },
-      {
-        element: '.ft-action-grid',
-        popover: {
-          title: 'الإضافة السريعة ⚡',
-          description: 'سجل إيراداتك، مصروفاتك، أو ديونك بضغطة واحدة من الأزرار دي.',
-          side: "top"
-        }
-      },
-      {
-        element: '#segmentedQuickNav',
-        popover: {
-          title: 'تنقل بين شاشاتك بسهولة 🔄',
-          description: 'الشريط ده بيخليك تتنقل بين المعاملات السابقة، دفتر الديون، وقائمة عملائك بسرعة جداً.',
-          side: "top"
-        }
-      },
-      {
-        element: '#controlCenterBtn',
-        popover: {
-          title: 'مركز التحكم والتقارير ⚙️',
-          description: 'هنا هتلاقي كل اللي تحتاجه: استخراج تقارير PDF، الميزانية، النسخ الاحتياطي، وتقفيل الوردية.',
-          side: "bottom",
-          align: 'end'
-        }
-      }
-    ],
-    onDestroyStarted: () => {
-      localStorage.setItem('a7sbley_tour_done', 'true');
-      driverObj.destroy();
-      if (typeof confetti === 'function') confetti({ particleCount: 100, spread: 80, origin: { y: .6 } });
-    }
-  });
-
-  setTimeout(() => {
-    // التأكد اننا على الشاشة الرئيسية قبل بدء الجولة
-    navigateSegmented('home');
-    driverObj.drive();
-  }, 1200); // تأخير بسيط لضمان تحميل الواجهة
-}
-
-// تشغيل الجولة بعد تسجيل الدخول
-auth.onAuthStateChanged(user => {
-  if (user && !isPortalModeActive) {
-    setTimeout(startAppTour, 3000);
   }
 });
