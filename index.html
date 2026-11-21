@@ -36,7 +36,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20.4">
+  <link rel="stylesheet" href="styles.css?v=20.5">
 
   <!-- Driver.js for Elegant Tutorial -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
@@ -122,10 +122,10 @@
         <div class="flex items-center gap-2 shrink-0">
           <button id="headerInstallBtn" onclick="showMobileInstallModal()" class="hidden"></button>
 
-          <button onclick="openModal('expense')"
+          <button onclick="openQuickAdd()" aria-haspopup="dialog" aria-label="إضافة عملية جديدة"
             class="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow hover:brightness-110 transition">
             <i class="fa-solid fa-plus"></i>
-            <span>عملية جديدة</span>
+            <span>إضافة</span>
           </button>
 
           <div id="globalPendingAlert" onclick="handleMoneyAlertClick()" 
@@ -630,6 +630,7 @@
     <!-- Transactions -->
     <section id="panelTransactions" data-mob-view="transactions" data-mob-display="block" class="ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800 bg-slate-50/50 dark:bg-dark-850/50">
+        <div id="txSummary" class="tx-summary"></div>
         <div class="flex flex-col gap-2.5">
           <div class="flex gap-1.5 overflow-x-auto mobile-table-wrap pb-1">
             <button class="filter-pill active" data-filter="all" onclick="filterTransactions('all')">الكل</button>
@@ -649,19 +650,18 @@
 
       <!-- Desktop Table -->
       <div class="hidden md:block overflow-x-auto mobile-table-wrap">
-        <table class="w-full text-right min-w-[800px]">
+        <table class="tx-table w-full text-right min-w-[860px]">
           <thead>
-            <tr class="text-[10px] font-black text-slate-400 bg-slate-50 dark:bg-dark-850">
-              <th class="py-3 px-3">النوع / البيان</th>
-              <th class="py-3 px-3">العميل</th>
-              <th class="py-3 px-3">التصنيف</th>
-              <th class="py-3 px-3">الدفع</th>
-              <th class="py-3 px-3">التاريخ</th>
-              <th class="py-3 px-3">المبلغ</th>
-              <th class="py-3 px-3 text-center">إجراءات</th>
+            <tr class="tx-thead">
+              <th>العملية</th>
+              <th>العميل</th>
+              <th>الدفع</th>
+              <th>الوقت</th>
+              <th>المبلغ</th>
+              <th class="text-center">إجراءات</th>
             </tr>
           </thead>
-          <tbody id="transactionsTbody" class="divide-y divide-slate-100 dark:divide-dark-800 text-xs"></tbody>
+          <tbody id="transactionsTbody" class="text-xs"></tbody>
         </table>
       </div>
 
@@ -702,14 +702,22 @@
       <div class="p-3 border-b border-slate-100 dark:border-dark-800">
         <div class="flex items-center justify-between gap-2 mb-2">
           <h3 class="text-sm font-black">دفتر العملاء</h3>
+          <select id="clientSort" onchange="renderClients()" class="cl-sort" aria-label="ترتيب العملاء">
+            <option value="debt">الأعلى مديونية</option>
+            <option value="recent">الأحدث تعاملاً</option>
+            <option value="count">الأكثر معاملات</option>
+            <option value="name">الاسم</option>
+          </select>
         </div>
+        <div id="clientsSummary" class="tx-summary"></div>
         <div class="relative">
           <input type="text" id="clientSearchInput" oninput="renderClients()" placeholder="ابحث باسم العميل..."
             class="w-full text-sm font-medium pr-9 pl-3 py-2.5 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-800 focus:outline-none focus:ring-2 focus:ring-orange-500">
           <i class="fa-solid fa-magnifying-glass text-slate-400 absolute right-3 top-3 text-sm"></i>
         </div>
+        <div id="clientFilterChips" class="flex gap-1.5 overflow-x-auto mobile-table-wrap pt-2.5"></div>
       </div>
-      <div id="clientsContainer" class="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      <div id="clientsContainer" class="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 cl-grid"></div>
       <div id="emptyClientsState" class="hidden py-12 text-center">
         <div class="w-14 h-14 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mx-auto mb-3">
           <i class="fa-solid fa-user-group text-2xl"></i>
@@ -794,17 +802,34 @@
     </button>
   </nav>
 
-  <!-- Quick add sheet -->
-  <div id="quickAddSheet" class="quick-sheet hidden no-print" role="dialog" aria-modal="true" aria-label="إضافة سريعة">
-    <div class="quick-backdrop" onclick="closeQuickAdd()"></div>
-    <div class="quick-panel">
-      <div class="quick-handle"></div>
-      <div class="text-sm font-black mb-3">إضافة سريعة</div>
-      <div class="grid grid-cols-2 gap-2.5">
-        <button onclick="quickAdd('income')" class="quick-btn text-emerald-400"><i class="fa-solid fa-arrow-down-left"></i><span>دخل</span></button>
-        <button onclick="quickAdd('expense')" class="quick-btn text-rose-400"><i class="fa-solid fa-receipt"></i><span>مصروف</span></button>
-        <button onclick="quickAdd('debt_receivable')" class="quick-btn text-orange-400"><i class="fa-solid fa-handshake"></i><span>دين ليّ</span></button>
-        <button onclick="quickAdd('charity')" class="quick-btn text-amber-400"><i class="fa-solid fa-hand-holding-heart"></i><span>خير</span></button>
+  <!-- ===== قائمة الإضافة (+) ===== -->
+  <button type="button" id="desktopFab" class="qa-fab no-print" onclick="openQuickAdd()" aria-label="إضافة عملية" aria-haspopup="dialog" aria-expanded="false">
+    <i class="fa-solid fa-plus"></i><span>إضافة</span>
+  </button>
+
+  <div id="quickAddSheet" class="qa-root hidden no-print" role="dialog" aria-modal="true" aria-labelledby="qaTitle">
+    <div class="qa-backdrop" onclick="closeQuickAdd()"></div>
+    <div class="qa-panel">
+      <div class="qa-handle" aria-hidden="true"></div>
+      <div class="qa-head">
+        <div><b id="qaTitle">إضافة جديدة</b><small>اختر نوع العملية</small></div>
+        <button type="button" class="qa-x" onclick="closeQuickAdd()" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="qa-sec">العمليات المالية</div>
+      <div class="qa-grid">
+        <button type="button" class="qa-tile" style="--c:#10b981" onclick="quickAdd('income')"><span class="qa-ic"><i class="fa-solid fa-arrow-down-left"></i></span><span class="qa-tx"><b>إضافة دخل</b><small>إيراد أو مبيعات</small></span></button>
+        <button type="button" class="qa-tile" style="--c:#f43f5e" onclick="quickAdd('expense')"><span class="qa-ic"><i class="fa-solid fa-receipt"></i></span><span class="qa-tx"><b>إضافة مصروف</b><small>شراء أو التزام</small></span></button>
+        <button type="button" class="qa-tile" data-feature="charity" style="--c:#f59e0b" onclick="quickAdd('charity')"><span class="qa-ic"><i class="fa-solid fa-hand-holding-heart"></i></span><span class="qa-tx"><b>باب الخير</b><small>صدقة أو تبرع</small></span></button>
+        <button type="button" class="qa-tile personal-only" style="--c:#06b6d4" onclick="quickAdd('budget')"><span class="qa-ic"><i class="fa-solid fa-chart-pie"></i></span><span class="qa-tx"><b>الميزانية</b><small>حد الصرف الشهري</small></span></button>
+      </div>
+
+      <div class="qa-sec business-only">الديون والمحل</div>
+      <div class="qa-grid business-only">
+        <button type="button" class="qa-tile business-only" style="--c:#06b6d4" onclick="quickAdd('debt_receivable')"><span class="qa-ic"><i class="fa-solid fa-handshake"></i></span><span class="qa-tx"><b>دين ليّ</b><small>مستحق عند عميل</small></span></button>
+        <button type="button" class="qa-tile business-only" style="--c:#a855f7" onclick="quickAdd('debt_payable')"><span class="qa-ic"><i class="fa-solid fa-hand-holding-dollar"></i></span><span class="qa-tx"><b>دين عليّ</b><small>مستحق لمورد</small></span></button>
+        <button type="button" class="qa-tile business-only" style="--c:#f97316" onclick="quickAdd('shift')"><span class="qa-ic"><i class="fa-solid fa-calendar-check"></i></span><span class="qa-tx"><b>تقفيل اليوم</b><small>جرد الدرج والوردية</small></span></button>
+        <button type="button" class="qa-tile business-only" style="--c:#eab308" onclick="quickAdd('machines')"><span class="qa-ic"><i class="fa-solid fa-bolt"></i></span><span class="qa-tx"><b>مكن الشحن</b><small>أرصدة وسجل التعديلات</small></span></button>
       </div>
     </div>
   </div>
@@ -1041,6 +1066,8 @@
           <div id="clientTotalPayable" class="money-val text-xs sm:text-sm font-black text-purple-500 mt-0.5">0</div>
         </div>
       </div>
+
+      <div id="clientMetaStrip" class="cl-meta"></div>
 
       <div class="p-3 flex-1 overflow-y-auto">
         <div class="flex items-center justify-between mb-2.5">
@@ -2080,6 +2107,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20.4"></script>
+  <script src="app.js?v=20.5"></script>
 </body>
 </html>

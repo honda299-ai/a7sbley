@@ -1540,6 +1540,7 @@ async function savePinEverywhere(pin) {
 async function clearPinEverywhere() {
   if (currentUser) await pinDocRef(currentUser.uid).delete();
   lsDel(PIN_KEY);
+  lsDel(PIN_ACTIVE_KEY);
 }
 
 function showAuthLoading() {
@@ -1566,6 +1567,7 @@ function hideLoginWall() {
 }
 function showPinLock() {
   if (isPortalModeActive) return;
+  lsDel(PIN_ACTIVE_KEY);
   document.getElementById('lockScreen').classList.remove('hidden');
   document.getElementById('lockScreen').classList.add('flex');
   document.getElementById('unlockPinInput').value = '';
@@ -1599,6 +1601,7 @@ function handleUserSwitch(uid) {
    حالة "غير مسجّل" (بعد تسجيل الخروج من حساب أو من وضع الزائر)
    ========================================================= */
 function applySignedOutState() {
+  lsDel(PIN_ACTIVE_KEY);
   currentUser = null;
   userRole = 'free';
   isSuperAdmin = false;
@@ -1857,8 +1860,8 @@ auth.onAuthStateChanged(async user => {
     checkPendingShare();
 
     loadCloudData(user.uid).finally(() => {
-      if (getPin()) showPinLock();
-      else hidePinLock();
+      if (getPin() && !pinStillUnlocked()) showPinLock();
+      else { hidePinLock(); if (getPin()) markPinActive(); }
       
       // تشغيل التوتوريال بعد ما كل حاجة تحمل
       maybeOfferGuestImport();
@@ -5187,26 +5190,6 @@ function handleMoneyAlertClick() {
 
 
 
-/* ---------- Quick add sheet (mobile FAB) ---------- */
-function openQuickAdd() {
-  const s = document.getElementById('quickAddSheet');
-  if (!s) return;
-  s.classList.remove('hidden');
-  requestAnimationFrame(() => s.classList.add('open'));
-}
-function closeQuickAdd() {
-  const s = document.getElementById('quickAddSheet');
-  if (!s) return;
-  s.classList.remove('open');
-  setTimeout(() => s.classList.add('hidden'), 200);
-}
-function quickAdd(kind) {
-  closeQuickAdd();
-  setTimeout(() => openModal(kind), 210);
-}
-document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeQuickAdd(); });
-
-
 /* =========================================================
    MODERN SEGMENTED NAV + LAST 8 TRANSACTIONS + SHOW MORE (V15.0)
    ========================================================= */
@@ -6719,6 +6702,13 @@ async function admLog(action, uid, details) {
     });
   } catch (e) { console.warn('admin audit not saved (update firestore.rules):', e.code || e.message); }
 }
+function _admErrText(e, base) {
+  const c = e && e.code;
+  if (c === 'permission-denied') return base + ': القواعد الجديدة (admin_audit / admin_notes) لسه ماتنشرتش على Firebase';
+  if (c === 'unavailable') return base + ': مفيش اتصال بالإنترنت';
+  if (c === 'failed-precondition') return base + ': Firestore محتاج فهرس (Index) — افتح الـ Console وشوف الرابط في رسالة الخطأ';
+  return base + (c ? ` (${c})` : '');
+}
 function admCloseUser() {
   admCurrentUid = null;
   const d = document.getElementById('admUserDrawer');
@@ -6834,7 +6824,7 @@ async function admLoadNote(uid) {
     ta.value = doc.exists ? (doc.data().text || '') : '';
     ta.disabled = false;
   } catch (e) {
-    document.getElementById('admNoteStatus').textContent = 'الملاحظات محتاجة تحديث قواعد Firestore (انظر firestore.rules)';
+    document.getElementById('admNoteStatus').textContent = _admErrText(e, 'تعذر تحميل الملاحظة'); console.warn('admin_notes read failed:', e.code, e.message);
   }
 }
 async function admSaveNote() {
@@ -6845,7 +6835,7 @@ async function admSaveNote() {
     await db.collection('admin_notes').doc(uid).set({ text, by: currentUser.uid, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
     st.textContent = 'تم الحفظ ✓';
     admLog('note', uid, {});
-  } catch (e) { st.textContent = 'تعذر الحفظ — حدّث قواعد Firestore'; }
+  } catch (e) { st.textContent = _admErrText(e, 'تعذر الحفظ'); console.warn('admin_notes write failed:', e.code, e.message); }
 }
 const ADM_ACTION_LABELS = { role_change: 'تغيير الدور', suspend: 'إيقاف الحساب', unsuspend: 'إعادة تفعيل', permissions: 'تعديل الصلاحيات', note: 'تحديث الملاحظة' };
 async function admLoadActivity(uid) {
@@ -6866,7 +6856,7 @@ async function admLoadActivity(uid) {
         _admEl('small', '', `${_admFmtFull(_admDate(it.ts))} • ${it.byEmail || ''}`));
       host.appendChild(row);
     });
-  } catch (e) { host.replaceChildren(_admEl('div', 'adm-empty', 'سجل الإجراءات محتاج تحديث قواعد Firestore')); }
+  } catch (e) { host.replaceChildren(_admEl('div', 'adm-empty', _admErrText(e, 'تعذر تحميل سجل الإجراءات'))); console.warn('admin_audit read failed:', e.code, e.message); }
 }
 
 (function hookAdminActions() {
@@ -6911,3 +6901,373 @@ document.addEventListener('keydown', e => {
   if (conf && !conf.classList.contains('hidden')) return;
   if (admCurrentUid) admCloseUser(); else closeAdminPanel();
 });
+
+/* =========================================================
+   V20.5 — قفل الـ PIN لمدة 10 دقايق، قائمة الإضافة (+)، المعاملات، العملاء
+   ========================================================= */
+
+/* ---------- 1) قفل الـ PIN: مايطلبش الرمز تاني قبل 10 دقايق من آخر نشاط ---------- */
+const PIN_GRACE_MS = 10 * 60 * 1000;
+const PIN_ACTIVE_KEY = 'a7sbley_pin_active_v1';
+function markPinActive() { if (currentUser && getPin()) lsSet(PIN_ACTIVE_KEY, String(Date.now())); }
+function pinStillUnlocked() {
+  const t = Number(lsGet(PIN_ACTIVE_KEY)) || 0;
+  const now = Date.now();
+  return t > 0 && t <= now + 60000 && (now - t) < PIN_GRACE_MS;
+}
+function _lockVisible() { const l = document.getElementById('lockScreen'); return !!l && !l.classList.contains('hidden'); }
+(function hookPinGrace() {
+  const origUnlock = window.unlockApp;
+  window.unlockApp = async function () {
+    const r = await origUnlock.apply(this, arguments);
+    if (!_lockVisible()) markPinActive();
+    return r;
+  };
+  let lastMark = 0;
+  const onActivity = () => {
+    const now = Date.now();
+    if (now - lastMark < 15000) return;
+    lastMark = now;
+    if (currentUser && getPin() && !_lockVisible()) markPinActive();
+  };
+  ['pointerdown', 'keydown', 'touchstart', 'wheel'].forEach(ev => document.addEventListener(ev, onActivity, { passive: true, capture: true }));
+  document.addEventListener('visibilitychange', () => {
+    if (!currentUser || !getPin()) return;
+    if (document.visibilityState === 'hidden') { if (!_lockVisible()) markPinActive(); }
+    else if (!_lockVisible() && !pinStillUnlocked()) showPinLock();
+  });
+  window.addEventListener('pagehide', () => { if (!_lockVisible()) markPinActive(); });
+  // قفل تلقائي لو التطبيق مفتوح وساكن أكتر من 10 دقايق
+  setInterval(() => {
+    if (currentUser && getPin() && !_lockVisible() && !pinStillUnlocked()) showPinLock();
+  }, 20000);
+})();
+
+/* ---------- 2) قائمة الإضافة (+) ---------- */
+let _qaLastFocus = null;
+function openQuickAdd() {
+  const s = document.getElementById('quickAddSheet');
+  if (!s || !currentUser) return;
+  if (!s.classList.contains('hidden') && s.classList.contains('open')) { closeQuickAdd(); return; }
+  _qaLastFocus = document.activeElement;
+  s.classList.remove('hidden');
+  document.querySelectorAll('.qa-fab').forEach(b => { b.classList.add('open'); b.setAttribute('aria-expanded', 'true'); });
+  requestAnimationFrame(() => {
+    s.classList.add('open');
+    const first = s.querySelector('.qa-tile:not([hidden])');
+    if (first && first.offsetParent !== null) setTimeout(() => first.focus({ preventScroll: true }), 120);
+  });
+}
+function closeQuickAdd(restoreFocus = true) {
+  const s = document.getElementById('quickAddSheet');
+  if (!s) return;
+  s.classList.remove('open');
+  document.querySelectorAll('.qa-fab').forEach(b => { b.classList.remove('open'); b.setAttribute('aria-expanded', 'false'); });
+  setTimeout(() => { if (!s.classList.contains('open')) s.classList.add('hidden'); }, 220);
+  if (restoreFocus && _qaLastFocus && _qaLastFocus.focus) { try { _qaLastFocus.focus({ preventScroll: true }); } catch (e) {} }
+}
+function quickAdd(kind) {
+  closeQuickAdd(false);
+  setTimeout(() => {
+    if (kind === 'shift') openShiftSettlementModal();
+    else if (kind === 'machines') openChargeMachines();
+    else if (kind === 'budget') openBudgetModal();
+    else openModal(kind);
+  }, 230);
+}
+document.addEventListener('keydown', e => {
+  const s = document.getElementById('quickAddSheet');
+  if (!s || s.classList.contains('hidden')) return;
+  if (e.key === 'Escape') { closeQuickAdd(); return; }
+  if (e.key === 'Tab') {   // حبس التنقل داخل القائمة
+    const items = Array.from(s.querySelectorAll('.qa-tile, .qa-x')).filter(x => x.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+});
+
+/* ---------- 3) المعاملات ---------- */
+function _txStamp(t) {
+  const tm = /^\d{1,2}:\d{2}/.test(t.time || '') ? String(t.time).slice(0, 5).padStart(5, '0') : '00:00';
+  const v = Date.parse(`${t.date}T${tm}`);
+  return isNaN(v) ? 0 : v;
+}
+function _txMeta(item) {
+  if (item.type === 'income') return { cls: 'in', icon: 'fa-arrow-down-left', sign: '+', label: 'إيراد' };
+  if (item.type === 'charity') return { cls: 'ch', icon: 'fa-hand-holding-heart', sign: '-', label: 'خير' };
+  return { cls: 'out', icon: 'fa-arrow-up-right', sign: '-', label: 'مصروف' };
+}
+function _dayLabel(dateStr) {
+  const today = todayString();
+  const y = new Date(today + 'T12:00:00'); y.setDate(y.getDate() - 1);
+  const yStr = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+  if (dateStr === today) return 'اليوم';
+  if (dateStr === yStr) return 'امبارح';
+  try { return new Date(dateStr + 'T12:00:00').toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' }); }
+  catch (e) { return dateStr; }
+}
+function _txFilteredList() {
+  const search = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+  const list = getPeriodTransactions().filter(t => {
+    if (isDebt(t.type)) return false;
+    if (activeFilter !== 'all' && t.type !== activeFilter) return false;
+    if (!search) return true;
+    return [t.category, t.notes, t.client, t.paymentMethod, t.reference, t.time, typeName(t.type)].join(' ').toLowerCase().includes(search);
+  });
+  list.sort((a, b) => _txStamp(b) - _txStamp(a));
+  return { list, search };
+}
+function _chip(label, valueHTML, tone) {
+  return `<div class="tx-sum ${tone}"><small>${label}</small><b>${valueHTML}</b></div>`;
+}
+function renderTxSummary(list) {
+  const host = document.getElementById('txSummary');
+  if (!host) return;
+  let inc = 0, out = 0;
+  list.forEach(t => { const a = Number(t.amount) || 0; if (t.type === 'income') inc += a; else out += a; });
+  host.innerHTML =
+    _chip('الإيرادات', `<span class="money-val">${money(inc)}</span>`, 'in') +
+    _chip('المصروفات', `<span class="money-val">${money(out)}</span>`, 'out') +
+    _chip('الصافي', `<span class="money-val">${inc - out >= 0 ? '' : '-'}${money(Math.abs(inc - out))}</span>`, inc - out >= 0 ? 'net' : 'out') +
+    _chip('العمليات', String(list.length), 'cnt');
+}
+buildFeedCardHTML = function (item) {
+  const m = _txMeta(item);
+  const title = escapeHTML(item.notes || item.category || 'عملية');
+  const time = item.time ? formatTimeTo12Hour(item.time) : '';
+  const sub = [item.client ? `<span class="tx-cl">${escapeHTML(item.client)}</span>` : '', payMethodHTML(item.paymentMethod), escapeHTML(time || item.date)].filter(Boolean).join(' <i class="tx-dot"></i> ');
+  return `
+    <div class="tx-m-left" onclick="editTransaction('${item.id}')">
+      <span class="tx-ic ${m.cls}"><i class="fa-solid ${m.icon}"></i></span>
+      <div class="tx-t"><b>${title}</b><small>${sub}</small></div>
+    </div>
+    <div class="tx-m-right">
+      <div class="tx-amt ${m.cls} money-val">${m.sign}${money(item.amount)}</div>
+      <span class="tx-cat">${escapeHTML(item.category || m.label)}</span>
+    </div>`;
+};
+renderTransactions = function () {
+  const tbody = document.getElementById('transactionsTbody');
+  const feed = document.getElementById('mobileTransactionsFeed');
+  const empty = document.getElementById('emptyTransactionsState');
+  const showMoreWrap = document.getElementById('txShowMoreContainer');
+  const showMoreBtn = document.getElementById('txShowMoreBtn');
+  if (tbody) tbody.innerHTML = '';
+  if (feed) feed.innerHTML = '';
+
+  const { list: fullList, search } = _txFilteredList();
+  renderTxSummary(fullList);
+  renderHomeRecentFeed();
+
+  if (!fullList.length) {
+    if (empty) empty.classList.remove('hidden');
+    if (showMoreWrap) showMoreWrap.classList.add('hidden');
+    return;
+  }
+  if (empty) empty.classList.add('hidden');
+
+  const isSearching = search.length > 0;
+  const visible = (showAllTransactions || isSearching) ? fullList : fullList.slice(0, TX_INITIAL_LIMIT);
+  const remaining = fullList.length - visible.length;
+  if (showMoreWrap && showMoreBtn) {
+    if (fullList.length > TX_INITIAL_LIMIT && !isSearching) {
+      showMoreWrap.classList.remove('hidden');
+      showMoreBtn.innerHTML = showAllTransactions
+        ? `<i class="fa-solid fa-chevron-up"></i> <span>عرض أقل (آخر ${TX_INITIAL_LIMIT} معاملات فقط)</span>`
+        : `<i class="fa-solid fa-chevron-down"></i> <span>عرض المزيد (+${remaining} معاملة أخرى)</span>`;
+    } else showMoreWrap.classList.add('hidden');
+  }
+
+  // صافي كل يوم (من القائمة الكاملة)
+  const dayNet = {};
+  fullList.forEach(t => { const a = Number(t.amount) || 0; dayNet[t.date] = (dayNet[t.date] || 0) + (t.type === 'income' ? a : -a); });
+  const groupHTML = (date) => {
+    const n = dayNet[date] || 0;
+    return `<span class="tx-g-l">${escapeHTML(_dayLabel(date))}</span><span class="tx-g-n ${n >= 0 ? 'pos' : 'neg'}"><span class="money-val">${n >= 0 ? '+' : '-'}${money(Math.abs(n))}</span> ج.م</span>`;
+  };
+
+  let lastDate = null;
+  visible.forEach(item => {
+    if (item.date !== lastDate) {
+      lastDate = item.date;
+      if (feed) { const g = document.createElement('div'); g.className = 'tx-group'; g.innerHTML = groupHTML(item.date); feed.appendChild(g); }
+      if (tbody) { const tr = document.createElement('tr'); tr.className = 'tx-group-row'; tr.innerHTML = `<td colspan="6"><div class="tx-group">${groupHTML(item.date)}</div></td>`; tbody.appendChild(tr); }
+    }
+    const m = _txMeta(item);
+    if (feed) {
+      const card = document.createElement('div');
+      card.className = 'ft-tx-feed-item tx-card';
+      card.innerHTML = buildFeedCardHTML(item) +
+        `<button type="button" onclick="requestDelete('${item.id}')" class="tx-del" aria-label="حذف"><i class="fa-solid fa-trash-can"></i></button>`;
+      feed.appendChild(card);
+    }
+    if (tbody) {
+      const tr = document.createElement('tr');
+      tr.className = 'tx-row';
+      const time = item.time ? formatTimeTo12Hour(item.time) : '';
+      tr.innerHTML = `
+        <td class="tx-c1"><div class="tx-main">
+          <span class="tx-ic ${m.cls}"><i class="fa-solid ${m.icon}"></i></span>
+          ${item.receipt ? `<img src="${escapeHTML(item.receipt)}" class="tx-rcpt" alt="صورة العملية" title="تكبير الصورة" onclick="viewReceiptImage(this.src)">` : ''}
+          <div class="tx-t"><b>${escapeHTML(item.notes || item.category || 'بدون بيان')}</b>
+            <small><span class="tx-cat">${escapeHTML(item.category || m.label)}</span>${item.reference ? ` <i class="tx-dot"></i> مرجع: ${escapeHTML(item.reference)}` : ''}</small></div>
+        </div></td>
+        <td class="tx-c2">${item.client ? `<button type="button" class="tx-client" data-client><span class="tx-av">${escapeHTML(item.client.charAt(0).toUpperCase())}</span><span>${escapeHTML(item.client)}</span></button>` : '<span class="tx-none">—</span>'}</td>
+        <td class="tx-c3"><span class="tx-pay">${payMethodHTML(item.paymentMethod)}</span></td>
+        <td class="tx-c4"><div class="tx-time"><i class="fa-regular fa-clock"></i> ${escapeHTML(time || '—')}</div><small>${escapeHTML(item.date)}</small></td>
+        <td class="tx-c5"><div class="tx-amt ${m.cls} money-val">${m.sign}${money(item.amount)} <small>ج.م</small></div></td>
+        <td class="tx-c6"><div class="tx-acts">
+          <button type="button" onclick="shareViaWhatsApp('${item.id}')" title="مشاركة" class="wa"><i class="fa-brands fa-whatsapp"></i></button>
+          <button type="button" onclick="editTransaction('${item.id}')" title="تعديل"><i class="fa-solid fa-pen"></i></button>
+          <button type="button" onclick="requestDelete('${item.id}')" title="حذف" class="del"><i class="fa-solid fa-trash-can"></i></button>
+        </div></td>`;
+      const cl = tr.querySelector('[data-client]');
+      if (cl) cl.addEventListener('click', () => openClientLedger(item.client));
+      tbody.appendChild(tr);
+    }
+  });
+};
+
+/* ---------- 4) العملاء ---------- */
+let clientFilter = 'all';
+function _clientDataMap() {
+  const names = new Map(getAllClientNames().map(n => [n.toLowerCase(), n]));
+  const today = todayString();
+  const map = new Map();
+  getActiveTransactions().forEach(t => {
+    if (!t.client || !t.client.trim()) return;
+    const key = t.client.trim().toLowerCase();
+    let s = map.get(key);
+    if (!s) { s = { name: names.get(key) || t.client.trim(), count: 0, income: 0, rec: 0, pay: 0, debtTotal: 0, debtPaid: 0, last: 0, first: Infinity, overdue: false }; map.set(key, s); }
+    const amt = Number(t.amount) || 0, paid = Math.min(Number(t.paidAmount) || 0, amt);
+    const st = _txStamp(t);
+    s.count++; if (st > s.last) s.last = st; if (st && st < s.first) s.first = st;
+    if (t.type === 'income') s.income += amt;
+    else if (t.type === 'debt_receivable') {
+      s.debtTotal += amt; s.debtPaid += (t.status === 'paid' ? amt : paid);
+      if (t.status !== 'paid') { s.rec += Math.max(0, amt - paid); if (t.dueDate && t.dueDate < today) s.overdue = true; }
+    } else if (t.type === 'debt_payable' && t.status !== 'paid') s.pay += Math.max(0, amt - paid);
+  });
+  return map;
+}
+function _ago(ts) {
+  if (!ts) return '—';
+  const d = Math.floor((Date.now() - ts) / 864e5);
+  if (d <= 0) return 'النهاردة'; if (d === 1) return 'امبارح'; if (d < 30) return `من ${d} يوم`;
+  if (d < 365) return `من ${Math.floor(d / 30)} شهر`; return `من ${Math.floor(d / 365)} سنة`;
+}
+function _clientStatus(s) {
+  if (s.overdue) return ['متأخر في السداد', 'bad'];
+  if (s.rec > 0) return ['عليه مديونية', 'warn'];
+  if (s.pay > 0) return ['مستحق له', 'info'];
+  if (s.debtTotal > 0) return ['مسدّد بالكامل', 'ok'];
+  return ['بدون ديون', 'mut'];
+}
+function setClientFilter(f) { clientFilter = f; renderClients(); }
+function clientQuickAdd(name, type) {
+  activeClientName = name;
+  openModal(type);
+  setTimeout(() => { const el = document.getElementById('formClient'); if (el) el.value = name; }, 120);
+}
+renderClients = function () {
+  const container = document.getElementById('clientsContainer');
+  const empty = document.getElementById('emptyClientsState');
+  if (!container) return;
+  const q = (document.getElementById('clientSearchInput')?.value || '').trim().toLowerCase();
+  const sortBy = (document.getElementById('clientSort') || {}).value || 'debt';
+  const all = Array.from(_clientDataMap().values());
+
+  // ملخص
+  const sum = document.getElementById('clientsSummary');
+  if (sum) {
+    const rec = all.reduce((a, c) => a + c.rec, 0), pay = all.reduce((a, c) => a + c.pay, 0);
+    const late = all.filter(c => c.overdue).length;
+    sum.innerHTML =
+      _chip('العملاء', String(all.length), 'cnt') +
+      _chip('مستحق لك', `<span class="money-val">${money(rec)}</span>`, 'warn') +
+      _chip('مستحق عليك', `<span class="money-val">${money(pay)}</span>`, 'info') +
+      _chip('متأخرين', String(late), late ? 'out' : 'mut');
+  }
+  // فلاتر
+  const chips = document.getElementById('clientFilterChips');
+  if (chips) {
+    const counts = { all: all.length, owes: all.filter(c => c.rec > 0).length, owed: all.filter(c => c.pay > 0).length, settled: all.filter(c => c.rec === 0 && c.pay === 0).length };
+    chips.replaceChildren();
+    [['all', 'الكل'], ['owes', 'عليهم ديون'], ['owed', 'مستحق لهم'], ['settled', 'بدون ديون']].forEach(([k, label]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'filter-pill' + (clientFilter === k ? ' active' : '');
+      b.textContent = `${label} ${counts[k]}`;
+      b.addEventListener('click', () => setClientFilter(k));
+      chips.appendChild(b);
+    });
+  }
+
+  let list = all.filter(c => {
+    if (q && !c.name.toLowerCase().includes(q)) return false;
+    if (clientFilter === 'owes') return c.rec > 0;
+    if (clientFilter === 'owed') return c.pay > 0;
+    if (clientFilter === 'settled') return c.rec === 0 && c.pay === 0;
+    return true;
+  });
+  const sorters = { debt: (a, b) => b.rec - a.rec || b.last - a.last, recent: (a, b) => b.last - a.last, count: (a, b) => b.count - a.count, name: (a, b) => a.name.localeCompare(b.name, 'ar') };
+  list.sort(sorters[sortBy] || sorters.debt);
+
+  container.replaceChildren();
+  if (!list.length) { empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+
+  list.forEach(c => {
+    const [stTxt, stCls] = _clientStatus(c);
+    const pct = c.debtTotal > 0 ? Math.round((c.debtPaid / c.debtTotal) * 100) : null;
+    const card = document.createElement('div');
+    card.className = 'cl-card' + (c.overdue ? ' late' : '');
+    card.innerHTML = `
+      <div class="cl-top">
+        <span class="cl-av"></span>
+        <div class="cl-id"><b class="cl-name"></b><small>${c.count} معاملة • آخر تعامل ${escapeHTML(_ago(c.last))}</small></div>
+        <span class="cl-st st-${stCls}">${stTxt}</span>
+      </div>
+      <div class="cl-stats">
+        <div><small>مستحق لك</small><b class="money-val ${c.rec > 0 ? 'warn' : ''}">${money(c.rec)}</b></div>
+        <div><small>مستحق عليك</small><b class="money-val ${c.pay > 0 ? 'info' : ''}">${money(c.pay)}</b></div>
+        <div><small>إجمالي الخدمات</small><b class="money-val ok">${money(c.income)}</b></div>
+      </div>
+      ${pct !== null ? `<div class="cl-prog" title="نسبة السداد"><div class="cl-prog-h"><small>نسبة سداد الديون</small><small>${pct}%</small></div><div class="cl-bar"><i style="width:${pct}%"></i></div></div>` : ''}
+      <div class="cl-acts">
+        <button type="button" class="cl-btn pri" data-a="ledger"><i class="fa-solid fa-folder-open"></i> كشف الحساب</button>
+        <button type="button" class="cl-btn" data-a="debt" title="دين جديد"><i class="fa-solid fa-plus"></i> دين</button>
+        <button type="button" class="cl-btn" data-a="income" title="إيراد جديد"><i class="fa-solid fa-plus"></i> دخل</button>
+      </div>`;
+    card.querySelector('.cl-av').textContent = c.name.charAt(0).toUpperCase();
+    card.querySelector('.cl-name').textContent = c.name;
+    card.addEventListener('click', e => {
+      const b = e.target.closest('button[data-a]');
+      if (!b) { openClientLedger(c.name); return; }
+      const a = b.getAttribute('data-a');
+      if (a === 'ledger') openClientLedger(c.name);
+      else clientQuickAdd(c.name, a === 'debt' ? 'debt_receivable' : 'income');
+    });
+    container.appendChild(card);
+  });
+};
+(function hookClientLedgerMeta() {
+  const orig = window.openClientLedger;
+  window.openClientLedger = function (clientName) {
+    const r = orig.apply(this, arguments);
+    try {
+      const s = _clientDataMap().get(String(clientName).trim().toLowerCase());
+      const host = document.getElementById('clientMetaStrip');
+      if (host && s) {
+        const fmt = ts => ts && isFinite(ts) ? new Date(ts).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+        const [stTxt, stCls] = _clientStatus(s);
+        const pct = s.debtTotal > 0 ? Math.round((s.debtPaid / s.debtTotal) * 100) + '%' : '—';
+        const items = [['الحالة', `<span class="cl-st st-${stCls}">${stTxt}</span>`], ['عدد المعاملات', String(s.count)], ['أول تعامل', fmt(s.first)],
+          ['آخر تعامل', `${fmt(s.last)}<em>${_ago(s.last)}</em>`], ['نسبة السداد', pct]];
+        host.innerHTML = items.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('');
+      }
+    } catch (e) { console.warn(e); }
+    return r;
+  };
+})();
