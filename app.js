@@ -149,15 +149,16 @@ const FEATURE_LIST = [
   { key: 'budget',  label: 'الميزانية',      icon: 'fa-wallet' },
   { key: 'export',  label: 'تصدير CSV',      icon: 'fa-file-excel' },
   { key: 'backup',  label: 'نسخ احتياطي',    icon: 'fa-database' },
-  { key: 'reports', label: 'تقارير PDF',     icon: 'fa-file-pdf' }
+  { key: 'reports', label: 'تقارير PDF',     icon: 'fa-file-pdf' },
+  { key: 'profitCurve', label: 'منحنى الأرباح (برو)', icon: 'fa-chart-area' }
 ];
 
 const DEFAULT_PERMISSIONS = {
-  free:     { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true },
-  personal: { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true },
-  work:     { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true },
-  pro:      { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true },
-  admin:    { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true }
+  free:     { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: false },
+  personal: { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: false },
+  work:     { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: false },
+  pro:      { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: true },
+  admin:    { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: true }
 };
 
 let rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
@@ -1841,7 +1842,7 @@ auth.onAuthStateChanged(async user => {
 
     const userIdentifier = user.email || user.phoneNumber || 'مستخدم';
     if (footerSync) {
-      footerSync.innerHTML = `<i class="fa-solid fa-cloud-check text-emerald-500"></i> متصل بالسحاب (${escapeHTML(userIdentifier)})`;
+      footerSync.innerHTML = `<i class="fa-solid fa-cloud text-emerald-500"></i> متصل بالسحاب (${escapeHTML(userIdentifier)})`;
     }
 
     await loadUserRole(user.uid);
@@ -1960,13 +1961,13 @@ function setSyncStatusUI(state, detail = '') {
     footerSync.innerHTML = `<i class="fa-solid fa-rotate fa-spin"></i> <span>جاري المزامنة مع السحابة...</span>`;
   } else if (state === 'synced') {
     footerSync.className = 'text-emerald-400 flex items-center gap-1.5 font-black';
-    footerSync.innerHTML = `<i class="fa-solid fa-cloud-check"></i> <span>متزامن سحابياً ${detail ? '(' + escapeHTML(detail) + ')' : '✓'}</span>`;
+    footerSync.innerHTML = `<i class="fa-solid fa-cloud"></i> <span>متزامن سحابياً ${detail ? '(' + escapeHTML(detail) + ')' : '✓'}</span>`;
   } else if (state === 'guest') {
     footerSync.className = 'text-orange-400 flex items-center gap-1.5 font-black';
     footerSync.innerHTML = `<i class="fa-solid fa-user-secret"></i> <span>وضع الزائر (محلي فقط)</span>`;
   } else if (state === 'error') {
     footerSync.className = 'text-rose-400 flex items-center gap-1.5 font-black';
-    footerSync.innerHTML = `<i class="fa-solid fa-cloud-exclamation"></i> <span>خطأ في المزامنة: ${escapeHTML(detail)}</span>`;
+    footerSync.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <span>خطأ في المزامنة: ${escapeHTML(detail)}</span>`;
   }
 }
 
@@ -5258,7 +5259,7 @@ function buildFeedCardHTML(item) {
   const isInc = item.type === 'income';
   const isChr = item.type === 'charity';
   const iconBg = isInc ? 'bg-emerald-500/15 text-emerald-400' : isChr ? 'bg-orange-500/15 text-orange-400' : 'bg-rose-500/15 text-rose-400';
-  const iconCls = isInc ? 'fa-arrow-down-left' : isChr ? 'fa-hand-holding-heart' : 'fa-arrow-up-right';
+  const iconCls = isInc ? 'fa-circle-arrow-down' : isChr ? 'fa-hand-holding-heart' : 'fa-circle-arrow-up';
   const amtColor = isInc ? 'text-emerald-400' : isChr ? 'text-orange-400' : 'text-rose-400';
   const sign = isInc ? '+' : '-';
 
@@ -6145,7 +6146,7 @@ function refreshProfileExtras() {
     const off = navigator.onLine === false;
     pill.className = 'pf-pill ' + (!real ? 'pf-pill-local' : (off ? 'pf-pill-off' : 'pf-pill-ok'));
     pill.innerHTML = !real ? '<i class="fa-solid fa-mobile-screen"></i> محلي على الجهاز'
-      : (off ? '<i class="fa-solid fa-plane"></i> أوفلاين' : '<i class="fa-solid fa-cloud-check"></i> متزامن');
+      : (off ? '<i class="fa-solid fa-plane"></i> أوفلاين' : '<i class="fa-solid fa-cloud"></i> متزامن');
   }
   const imp = document.getElementById('profileImportTile');
   if (imp) imp.hidden = !(real && guestHasData());
@@ -6995,9 +6996,9 @@ function _txStamp(t) {
   return isNaN(v) ? 0 : v;
 }
 function _txMeta(item) {
-  if (item.type === 'income') return { cls: 'in', icon: 'fa-arrow-down-left', sign: '+', label: 'إيراد' };
+  if (item.type === 'income') return { cls: 'in', icon: 'fa-circle-arrow-down', sign: '+', label: 'إيراد' };
   if (item.type === 'charity') return { cls: 'ch', icon: 'fa-hand-holding-heart', sign: '-', label: 'خير' };
-  return { cls: 'out', icon: 'fa-arrow-up-right', sign: '-', label: 'مصروف' };
+  return { cls: 'out', icon: 'fa-circle-arrow-up', sign: '-', label: 'مصروف' };
 }
 function _dayLabel(dateStr) {
   const today = todayString();
@@ -7270,4 +7271,322 @@ renderClients = function () {
     } catch (e) { console.warn(e); }
     return r;
   };
+})();
+
+/* =========================================================
+   V20.6 — الإعدادات المنظّمة، الديون، منحنى الأرباح (برو)
+   ========================================================= */
+
+/* ---------- 1) الإعدادات (مركز التحكم) ---------- */
+let _ccCat = 'ops';
+function ccSetCat(cat) {
+  _ccCat = cat;
+  const q = (document.getElementById('ccSearch') || {}).value || '';
+  if (q.trim()) { document.getElementById('ccSearch').value = ''; }
+  ccFilter();
+}
+function _ccRowVisible(row) { return getComputedStyle(row).display !== 'none'; }
+function ccFilter() {
+  const q = ((document.getElementById('ccSearch') || {}).value || '').trim().toLowerCase();
+  const groups = document.querySelectorAll('#controlCenterModal .cc-group');
+  let anyVisible = false;
+  groups.forEach(g => {
+    const rows = g.querySelectorAll('.cc-row');
+    let shown = 0;
+    rows.forEach(r => {
+      const match = !q || r.textContent.toLowerCase().includes(q);
+      r.classList.toggle('cc-hide', !match);
+      if (match && _ccRowVisible(r)) shown++;
+    });
+    const showGroup = q ? shown > 0 : g.getAttribute('data-cat') === _ccCat;
+    g.hidden = !showGroup;
+    if (showGroup && shown > 0) anyVisible = true;
+  });
+  document.querySelectorAll('#ccCats .cc-cat').forEach(b => b.classList.toggle('on', !q && b.getAttribute('data-cat') === _ccCat));
+  const empty = document.getElementById('ccEmpty');
+  if (empty) empty.hidden = anyVisible;
+}
+(function hookControlCenter() {
+  const origOpen = window.openControlCenter;
+  window.openControlCenter = function () {
+    const r = origOpen.apply(this, arguments);
+    const s = document.getElementById('ccSearch'); if (s) s.value = '';
+    _ccCat = 'ops';
+    const badge = document.getElementById('ccProBadge');
+    if (badge) badge.hidden = hasFeature('profitCurve');
+    ccFilter();
+    const main = document.querySelector('#controlCenterModal .cc-main'); if (main) main.scrollTop = 0;
+    return r;
+  };
+})();
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const m = document.getElementById('controlCenterModal');
+  if (m && !m.classList.contains('hidden')) closeControlCenter();
+  const u = document.getElementById('proUpsellModal');
+  if (u && !u.classList.contains('hidden')) closeProUpsell();
+});
+function ccOpenProfitCurve() {
+  closeControlCenter();
+  navigateSegmented('home');
+  setTimeout(() => {
+    const el = document.getElementById('profitCurveCard');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 250);
+}
+
+/* ---------- 2) الديون ---------- */
+let debtFilter = 'all';
+function _debtInfo(d) {
+  const total = Number(d.amount) || 0;
+  const isPaid = d.status === 'paid';
+  const paid = isPaid ? total : Math.min(Number(d.paidAmount) || 0, total);
+  const rem = isPaid ? 0 : Math.max(0, total - paid);
+  const dueDiff = d.dueDate ? Math.round((new Date(d.dueDate) - new Date(todayString())) / 864e5) : null;
+  return { total, paid, rem, isPaid, dueDiff, overdue: !isPaid && dueDiff !== null && dueDiff < 0, rec: d.type === 'debt_receivable' };
+}
+function setDebtFilter(f) { debtFilter = f; renderDebts(); }
+renderDebts = function () {
+  const container = document.getElementById('debtsContainer');
+  const empty = document.getElementById('emptyDebtsState');
+  if (!container) return;
+  const all = getActiveTransactions().filter(t => isDebt(t.type)).map(d => ({ d, i: _debtInfo(d) }));
+
+  // الملخص
+  const sum = document.getElementById('debtsSummary');
+  if (sum) {
+    const rec = all.filter(x => x.i.rec && !x.i.isPaid).reduce((a, x) => a + x.i.rem, 0);
+    const pay = all.filter(x => !x.i.rec && !x.i.isPaid).reduce((a, x) => a + x.i.rem, 0);
+    const late = all.filter(x => x.i.overdue);
+    sum.innerHTML =
+      _chip('مستحق لي', `<span class="money-val">${money(rec)}</span>`, 'in') +
+      _chip('مستحق عليّ', `<span class="money-val">${money(pay)}</span>`, 'out') +
+      _chip('متأخرة', String(late.length), late.length ? 'out' : 'mut') +
+      _chip('تم سدادها', String(all.filter(x => x.i.isPaid).length), 'cnt');
+  }
+  // الفلاتر
+  const counts = { all: all.length, rec: all.filter(x => x.i.rec && !x.i.isPaid).length, pay: all.filter(x => !x.i.rec && !x.i.isPaid).length, overdue: all.filter(x => x.i.overdue).length, paid: all.filter(x => x.i.isPaid).length };
+  const chips = document.getElementById('debtFilterChips');
+  if (chips) {
+    chips.replaceChildren();
+    [['all', 'الكل'], ['rec', 'ليّ'], ['pay', 'عليّ'], ['overdue', 'متأخرة'], ['paid', 'مسددة']].forEach(([k, label]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'filter-pill' + (debtFilter === k ? ' active' : '');
+      b.textContent = `${label} ${counts[k]}`; b.addEventListener('click', () => setDebtFilter(k));
+      chips.appendChild(b);
+    });
+  }
+  let list = all.filter(x => {
+    if (debtFilter === 'rec') return x.i.rec && !x.i.isPaid;
+    if (debtFilter === 'pay') return !x.i.rec && !x.i.isPaid;
+    if (debtFilter === 'overdue') return x.i.overdue;
+    if (debtFilter === 'paid') return x.i.isPaid;
+    return true;
+  });
+  const sortBy = (document.getElementById('debtSort') || {}).value || 'urgency';
+  const newest = (a, b) => _txStamp(b.d) - _txStamp(a.d);
+  const sorters = {
+    urgency: (a, b) => (a.i.isPaid - b.i.isPaid) || (b.i.overdue - a.i.overdue)
+      || ((a.i.dueDiff === null ? 1e9 : a.i.dueDiff) - (b.i.dueDiff === null ? 1e9 : b.i.dueDiff)) || newest(a, b),
+    amount: (a, b) => b.i.rem - a.i.rem || newest(a, b),
+    newest
+  };
+  list.sort(sorters[sortBy] || sorters.urgency);
+
+  container.replaceChildren();
+  if (!list.length) { empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+
+  list.forEach(({ d, i }) => {
+    const pct = i.total > 0 ? Math.min(100, Math.round((i.paid / i.total) * 100)) : 0;
+    const tone = i.isPaid ? 'paid' : (i.rec ? 'rec' : 'pay');
+    const card = document.createElement('div');
+    card.className = `db-card db-${tone}${i.overdue ? ' late' : ''}`;
+    card.innerHTML = `
+      <div class="db-top">
+        <span class="db-ic"><i class="fa-solid ${i.isPaid ? 'fa-circle-check' : (i.rec ? 'fa-hand-holding-dollar' : 'fa-file-invoice-dollar')}"></i></span>
+        <div class="db-id">
+          <b class="db-name"></b>
+          <small class="db-sub"></small>
+        </div>
+        <div class="db-amt">
+          <b class="money-val">${money(i.isPaid ? i.total : i.rem)}</b>
+          <small>${i.isPaid ? 'تم السداد ✓' : (i.rec ? 'مستحق لي' : 'مستحق عليّ')}</small>
+        </div>
+      </div>
+      <div class="db-meta"></div>
+      ${i.total > 0 && (i.paid > 0 || i.isPaid) ? `
+        <div class="db-prog">
+          <div class="db-bar"><i style="width:${pct}%"></i></div>
+          <div class="db-prog-t"><span>سُدد ${money(i.paid)} من ${money(i.total)}</span><span>${pct}%</span></div>
+        </div>` : ''}
+      <div class="db-acts">
+        ${!i.isPaid ? `<button type="button" class="db-btn pri" data-a="pay"><i class="fa-solid fa-coins"></i> تسديد</button>` : ''}
+        <button type="button" class="db-btn" data-a="card"><i class="fa-solid fa-receipt"></i> بطاقة مطالبة</button>
+        <button type="button" class="db-btn" data-a="toggle">${i.isPaid ? '<i class="fa-solid fa-rotate-left"></i> إعادة فتح' : '<i class="fa-solid fa-check-double"></i> تسوية كاملة'}</button>
+        <button type="button" class="db-ib" data-a="edit" title="تعديل"><i class="fa-solid fa-pen"></i></button>
+        <button type="button" class="db-ib del" data-a="del" title="حذف"><i class="fa-solid fa-trash-can"></i></button>
+      </div>`;
+    card.querySelector('.db-name').textContent = d.notes || 'دين بدون بيان';
+    const sub = card.querySelector('.db-sub');
+    if (d.client) {
+      const c = document.createElement('button'); c.type = 'button'; c.className = 'db-client'; c.innerHTML = '<i class="fa-solid fa-user"></i> ';
+      c.append(document.createTextNode(d.client)); c.addEventListener('click', ev => { ev.stopPropagation(); openClientLedger(d.client); });
+      sub.appendChild(c);
+    }
+    sub.append(document.createTextNode(`${d.category || ''} • ${d.date}${d.time ? ' • ' + formatTimeTo12Hour(d.time) : ''}`));
+    const meta = card.querySelector('.db-meta');
+    const badge = getDueDateBadge(d);
+    if (badge) { const w = document.createElement('span'); w.innerHTML = badge; meta.appendChild(w); }
+    if (d.receipt) {
+      const img = document.createElement('img'); img.src = d.receipt; img.className = 'db-rcpt'; img.alt = 'مرفق'; img.title = 'معاينة المرفق';
+      img.addEventListener('click', () => viewReceiptImage(img.src)); meta.appendChild(img);
+    }
+    if (!meta.childNodes.length) meta.remove();
+    card.addEventListener('click', ev => {
+      const b = ev.target.closest('button[data-a]'); if (!b) return;
+      const a = b.getAttribute('data-a');
+      if (a === 'pay') openDebtPaymentModal(d.id);
+      else if (a === 'card') openDebtCardModal(d.id);
+      else if (a === 'toggle') toggleDebtStatus(d.id);
+      else if (a === 'edit') editTransaction(d.id);
+      else if (a === 'del') requestDelete(d.id);
+    });
+    container.appendChild(card);
+  });
+};
+
+/* ---------- 3) منحنى الأرباح (برو) ---------- */
+const PRO_CONTACT_URL = '';  // ضع هنا رابط واتساب/تيليجرام للتواصل لو عايز زر "تواصل للترقية"
+let pcRange = '30';
+let pcChart = null;
+let pcTimer = null;
+
+function openProUpsell() {
+  const m = document.getElementById('proUpsellModal'); if (!m) return;
+  const cta = document.getElementById('proUpCta'), txt = document.getElementById('proUpText');
+  if (PRO_CONTACT_URL) { cta.innerHTML = '<i class="fa-solid fa-paper-plane"></i> تواصل للترقية'; txt.textContent = 'تواصل معنا وهنفعّل لك اشتراك برو.'; }
+  m.classList.remove('hidden'); m.classList.add('flex');
+}
+function closeProUpsell() { const m = document.getElementById('proUpsellModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
+function proUpsellAction() { if (PRO_CONTACT_URL) window.open(PRO_CONTACT_URL, '_blank', 'noopener'); closeProUpsell(); }
+
+function pcSetRange(r) {
+  pcRange = r;
+  document.querySelectorAll('#pcRange button').forEach(b => b.classList.toggle('on', b.getAttribute('data-r') === r));
+  renderProfitCurve();
+}
+function pcToggleTable() {
+  const w = document.getElementById('pcTableWrap'); if (!w) return;
+  w.hidden = !w.hidden;
+  document.querySelector('#pcToggle span').textContent = w.hidden ? 'عرض جدول المتابعة' : 'إخفاء جدول المتابعة';
+}
+function _pcData() {
+  const txs = getActiveTransactions().filter(t => t.type === 'income' || t.type === 'expense');
+  const buckets = [];
+  const monthly = pcRange === '12m';
+  const now = new Date(); now.setHours(12, 0, 0, 0);
+  const fmtDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  if (monthly) {
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1, 12);
+      buckets.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: d.toLocaleDateString('ar-EG', { month: 'short', year: '2-digit' }), income: 0, expense: 0 });
+    }
+  } else {
+    const n = Number(pcRange);
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(now); d.setDate(d.getDate() - i);
+      buckets.push({ key: fmtDay(d), label: d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }), income: 0, expense: 0 });
+    }
+  }
+  const idx = new Map(buckets.map((b, i) => [b.key, i]));
+  txs.forEach(t => {
+    const k = monthly ? String(t.date).slice(0, 7) : String(t.date).slice(0, 10);
+    const i = idx.get(k); if (i === undefined) return;
+    const a = Number(t.amount) || 0;
+    if (t.type === 'income') buckets[i].income += a; else buckets[i].expense += a;
+  });
+  let cum = 0;
+  buckets.forEach(b => { b.profit = Math.round((b.income - b.expense) * 100) / 100; cum += b.profit; b.cum = Math.round(cum * 100) / 100; });
+  return { buckets, monthly, hasData: buckets.some(b => b.income || b.expense) };
+}
+function renderProfitCurve() {
+  const card = document.getElementById('profitCurveCard');
+  if (!card) return;
+  const allowed = typeof hasFeature === 'function' && hasFeature('profitCurve');
+  const lock = document.getElementById('pcLock'), body = document.getElementById('pcBody'), range = document.getElementById('pcRange');
+  lock.hidden = allowed; body.hidden = !allowed; range.hidden = !allowed;
+  card.classList.toggle('locked', !allowed);
+  if (!allowed) { if (pcChart) { pcChart.destroy(); pcChart = null; } return; }
+
+  const { buckets, monthly, hasData } = _pcData();
+  const total = buckets.reduce((s, b) => s + b.profit, 0);
+  const income = buckets.reduce((s, b) => s + b.income, 0);
+  const best = buckets.reduce((m, b) => (b.profit > m.profit ? b : m), buckets[0]);
+  const worst = buckets.reduce((m, b) => (b.profit < m.profit ? b : m), buckets[0]);
+  const avg = total / buckets.length;
+  const half = Math.floor(buckets.length / 2);
+  const a1 = buckets.slice(0, half).reduce((s, b) => s + b.profit, 0), a2 = buckets.slice(half).reduce((s, b) => s + b.profit, 0);
+  const trendUp = a2 >= a1;
+  const margin = income > 0 ? Math.round((total / income) * 100) : null;
+  const unit = monthly ? 'شهر' : 'يوم';
+
+  const stats = document.getElementById('pcStats');
+  stats.innerHTML =
+    _chip('إجمالي الربح', `<span class="money-val">${total < 0 ? '-' : ''}${money(Math.abs(total))}</span>`, total >= 0 ? 'in' : 'out') +
+    _chip('أفضل ' + unit, hasData ? `<span class="money-val">${money(best.profit)}</span> <i class="pc-sm">${escapeHTML(best.label)}</i>` : '—', 'cnt') +
+    _chip('متوسط الـ' + unit, `<span class="money-val">${avg < 0 ? '-' : ''}${money(Math.abs(avg))}</span>`, avg >= 0 ? 'net' : 'out') +
+    _chip('الاتجاه', hasData ? (trendUp ? '<i class="fa-solid fa-arrow-trend-up"></i> صاعد' : '<i class="fa-solid fa-arrow-trend-down"></i> هابط') + (margin !== null ? ` <i class="pc-sm">هامش ${margin}%</i>` : '') : '—', trendUp ? 'in' : 'out');
+
+  document.getElementById('pcEmpty').hidden = hasData;
+
+  // الرسم
+  const canvas = document.getElementById('profitCurveChart');
+  if (typeof Chart !== 'undefined' && canvas) {
+    const dark = document.documentElement.classList.contains('dark');
+    const grid = dark ? 'rgba(255,255,255,.07)' : 'rgba(15,23,42,.07)', txt = dark ? '#98a4b8' : '#64748b';
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.clientHeight || 240);
+    grad.addColorStop(0, 'rgba(249,115,22,.35)'); grad.addColorStop(1, 'rgba(249,115,22,0)');
+    const data = {
+      labels: buckets.map(b => b.label),
+      datasets: [
+        { type: 'line', label: 'الربح التراكمي', data: buckets.map(b => b.cum), borderColor: '#f97316', backgroundColor: grad, fill: true, tension: .35, borderWidth: 3, pointRadius: buckets.length > 40 ? 0 : 3, pointHoverRadius: 5, pointBackgroundColor: '#f97316', yAxisID: 'y', order: 1 },
+        { type: 'bar', label: monthly ? 'ربح الشهر' : 'ربح اليوم', data: buckets.map(b => b.profit), backgroundColor: buckets.map(b => b.profit >= 0 ? 'rgba(16,185,129,.55)' : 'rgba(244,63,94,.55)'), borderRadius: 4, yAxisID: 'y1', order: 2, maxBarThickness: 18 }
+      ]
+    };
+    const fmt = v => (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(Math.round(v)));
+    const opts = {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { rtl: true, textDirection: 'rtl', callbacks: { label: c => ` ${c.dataset.label}: ${money(c.parsed.y)} ج.م` } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: txt, maxRotation: 0, autoSkip: true, maxTicksLimit: 8, font: { family: 'Cairo', size: 10 } } },
+        y: { position: 'right', grid: { color: grid }, ticks: { color: txt, callback: fmt, font: { size: 10 } } },
+        y1: { position: 'left', grid: { display: false }, ticks: { display: false } }
+      }
+    };
+    if (pcChart) { pcChart.data = data; pcChart.options = opts; pcChart.update(); }
+    else pcChart = new Chart(ctx, { data, options: opts });
+  }
+
+  // جدول المتابعة (الأحدث أولاً)
+  const tb = document.getElementById('pcTbody');
+  tb.innerHTML = buckets.slice().reverse().map(b => `
+    <tr><td>${escapeHTML(b.label)}</td>
+      <td class="in money-val">${b.income ? money(b.income) : '—'}</td>
+      <td class="out money-val">${b.expense ? money(b.expense) : '—'}</td>
+      <td class="${b.profit >= 0 ? 'in' : 'out'} money-val"><b>${b.profit < 0 ? '-' : ''}${money(Math.abs(b.profit))}</b></td>
+      <td class="money-val">${b.cum < 0 ? '-' : ''}${money(Math.abs(b.cum))}</td></tr>`).join('');
+}
+function _schedulePC() { clearTimeout(pcTimer); pcTimer = setTimeout(() => { try { renderProfitCurve(); } catch (e) { console.warn(e); } }, 150); }
+(function hookProfitCurve() {
+  const um = window.updateMetrics;
+  window.updateMetrics = function () { const r = um.apply(this, arguments); _schedulePC(); return r; };
+  const ar = window.applyRoleUI;
+  window.applyRoleUI = function () { const r = ar.apply(this, arguments); _schedulePC(); return r; };
+  const at = window.applyTheme;
+  if (typeof at === 'function') window.applyTheme = function () { const r = at.apply(this, arguments); if (pcChart) { pcChart.destroy(); pcChart = null; } _schedulePC(); return r; };
 })();
