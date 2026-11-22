@@ -36,7 +36,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20.6">
+  <link rel="stylesheet" href="styles.css?v=20.7">
 
   <!-- Driver.js for Elegant Tutorial -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
@@ -107,13 +107,14 @@
             <div class="text-[10px] font-bold text-slate-400 leading-none">أهلاً بك 👋</div>
             <div id="headerUserGreeting" class="text-sm font-black text-slate-900 dark:text-white truncate mt-1">هوندا</div>
           </div>
+          <span id="teamChip" class="tm-chip" hidden></span>
           <span id="roleBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400">
             <i class="fa-solid fa-user"></i> مجاني
           </span>
         </div>
 
         <!-- 2. Center Mode Switcher Pill -->
-        <button id="modeSwitcherBtn" onclick="toggleAppMode()" class="mode-pill-btn shrink-0" title="تبديل وضع الاستخدام">
+        <button id="modeSwitcherBtn" onclick="toggleAppMode()" class="owner-only mode-pill-btn shrink-0" title="تبديل وضع الاستخدام">
           <i id="modeSwitchIcon" class="fa-solid fa-store"></i>
           <span id="modeSwitchLabel">المحل</span>
         </button>
@@ -123,7 +124,7 @@
           <button id="headerInstallBtn" onclick="showMobileInstallModal()" class="hidden"></button>
 
           <button onclick="openQuickAdd()" aria-haspopup="dialog" aria-label="إضافة عملية جديدة"
-            class="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow hover:brightness-110 transition">
+            class="perm-add-any hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-xs shadow hover:brightness-110 transition">
             <i class="fa-solid fa-plus"></i>
             <span>إضافة</span>
           </button>
@@ -279,20 +280,26 @@
         <span>المعاملات</span>
         <span id="segTxBadge" class="seg-pill-badge">0</span>
       </button>
-      <button onclick="navigateSegmented('debts')" class="business-only seg-pill-btn" data-seg="debts" data-feature="debts">
+      <button onclick="navigateSegmented('debts')" class="perm-debts business-only seg-pill-btn" data-seg="debts" data-feature="debts">
         <i class="fa-solid fa-handshake"></i>
         <span>الديون</span>
         <span id="segDebtBadge" class="seg-pill-badge">0</span>
       </button>
-      <button onclick="navigateSegmented('clients')" class="business-only seg-pill-btn" data-seg="clients">
+      <button onclick="navigateSegmented('clients')" class="perm-clients business-only seg-pill-btn" data-seg="clients">
         <i class="fa-solid fa-users"></i>
         <span>العملاء</span>
         <span id="segClientBadge" class="seg-pill-badge">0</span>
       </button>
     </nav>
 
+    <!-- بطاقة العضو (لما الأرصدة مخفية عنه) -->
+    <section id="teamHomeCard" class="team-home no-print" data-mob-view="home" data-mob-display="block">
+      <div class="team-home-ic"><i class="fa-solid fa-people-group"></i></div>
+      <div><b>أنت بتشتغل ضمن فريق <span id="teamHomeName"></span></b><small>استخدم زر <i class="fa-solid fa-plus"></i> لإضافة العمليات المسموحة لك.</small></div>
+    </section>
+
 <!-- ===== DESKTOP HERO: شريحة الرصيد + الخزائن + الإجراءات ===== -->
-    <section id="desktopHero" class="hidden md:grid dk-hero no-print">
+    <section id="desktopHero" class="totals-only hidden md:grid dk-hero no-print">
       <div class="fintech-bank-card dk-card">
         <div class="dk-card-top">
           <div class="dk-brand"><img src="logo.png" alt="" class="dk-logo"><span>احسبلي</span></div>
@@ -313,24 +320,24 @@
       <div class="dk-side">
         <div class="dk-side-h"><i class="fa-solid fa-vault"></i> الخزائن والمحافظ</div>
         <div id="desktopWalletsStrip" class="dk-wallets"></div>
-        <button type="button" onclick="openChargeMachines()" class="business-only mc-card dk-mc">
+        <button type="button" onclick="openChargeMachines()" class="perm-machines business-only mc-card dk-mc">
           <span class="mc-card-ic"><i class="fa-solid fa-bolt"></i></span>
           <span class="mc-card-tx"><b>مكن الشحن</b><small class="js-mc-sub">اضغط لإضافة أول مكنة</small></span>
           <span class="mc-card-bal"><b class="money-val js-mc-total">0</b><small>ج.م</small></span>
         </button>
         <div class="ft-action-grid dk-actions">
-          <button onclick="openModal('income')" class="ft-action-btn"><div class="ft-action-circle text-emerald-500"><i class="fa-solid fa-circle-arrow-down"></i></div><span class="ft-action-label">إضافة دخل</span></button>
-          <button onclick="openModal('expense')" class="ft-action-btn"><div class="ft-action-circle text-rose-500"><i class="fa-solid fa-receipt"></i></div><span class="ft-action-label">مصروف</span></button>
-          <button onclick="openModal('charity')" data-feature="charity" class="ft-action-btn"><div class="ft-action-circle text-amber-500"><i class="fa-solid fa-hand-holding-heart"></i></div><span class="ft-action-label">باب الخير</span></button>
-          <button onclick="openBudgetModal()" class="personal-only ft-action-btn"><div class="ft-action-circle text-cyan-500"><i class="fa-solid fa-chart-pie"></i></div><span class="ft-action-label">الميزانية</span></button>
-          <button onclick="openModal('debt_receivable')" class="business-only ft-action-btn"><div class="ft-action-circle text-cyan-500"><i class="fa-solid fa-user-plus"></i></div><span class="ft-action-label">دين جديد</span></button>
-          <button onclick="openShiftSettlementModal()" class="business-only ft-action-btn"><div class="ft-action-circle text-orange-500"><i class="fa-solid fa-calendar-check"></i></div><span class="ft-action-label">تقفيل اليوم</span></button>
+          <button onclick="openModal('income')" class="perm-addIncome ft-action-btn"><div class="ft-action-circle text-emerald-500"><i class="fa-solid fa-circle-arrow-down"></i></div><span class="ft-action-label">إضافة دخل</span></button>
+          <button onclick="openModal('expense')" class="perm-addExpense ft-action-btn"><div class="ft-action-circle text-rose-500"><i class="fa-solid fa-receipt"></i></div><span class="ft-action-label">مصروف</span></button>
+          <button onclick="openModal('charity')" data-feature="charity" class="perm-addExpense ft-action-btn"><div class="ft-action-circle text-amber-500"><i class="fa-solid fa-hand-holding-heart"></i></div><span class="ft-action-label">باب الخير</span></button>
+          <button onclick="openBudgetModal()" class="owner-only personal-only ft-action-btn"><div class="ft-action-circle text-cyan-500"><i class="fa-solid fa-chart-pie"></i></div><span class="ft-action-label">الميزانية</span></button>
+          <button onclick="openModal('debt_receivable')" class="perm-debts business-only ft-action-btn"><div class="ft-action-circle text-cyan-500"><i class="fa-solid fa-user-plus"></i></div><span class="ft-action-label">دين جديد</span></button>
+          <button onclick="openShiftSettlementModal()" class="owner-only business-only ft-action-btn"><div class="ft-action-circle text-orange-500"><i class="fa-solid fa-calendar-check"></i></div><span class="ft-action-label">تقفيل اليوم</span></button>
         </div>
       </div>
     </section>
 
     <!-- ULTRA-CLEAN BANKING HOME (MOBILE) -->
-    <section id="mobileHero" data-mob-view="home" data-mob-display="block" class="md:hidden space-y-4 no-print">
+    <section id="mobileHero" data-mob-view="home" data-mob-display="block" class="totals-only md:hidden space-y-4 no-print">
       <!-- 1. 3D Bank Card -->
       <div class="fintech-bank-card">
         <div class="flex items-center justify-between">
@@ -366,27 +373,27 @@
 
       <!-- 2. Circular Quick Actions (Adapts to Business vs Personal) -->
       <div class="ft-action-grid">
-        <button onclick="openModal('income')" class="ft-action-btn">
+        <button onclick="openModal('income')" class="perm-addIncome ft-action-btn">
           <div class="ft-action-circle text-emerald-500"><i class="fa-solid fa-circle-arrow-down"></i></div>
           <span class="ft-action-label">إضافة دخل</span>
         </button>
-        <button onclick="openModal('expense')" class="ft-action-btn">
+        <button onclick="openModal('expense')" class="perm-addExpense ft-action-btn">
           <div class="ft-action-circle text-rose-500"><i class="fa-solid fa-receipt"></i></div>
           <span class="ft-action-label">مصروف</span>
         </button>
-        <button onclick="openModal('charity')" class="personal-only ft-action-btn">
+        <button onclick="openModal('charity')" class="perm-addExpense personal-only ft-action-btn">
           <div class="ft-action-circle text-amber-500"><i class="fa-solid fa-hand-holding-heart"></i></div>
           <span class="ft-action-label">باب الخير</span>
         </button>
-        <button onclick="openBudgetModal()" class="personal-only ft-action-btn">
+        <button onclick="openBudgetModal()" class="owner-only personal-only ft-action-btn">
           <div class="ft-action-circle text-cyan-500"><i class="fa-solid fa-chart-pie"></i></div>
           <span class="ft-action-label">الميزانية</span>
         </button>
-        <button onclick="openModal('debt_receivable')" class="business-only ft-action-btn">
+        <button onclick="openModal('debt_receivable')" class="perm-debts business-only ft-action-btn">
           <div class="ft-action-circle text-cyan-500"><i class="fa-solid fa-user-plus"></i></div>
           <span class="ft-action-label">دين جديد</span>
         </button>
-        <button onclick="openShiftSettlementModal()" class="business-only ft-action-btn">
+        <button onclick="openShiftSettlementModal()" class="owner-only business-only ft-action-btn">
           <div class="ft-action-circle text-orange-500"><i class="fa-solid fa-calendar-check"></i></div>
           <span class="ft-action-label">تقفيل اليوم</span>
         </button>
@@ -402,7 +409,7 @@
       </div>
 
       <!-- مكن الشحن (موبايل) -->
-      <button type="button" onclick="openChargeMachines()" class="business-only mc-card">
+      <button type="button" onclick="openChargeMachines()" class="perm-machines business-only mc-card">
         <span class="mc-card-ic"><i class="fa-solid fa-bolt"></i></span>
         <span class="mc-card-tx"><b>مكن الشحن</b><small class="js-mc-sub">اضغط لإضافة أول مكنة</small></span>
         <span class="mc-card-bal"><b class="money-val js-mc-total">0</b><small>ج.م</small></span>
@@ -410,14 +417,14 @@
 
       <!-- 4. Debts 50/50 Cards (Business Mode Focus) -->
       <div class="business-only grid grid-cols-2 gap-2.5">
-        <div onclick="navigateSegmented('debts')" class="mob-debt-card-rec p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 cursor-pointer active:scale-95 transition">
+        <div onclick="navigateSegmented('debts')" class="perm-debts mob-debt-card-rec p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 cursor-pointer active:scale-95 transition">
           <div class="text-[10px] font-bold text-emerald-500 flex items-center justify-between">
             <span>ليّ عند الناس</span>
             <i class="fa-solid fa-arrow-left text-[9px]"></i>
           </div>
           <div id="mobCardDebtRec" class="mob-debt-card-val money-val text-base font-black text-white mt-1.5">0 ج.م</div>
         </div>
-        <div onclick="navigateSegmented('debts')" class="mob-debt-card-pay p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 cursor-pointer active:scale-95 transition">
+        <div onclick="navigateSegmented('debts')" class="perm-debts mob-debt-card-pay p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 cursor-pointer active:scale-95 transition">
           <div class="text-[10px] font-bold text-rose-500 flex items-center justify-between">
             <span>عليّ للناس</span>
             <i class="fa-solid fa-arrow-left text-[9px]"></i>
@@ -471,7 +478,7 @@
     </section>
 
     <!-- Stats (Desktop Only) -->
-    <section class="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-2.5 no-print">
+    <section class="totals-only hidden md:grid grid-cols-2 lg:grid-cols-4 gap-2.5 no-print">
       <div class="bg-white dark:bg-dark-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-dark-800">
         <div class="flex items-center justify-between mb-2">
           <span class="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400">الإيرادات</span>
@@ -530,7 +537,7 @@
     </section>
 
     <!-- Quick Insights (تحليلات ذكية) -->
-    <section id="insightsSection" class="hidden md:flex bg-gradient-to-r from-slate-900 to-dark-850 text-white rounded-2xl p-3.5 border border-orange-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 no-print shadow-md">
+    <section id="insightsSection" class="totals-only hidden md:flex bg-gradient-to-r from-slate-900 to-dark-850 text-white rounded-2xl p-3.5 border border-orange-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 no-print shadow-md">
       <div class="flex items-center gap-3 w-full sm:w-auto">
         <div class="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 text-base">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
@@ -546,7 +553,7 @@
     </section>
 
     <!-- Debts + Budget (Desktop Only) -->
-    <section class="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-3 no-print">
+    <section class="totals-only hidden md:grid grid-cols-1 lg:grid-cols-2 gap-3 no-print">
       <div class="bg-white dark:bg-dark-900 rounded-2xl p-4 border border-slate-200 dark:border-dark-800">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
@@ -577,7 +584,7 @@
             </div>
             <h3 class="text-sm font-black">الميزانية</h3>
           </div>
-          <button onclick="openBudgetModal()" data-feature="budget" class="w-7 h-7 rounded-lg bg-orange-500/10 text-orange-500 text-xs">
+          <button onclick="openBudgetModal()" data-feature="budget" class="owner-only w-7 h-7 rounded-lg bg-orange-500/10 text-orange-500 text-xs">
             <i class="fa-solid fa-pen"></i>
           </button>
         </div>
@@ -600,7 +607,7 @@
     </section>
 
     <!-- Charts -->
-    <section class="hidden lg:grid lg:grid-cols-3 gap-4 no-print">
+    <section class="totals-only hidden lg:grid lg:grid-cols-3 gap-4 no-print">
       <div class="bg-white dark:bg-dark-900 p-4 rounded-2xl border border-slate-200 dark:border-dark-800">
         <h3 class="text-sm font-black mb-3"><i class="fa-solid fa-chart-pie text-orange-500"></i> التوزيع</h3>
         <div class="relative h-56">
@@ -615,7 +622,7 @@
     </section>
 
     <!-- منحنى الأرباح (برو) -->
-    <section id="profitCurveCard" data-mob-view="home" data-mob-display="block" class="pc-card no-print">
+    <section id="profitCurveCard" data-mob-view="home" data-mob-display="block" class="totals-only pc-card no-print">
       <div class="pc-head">
         <div class="pc-title">
           <span class="pc-ic"><i class="fa-solid fa-chart-area"></i></span>
@@ -672,7 +679,7 @@
     <!-- Transactions -->
     <section id="panelTransactions" data-mob-view="transactions" data-mob-display="block" class="ft-glass-panel bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-800 overflow-hidden no-print">
       <div class="p-3 border-b border-slate-100 dark:border-dark-800 bg-slate-50/50 dark:bg-dark-850/50">
-        <div id="txSummary" class="tx-summary"></div>
+        <div id="txSummary" class="totals-only tx-summary"></div>
         <div class="flex flex-col gap-2.5">
           <div class="flex gap-1.5 overflow-x-auto mobile-table-wrap pb-1">
             <button class="filter-pill active" data-filter="all" onclick="filterTransactions('all')">الكل</button>
@@ -728,11 +735,11 @@
         <div class="db-head-top">
           <h3 class="db-title"><i class="fa-solid fa-handshake"></i> سجل الديون</h3>
           <div class="db-add">
-            <button type="button" onclick="openModal('debt_receivable')" class="db-add-btn rec"><i class="fa-solid fa-plus"></i> دين ليّ</button>
-            <button type="button" onclick="openModal('debt_payable')" class="db-add-btn pay"><i class="fa-solid fa-plus"></i> دين عليّ</button>
+            <button type="button" onclick="openModal('debt_receivable')" class="perm-debts db-add-btn rec"><i class="fa-solid fa-plus"></i> دين ليّ</button>
+            <button type="button" onclick="openModal('debt_payable')" class="perm-debts db-add-btn pay"><i class="fa-solid fa-plus"></i> دين عليّ</button>
           </div>
         </div>
-        <div id="debtsSummary" class="tx-summary"></div>
+        <div id="debtsSummary" class="totals-only tx-summary"></div>
         <div class="db-tools">
           <div id="debtFilterChips" class="db-chips"></div>
           <select id="debtSort" onchange="renderDebts()" class="cl-sort" aria-label="ترتيب الديون">
@@ -765,7 +772,7 @@
             <option value="name">الاسم</option>
           </select>
         </div>
-        <div id="clientsSummary" class="tx-summary"></div>
+        <div id="clientsSummary" class="totals-only tx-summary"></div>
         <div class="relative">
           <input type="text" id="clientSearchInput" oninput="renderClients()" placeholder="ابحث باسم العميل..."
             class="w-full text-sm font-medium pr-9 pl-3 py-2.5 rounded-xl border border-slate-200 dark:border-dark-750 bg-white dark:bg-dark-800 focus:outline-none focus:ring-2 focus:ring-orange-500">
@@ -845,21 +852,21 @@
       <i class="fa-solid fa-receipt"></i>
       <span>المعاملات</span>
     </button>
-    <button onclick="openQuickAdd()" class="mob-nav-fab" aria-label="إضافة" aria-haspopup="dialog">
+    <button onclick="openQuickAdd()" class="perm-add-any mob-nav-fab" aria-label="إضافة" aria-haspopup="dialog">
       <i class="fa-solid fa-plus"></i>
     </button>
-    <button onclick="navigateSegmented('debts')" class="mob-nav-btn" data-mob-tab="debts">
+    <button onclick="navigateSegmented('debts')" class="perm-debts mob-nav-btn" data-mob-tab="debts">
       <i class="fa-solid fa-handshake"></i>
       <span>الديون</span>
     </button>
-    <button onclick="navigateSegmented('manage')" class="mob-nav-btn" data-mob-tab="manage">
+    <button onclick="navigateSegmented('manage')" class="perm-inventory mob-nav-btn" data-mob-tab="manage">
       <i class="fa-solid fa-boxes-stacked"></i>
       <span id="mobManageLabel">المخزن</span>
     </button>
   </nav>
 
   <!-- ===== قائمة الإضافة (+) ===== -->
-  <button type="button" id="desktopFab" class="qa-fab no-print" onclick="openQuickAdd()" aria-label="إضافة عملية" aria-haspopup="dialog" aria-expanded="false">
+  <button type="button" id="desktopFab" class="perm-add-any qa-fab no-print" onclick="openQuickAdd()" aria-label="إضافة عملية" aria-haspopup="dialog" aria-expanded="false">
     <i class="fa-solid fa-plus"></i><span>إضافة</span>
   </button>
 
@@ -874,18 +881,18 @@
 
       <div class="qa-sec">العمليات المالية</div>
       <div class="qa-grid">
-        <button type="button" class="qa-tile" style="--c:#10b981" onclick="quickAdd('income')"><span class="qa-ic"><i class="fa-solid fa-circle-arrow-down"></i></span><span class="qa-tx"><b>إضافة دخل</b><small>إيراد أو مبيعات</small></span></button>
-        <button type="button" class="qa-tile" style="--c:#f43f5e" onclick="quickAdd('expense')"><span class="qa-ic"><i class="fa-solid fa-receipt"></i></span><span class="qa-tx"><b>إضافة مصروف</b><small>شراء أو التزام</small></span></button>
-        <button type="button" class="qa-tile" data-feature="charity" style="--c:#f59e0b" onclick="quickAdd('charity')"><span class="qa-ic"><i class="fa-solid fa-hand-holding-heart"></i></span><span class="qa-tx"><b>باب الخير</b><small>صدقة أو تبرع</small></span></button>
-        <button type="button" class="qa-tile personal-only" style="--c:#06b6d4" onclick="quickAdd('budget')"><span class="qa-ic"><i class="fa-solid fa-chart-pie"></i></span><span class="qa-tx"><b>الميزانية</b><small>حد الصرف الشهري</small></span></button>
+        <button type="button" class="perm-addIncome qa-tile" style="--c:#10b981" onclick="quickAdd('income')"><span class="qa-ic"><i class="fa-solid fa-circle-arrow-down"></i></span><span class="qa-tx"><b>إضافة دخل</b><small>إيراد أو مبيعات</small></span></button>
+        <button type="button" class="perm-addExpense qa-tile" style="--c:#f43f5e" onclick="quickAdd('expense')"><span class="qa-ic"><i class="fa-solid fa-receipt"></i></span><span class="qa-tx"><b>إضافة مصروف</b><small>شراء أو التزام</small></span></button>
+        <button type="button" class="perm-addExpense qa-tile" data-feature="charity" style="--c:#f59e0b" onclick="quickAdd('charity')"><span class="qa-ic"><i class="fa-solid fa-hand-holding-heart"></i></span><span class="qa-tx"><b>باب الخير</b><small>صدقة أو تبرع</small></span></button>
+        <button type="button" class="owner-only qa-tile personal-only" style="--c:#06b6d4" onclick="quickAdd('budget')"><span class="qa-ic"><i class="fa-solid fa-chart-pie"></i></span><span class="qa-tx"><b>الميزانية</b><small>حد الصرف الشهري</small></span></button>
       </div>
 
       <div class="qa-sec business-only">الديون والمحل</div>
       <div class="qa-grid business-only">
-        <button type="button" class="qa-tile business-only" style="--c:#06b6d4" onclick="quickAdd('debt_receivable')"><span class="qa-ic"><i class="fa-solid fa-handshake"></i></span><span class="qa-tx"><b>دين ليّ</b><small>مستحق عند عميل</small></span></button>
-        <button type="button" class="qa-tile business-only" style="--c:#a855f7" onclick="quickAdd('debt_payable')"><span class="qa-ic"><i class="fa-solid fa-hand-holding-dollar"></i></span><span class="qa-tx"><b>دين عليّ</b><small>مستحق لمورد</small></span></button>
-        <button type="button" class="qa-tile business-only" style="--c:#f97316" onclick="quickAdd('shift')"><span class="qa-ic"><i class="fa-solid fa-calendar-check"></i></span><span class="qa-tx"><b>تقفيل اليوم</b><small>جرد الدرج والوردية</small></span></button>
-        <button type="button" class="qa-tile business-only" style="--c:#eab308" onclick="quickAdd('machines')"><span class="qa-ic"><i class="fa-solid fa-bolt"></i></span><span class="qa-tx"><b>مكن الشحن</b><small>أرصدة وسجل التعديلات</small></span></button>
+        <button type="button" class="perm-debts qa-tile business-only" style="--c:#06b6d4" onclick="quickAdd('debt_receivable')"><span class="qa-ic"><i class="fa-solid fa-handshake"></i></span><span class="qa-tx"><b>دين ليّ</b><small>مستحق عند عميل</small></span></button>
+        <button type="button" class="perm-debts qa-tile business-only" style="--c:#a855f7" onclick="quickAdd('debt_payable')"><span class="qa-ic"><i class="fa-solid fa-hand-holding-dollar"></i></span><span class="qa-tx"><b>دين عليّ</b><small>مستحق لمورد</small></span></button>
+        <button type="button" class="owner-only qa-tile business-only" style="--c:#f97316" onclick="quickAdd('shift')"><span class="qa-ic"><i class="fa-solid fa-calendar-check"></i></span><span class="qa-tx"><b>تقفيل اليوم</b><small>جرد الدرج والوردية</small></span></button>
+        <button type="button" class="perm-machines qa-tile business-only" style="--c:#eab308" onclick="quickAdd('machines')"><span class="qa-ic"><i class="fa-solid fa-bolt"></i></span><span class="qa-tx"><b>مكن الشحن</b><small>أرصدة وسجل التعديلات</small></span></button>
       </div>
     </div>
   </div>
@@ -1092,7 +1099,7 @@
           </div>
           <h3 id="clientModalName" class="text-base font-black truncate">كشف حساب</h3>
         </div>
-        <div class="flex gap-1.5 shrink-0">
+        <div class="owner-only flex gap-1.5 shrink-0">
           <button onclick="exportClientLedgerPDF()" title="تحميل كشف حساب PDF" class="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 text-white text-xs font-black flex items-center gap-1.5 shadow">
             <i class="fa-solid fa-file-pdf"></i> <span class="hidden sm:inline">PDF كشف</span>
           </button>
@@ -1768,14 +1775,14 @@
         <div class="cc-group" data-cat="ops">
           <h5 class="cc-h">أدوات المحل</h5>
           <div class="cc-list">
-            <button type="button" class="cc-row" style="--c:#f59e0b" onclick="closeControlCenter(); openShiftSettlementModal();"><span class="cc-ic"><i class="fa-solid fa-calendar-check"></i></span><span class="cc-tx"><b>تقفيل اليومية</b><small>ملخص الوردية والواتساب</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
-            <button type="button" class="cc-row" style="--c:#10b981" onclick="closeControlCenter(); openWalletTransferModal();"><span class="cc-ic"><i class="fa-solid fa-money-bill-transfer"></i></span><span class="cc-tx"><b>تحويل بين الخزائن</b><small>نقل سيولة وعمولات</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
-            <button type="button" class="cc-row business-only" style="--c:#eab308" onclick="closeControlCenter(); openChargeMachines();"><span class="cc-ic"><i class="fa-solid fa-bolt"></i></span><span class="cc-tx"><b>مكن الشحن</b><small>أرصدة المكن وسجل التعديلات</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
-            <button type="button" class="cc-row business-only" style="--c:#06b6d4" onclick="closeControlCenter(); openTicketsModal();"><span class="cc-ic"><i class="fa-solid fa-screwdriver-wrench"></i></span><span class="cc-tx"><b>أجهزة الصيانة</b><small>إيصالات الاستلام والعملاء</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
-            <button type="button" class="cc-row business-only" style="--c:#14b8a6" onclick="closeControlCenter(); openDrawerModal();"><span class="cc-ic"><i class="fa-solid fa-cash-register"></i></span><span class="cc-tx"><b>مطابقة الدرج</b><small>كشف العجز والزيادة</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
-            <button type="button" class="cc-row business-only" style="--c:#f59e0b" onclick="closeControlCenter(); openProfitModal();"><span class="cc-ic"><i class="fa-solid fa-calculator"></i></span><span class="cc-tx"><b>حاسبة الأرباح</b><small>احتساب الهامش والربح</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
-            <button type="button" class="cc-row" style="--c:#a855f7" onclick="closeControlCenter(); openRecurringModal();"><span class="cc-ic"><i class="fa-solid fa-repeat"></i></span><span class="cc-tx"><b>المصاريف الثابتة</b><small>إيجار، فواتير، اشتراكات</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
-            <button type="button" class="cc-row business-only" style="--c:#f97316" onclick="closeControlCenter(); switchTab('inventory');"><span class="cc-ic"><i class="fa-solid fa-boxes-stacked"></i></span><span class="cc-tx"><b>مخزن قطع الغيار</b><small>الأصناف والأسعار والكمية</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="owner-only cc-row" style="--c:#f59e0b" onclick="closeControlCenter(); openShiftSettlementModal();"><span class="cc-ic"><i class="fa-solid fa-calendar-check"></i></span><span class="cc-tx"><b>تقفيل اليومية</b><small>ملخص الوردية والواتساب</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="owner-only cc-row" style="--c:#10b981" onclick="closeControlCenter(); openWalletTransferModal();"><span class="cc-ic"><i class="fa-solid fa-money-bill-transfer"></i></span><span class="cc-tx"><b>تحويل بين الخزائن</b><small>نقل سيولة وعمولات</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="perm-machines cc-row business-only" style="--c:#eab308" onclick="closeControlCenter(); openChargeMachines();"><span class="cc-ic"><i class="fa-solid fa-bolt"></i></span><span class="cc-tx"><b>مكن الشحن</b><small>أرصدة المكن وسجل التعديلات</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="owner-only cc-row business-only" style="--c:#06b6d4" onclick="closeControlCenter(); openTicketsModal();"><span class="cc-ic"><i class="fa-solid fa-screwdriver-wrench"></i></span><span class="cc-tx"><b>أجهزة الصيانة</b><small>إيصالات الاستلام والعملاء</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="owner-only cc-row business-only" style="--c:#14b8a6" onclick="closeControlCenter(); openDrawerModal();"><span class="cc-ic"><i class="fa-solid fa-cash-register"></i></span><span class="cc-tx"><b>مطابقة الدرج</b><small>كشف العجز والزيادة</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="owner-only cc-row business-only" style="--c:#f59e0b" onclick="closeControlCenter(); openProfitModal();"><span class="cc-ic"><i class="fa-solid fa-calculator"></i></span><span class="cc-tx"><b>حاسبة الأرباح</b><small>احتساب الهامش والربح</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="owner-only cc-row" style="--c:#a855f7" onclick="closeControlCenter(); openRecurringModal();"><span class="cc-ic"><i class="fa-solid fa-repeat"></i></span><span class="cc-tx"><b>المصاريف الثابتة</b><small>إيجار، فواتير، اشتراكات</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="perm-inventory cc-row business-only" style="--c:#f97316" onclick="closeControlCenter(); switchTab('inventory');"><span class="cc-ic"><i class="fa-solid fa-boxes-stacked"></i></span><span class="cc-tx"><b>مخزن قطع الغيار</b><small>الأصناف والأسعار والكمية</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
           </div>
         </div>
 
@@ -1784,17 +1791,18 @@
           <div class="cc-list">
             <button type="button" class="cc-row" data-feature="reports" style="--c:#06b6d4" onclick="closeControlCenter(); openReportModal();"><span class="cc-ic"><i class="fa-solid fa-file-pdf"></i></span><span class="cc-tx"><b>تقرير مالي PDF</b><small>معاينة وطباعة وتحميل</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
             <button type="button" class="cc-row" data-feature="export" style="--c:#10b981" onclick="closeControlCenter(); exportToExcel();"><span class="cc-ic"><i class="fa-solid fa-file-excel"></i></span><span class="cc-tx"><b>تصدير Excel</b><small>المعاملات والديون</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
-            <button type="button" class="cc-row" style="--c:#3b82f6" onclick="closeControlCenter(); openKPIModal();"><span class="cc-ic"><i class="fa-solid fa-chart-line"></i></span><span class="cc-tx"><b>مؤشرات الأداء</b><small>أكثر عميل وخدمة ربحية</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
-            <button type="button" id="ccProfitRow" class="cc-row" style="--c:#f97316" onclick="ccOpenProfitCurve()"><span class="cc-ic"><i class="fa-solid fa-chart-area"></i></span><span class="cc-tx"><b>منحنى الأرباح</b><small>متابعة الربح بمرور الوقت</small></span><span class="cc-pro" id="ccProBadge" hidden><i class="fa-solid fa-crown"></i> PRO</span><i class="fa-solid fa-chevron-left cc-go"></i></button>
-            <button type="button" class="cc-row" style="--c:#a855f7" onclick="closeControlCenter(); switchTab('audit');"><span class="cc-ic"><i class="fa-solid fa-clock-rotate-left"></i></span><span class="cc-tx"><b>سجل النشاطات</b><small>تتبع التعديلات والعمليات</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
-            <button type="button" class="cc-row" data-feature="backup" style="--c:#8b5cf6" onclick="closeControlCenter(); openBackupModal();"><span class="cc-ic"><i class="fa-solid fa-database"></i></span><span class="cc-tx"><b>النسخ الاحتياطي</b><small>حفظ واستعادة البيانات</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="perm-totals cc-row" style="--c:#3b82f6" onclick="closeControlCenter(); openKPIModal();"><span class="cc-ic"><i class="fa-solid fa-chart-line"></i></span><span class="cc-tx"><b>مؤشرات الأداء</b><small>أكثر عميل وخدمة ربحية</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" id="ccProfitRow" class="perm-totals cc-row" style="--c:#f97316" onclick="ccOpenProfitCurve()"><span class="cc-ic"><i class="fa-solid fa-chart-area"></i></span><span class="cc-tx"><b>منحنى الأرباح</b><small>متابعة الربح بمرور الوقت</small></span><span class="cc-pro" id="ccProBadge" hidden><i class="fa-solid fa-crown"></i> PRO</span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="owner-only cc-row" style="--c:#a855f7" onclick="closeControlCenter(); switchTab('audit');"><span class="cc-ic"><i class="fa-solid fa-clock-rotate-left"></i></span><span class="cc-tx"><b>سجل النشاطات</b><small>تتبع التعديلات والعمليات</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="owner-only cc-row" data-feature="backup" style="--c:#8b5cf6" onclick="closeControlCenter(); openBackupModal();"><span class="cc-ic"><i class="fa-solid fa-database"></i></span><span class="cc-tx"><b>النسخ الاحتياطي</b><small>حفظ واستعادة البيانات</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
           </div>
         </div>
 
         <div class="cc-group" data-cat="account" hidden>
           <h5 class="cc-h">الحساب والأمان</h5>
           <div class="cc-list">
-            <button type="button" class="cc-row" data-feature="budget" style="--c:#f97316" onclick="closeControlCenter(); openBudgetModal();"><span class="cc-ic"><i class="fa-solid fa-wallet"></i></span><span class="cc-tx"><b>الميزانية الشهرية</b><small>سقف المصاريف وميزانية الفئات</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="owner-only cc-row" data-feature="budget" style="--c:#f97316" onclick="closeControlCenter(); openBudgetModal();"><span class="cc-ic"><i class="fa-solid fa-wallet"></i></span><span class="cc-tx"><b>الميزانية الشهرية</b><small>سقف المصاريف وميزانية الفئات</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" id="ccTeamRow" class="cc-row owner-only" style="--c:#8b5cf6" onclick="closeControlCenter(); openTeamModal();"><span class="cc-ic"><i class="fa-solid fa-people-group"></i></span><span class="cc-tx"><b>فريق العمل</b><small>أضف أعضاء وتحكم في صلاحياتهم</small></span><span class="cc-pro" id="ccTeamBadge" hidden><i class="fa-solid fa-crown"></i> PRO</span><i class="fa-solid fa-chevron-left cc-go"></i></button>
             <button type="button" class="cc-row" style="--c:#a855f7" onclick="closeControlCenter(); openPinModal();"><span class="cc-ic"><i class="fa-solid fa-lock"></i></span><span class="cc-tx"><b>قفل التطبيق (PIN)</b><small>حماية برمز سري</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
             <button type="button" class="cc-row" style="--c:#10b981" onclick="closeControlCenter(); manualCloudSyncNow();"><span class="cc-ic"><i class="fa-solid fa-cloud-arrow-up"></i></span><span class="cc-tx"><b>مزامنة الآن</b><small>رفع بياناتك للسحابة فوراً</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
             <button type="button" class="cc-row" style="--c:#f97316" onclick="closeControlCenter(); showMobileInstallModal();"><span class="cc-ic"><i class="fa-solid fa-mobile-screen-button"></i></span><span class="cc-tx"><b>تثبيت التطبيق</b><small>على الشاشة الرئيسية</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
@@ -1802,8 +1810,8 @@
           </div>
           <h5 class="cc-h cc-h-danger">منطقة حساسة</h5>
           <div class="cc-list">
-            <button type="button" class="cc-row" style="--c:#94a3b8" onclick="closeControlCenter(); loadDemoData();"><span class="cc-ic"><i class="fa-solid fa-flask"></i></span><span class="cc-tx"><b>بيانات تجريبية</b><small>للتجربة فقط</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
-            <button type="button" class="cc-row cc-danger" style="--c:#f43f5e" onclick="closeControlCenter(); confirmClearData();"><span class="cc-ic"><i class="fa-solid fa-trash-can"></i></span><span class="cc-tx"><b>تصفير كل البيانات</b><small>مسح نهائي لا يمكن التراجع عنه</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="owner-only cc-row" style="--c:#94a3b8" onclick="closeControlCenter(); loadDemoData();"><span class="cc-ic"><i class="fa-solid fa-flask"></i></span><span class="cc-tx"><b>بيانات تجريبية</b><small>للتجربة فقط</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
+            <button type="button" class="owner-only cc-row cc-danger" style="--c:#f43f5e" onclick="closeControlCenter(); confirmClearData();"><span class="cc-ic"><i class="fa-solid fa-trash-can"></i></span><span class="cc-tx"><b>تصفير كل البيانات</b><small>مسح نهائي لا يمكن التراجع عنه</small></span><i class="fa-solid fa-chevron-left cc-go"></i></button>
           </div>
         </div>
         <div id="ccEmpty" class="cc-empty" hidden><i class="fa-solid fa-magnifying-glass"></i><b>مفيش نتائج</b><span>جرّب كلمة تانية</span></div>
@@ -1850,13 +1858,17 @@
             <span class="pf-tile-ic"><i id="themeIcon" class="fa-solid fa-sun"></i></span>
             <span class="pf-tile-tx"><b>المظهر</b><small id="profileThemeSubtitle">الوضع الليلي</small></span>
           </button>
-          <button type="button" class="pf-tile" style="--c:#06b6d4" onclick="toggleAppMode(); updateProfileModalLabels();">
+          <button type="button" class="owner-only pf-tile" style="--c:#06b6d4" onclick="toggleAppMode(); updateProfileModalLabels();">
             <span class="pf-tile-ic"><i class="fa-solid fa-repeat"></i></span>
             <span class="pf-tile-tx"><b>نوع الحساب</b><small id="profileModeSubtitle">المحل / شخصي</small></span>
           </button>
           <button type="button" class="pf-tile" style="--c:#10b981" onclick="closeUserProfileModal(); openControlCenter();">
             <span class="pf-tile-ic"><i class="fa-solid fa-sliders"></i></span>
             <span class="pf-tile-tx"><b>الإعدادات</b><small>الأدوات والنسخ والأمان</small></span>
+          </button>
+          <button type="button" id="profileWsTile" class="pf-tile" style="--c:#8b5cf6" hidden onclick="closeUserProfileModal(); openWorkspaceSwitcher();">
+            <span class="pf-tile-ic"><i class="fa-solid fa-people-group"></i></span>
+            <span class="pf-tile-tx"><b>مساحة العمل</b><small>حسابي / الفريق</small></span>
           </button>
           <button type="button" class="pf-tile" style="--c:#f97316" onclick="closeUserProfileModal(); scheduleAppTour(250, true);">
             <span class="pf-tile-ic"><i class="fa-solid fa-route"></i></span>
@@ -1978,6 +1990,79 @@
     </div>
   </div>
 
+<!-- ===== فريق العمل (برو) ===== -->
+  <div id="teamModal" class="pf-root hidden" onclick="closeTeamModal()" role="dialog" aria-modal="true" aria-labelledby="tmTitle">
+    <div class="pf-card tm-card" onclick="event.stopPropagation()">
+      <header class="mc-head">
+        <span class="mc-ib tm-ico" aria-hidden="true"><i class="fa-solid fa-people-group"></i></span>
+        <div class="mc-title"><span id="tmTitle">فريق العمل</span><em class="tm-pro"><i class="fa-solid fa-crown"></i> PRO</em></div>
+        <button type="button" class="mc-ib" onclick="closeTeamModal()" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button>
+      </header>
+      <div class="mc-body">
+        <div id="tmLocked" class="tm-locked" hidden>
+          <div class="pc-lock-ic"><i class="fa-solid fa-lock"></i></div>
+          <b>فريق العمل لمشتركي برو</b>
+          <p>أضف موظفينك على حسابك وحدد لكل واحد منهم الصلاحيات اللي تظهر له: إضافة، تعديل، حذف، الديون، المخزن، والأرباح.</p>
+          <button type="button" class="pc-cta" onclick="closeTeamModal(); openProUpsell();"><i class="fa-solid fa-crown"></i> اعرف أكتر عن برو</button>
+        </div>
+        <div id="tmMain">
+          <div class="tm-seats">
+            <div class="tm-seats-t"><b id="tmSeatCount">0 / 5</b><small>مقاعد الفريق</small></div>
+            <div class="tm-bar"><i id="tmSeatBar"></i></div>
+            <button type="button" class="mc-btn" onclick="openMemberEditor('add')"><i class="fa-solid fa-user-plus"></i> إضافة عضو</button>
+          </div>
+          <div id="tmList" class="tm-list"></div>
+          <div id="tmEmpty" class="mc-empty"><i class="fa-solid fa-people-group"></i><b>لسه مفيش أعضاء</b><span>أضف عضو بإيميله وحدد صلاحياته. هيدخل بحسابه هو، ويشتغل على بياناتك حسب اللي تسمح بيه.</span></div>
+          <p class="tm-note"><i class="fa-solid fa-shield-halved"></i> الصلاحيات بتتطبق في التطبيق وفي قواعد قاعدة البيانات. تقدر توقف أي عضو أو تشيله في أي وقت.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="memberEditModal" class="pf-root hidden" onclick="closeMemberEditor()" role="dialog" aria-modal="true" aria-labelledby="tmEdTitle" style="z-index:136">
+    <div class="pf-card tm-card" onclick="event.stopPropagation()">
+      <header class="mc-head">
+        <button type="button" class="mc-ib" onclick="closeMemberEditor()" aria-label="رجوع"><i class="fa-solid fa-arrow-right"></i></button>
+        <div class="mc-title"><i class="fa-solid fa-user-gear"></i><span id="tmEdTitle">إضافة عضو للفريق</span></div>
+        <span class="mc-ib" style="visibility:hidden"></span>
+      </header>
+      <div class="mc-body">
+        <label class="field-label">الاسم (اختياري)</label>
+        <input id="tmName" type="text" maxlength="60" class="form-input" placeholder="مثال: أحمد - كاشير">
+        <label class="field-label tm-lbl">البريد الإلكتروني</label>
+        <input id="tmEmail" type="email" dir="ltr" class="form-input" placeholder="name@gmail.com" autocomplete="off">
+        <p id="tmEdHint" class="tm-hint"></p>
+        <div class="tm-g">الدور الجاهز</div>
+        <div id="tmPresets" class="tm-presets"></div>
+        <div id="tmPerms" class="tm-perms"></div>
+        <button type="button" class="mc-btn mc-btn-w" onclick="saveMember()"><i class="fa-solid fa-check"></i> حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="teamInviteModal" class="pf-root hidden" role="dialog" aria-modal="true" aria-labelledby="tiTitle" style="z-index:137">
+    <div class="pf-card pf-dialog" onclick="event.stopPropagation()">
+      <div class="pf-grab" aria-hidden="true"></div>
+      <div class="gim-ic" style="color:#8b5cf6;background:rgba(139,92,246,.15)"><i class="fa-solid fa-people-group"></i></div>
+      <h3 id="tiTitle" class="gim-t">دعوة للانضمام لفريق</h3>
+      <p class="gim-p"><b id="tiOwner"></b> دعاك تشتغل معاه بدور <b id="tiPreset"></b>. هتقدر تعمل:</p>
+      <ul id="tiPerms" class="pu-list"></ul>
+      <button type="button" class="gim-btn gim-btn-p" onclick="acceptTeamInvite()"><i class="fa-solid fa-check"></i> انضم للفريق</button>
+      <button type="button" class="gim-btn" onclick="declineTeamInvite()">مش دلوقتي</button>
+    </div>
+  </div>
+
+  <div id="wsModal" class="pf-root hidden" onclick="closeWorkspaceSwitcher()" role="dialog" aria-modal="true" aria-labelledby="wsTitle">
+    <div class="pf-card pf-dialog" onclick="event.stopPropagation()">
+      <div class="pf-grab" aria-hidden="true"></div>
+      <h3 id="wsTitle" class="gim-t">مساحة العمل</h3>
+      <p class="gim-p" style="margin-bottom:10px">اختار البيانات اللي هتشتغل عليها:</p>
+      <div id="wsList" class="ws-list"></div>
+      <button type="button" id="wsLeave" class="gim-btn ws-leave" hidden onclick="closeWorkspaceSwitcher(); leaveCurrentTeam();"><i class="fa-solid fa-right-from-bracket"></i> مغادرة الفريق الحالي</button>
+      <button type="button" class="gim-btn" onclick="closeWorkspaceSwitcher()">إغلاق</button>
+    </div>
+  </div>
+
 <!-- MODE ONBOARDING MODAL -->
   <div id="modeOnboardingModal" class="fixed inset-0 z-[450] hidden items-center justify-center p-4 bg-black/90 backdrop-blur-md">
     <div class="adaptive-modal-card relative w-full max-w-md rounded-3xl bg-[#11131a] border border-orange-500/40 p-6 text-center text-white shadow-2xl modal-enter">
@@ -2013,6 +2098,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20.6"></script>
+  <script src="app.js?v=20.7"></script>
 </body>
 </html>

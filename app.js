@@ -60,9 +60,14 @@ const AUDIT_KEY = 'ehsebli_audit_v1';
    ========================================================= */
 let categoryBudgets = {};
 let chargeMachines = [];
+let workspaceUid = null;
+let teamPerms = null;
 const CHARGE_KEY = 'ehsebli_charge_machines_v1';
 const CATBUDGET_KEY = 'ehsebli_catbudget_v1';
-function dataScope() { return (currentUser && currentUser.uid) ? String(currentUser.uid) : null; }
+function dataScope() {
+  if (!(currentUser && currentUser.uid)) return null;
+  return (workspaceUid && workspaceUid !== currentUser.uid) ? (String(currentUser.uid) + '@' + String(workspaceUid)) : String(currentUser.uid);
+}
 function scopedKey(key, scope) { return key + '::' + (scope || dataScope()); }
 function lsGet(key) {
   const sc = dataScope();
@@ -150,15 +155,16 @@ const FEATURE_LIST = [
   { key: 'export',  label: 'تصدير CSV',      icon: 'fa-file-excel' },
   { key: 'backup',  label: 'نسخ احتياطي',    icon: 'fa-database' },
   { key: 'reports', label: 'تقارير PDF',     icon: 'fa-file-pdf' },
-  { key: 'profitCurve', label: 'منحنى الأرباح (برو)', icon: 'fa-chart-area' }
+  { key: 'profitCurve', label: 'منحنى الأرباح (برو)', icon: 'fa-chart-area' },
+  { key: 'team', label: 'فريق العمل (برو)', icon: 'fa-people-group' }
 ];
 
 const DEFAULT_PERMISSIONS = {
-  free:     { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: false },
-  personal: { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: false },
-  work:     { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: false },
-  pro:      { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: true },
-  admin:    { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: true }
+  free:     { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: false, team: false },
+  personal: { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: false, team: false },
+  work:     { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: false, team: false },
+  pro:      { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: true, team: true },
+  admin:    { maxTransactions: -1, charity: true, debts: true, budget: true, export: true, backup: true, reports: true, profitCurve: true, team: true }
 };
 
 let rolePermissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
@@ -1590,6 +1596,7 @@ function handleUserSwitch(uid) {
   auditLogs = [];
   categoryBudgets = {};
   chargeMachines = [];
+  workspaceUid = null; teamPerms = null;
   lastDeletedId = null;
   localStorage.setItem(LAST_UID_KEY, uid);
 }
@@ -1615,6 +1622,8 @@ function applySignedOutState() {
   auditLogs = [];
   categoryBudgets = {};
   chargeMachines = [];
+  workspaceUid = null; teamPerms = null;
+  if (typeof applyTeamUI === 'function') applyTeamUI();
   if (typeof clearNotices === 'function') clearNotices();
   if (typeof hideSuspendedScreen === 'function') hideSuspendedScreen();
   if (typeof closeChargeMachines === 'function') closeChargeMachines();
@@ -1848,6 +1857,9 @@ auth.onAuthStateChanged(async user => {
     await loadUserRole(user.uid);
     if (window._accountSuspended) return;
     await loadRolePermissions();
+    await resolveWorkspace(user);
+    if (isTeamMode()) syncModeForCurrentUser();
+    applyTeamUI();
 
     loadAllLocal();
     refreshAll();
@@ -1860,12 +1872,13 @@ auth.onAuthStateChanged(async user => {
 
     checkPendingShare();
 
-    loadCloudData(user.uid).finally(() => {
+    loadCloudData(wsUid()).finally(() => {
       if (getPin() && !pinStillUnlocked()) showPinLock();
       else { hidePinLock(); if (getPin()) markPinActive(); }
       
       // تشغيل التوتوريال بعد ما كل حاجة تحمل
       maybeOfferGuestImport();
+      maybeShowTeamInvites();
       scheduleAppTour(1500);
       scheduleBackupCheck();
       scheduleLibPrefetch();
@@ -1979,7 +1992,7 @@ async function doSyncToCloud() {
     setSyncStatusUI('guest');
     return;
   }
-  const uid = currentUser.uid;
+  const uid = wsUid();
   setSyncStatusUI('syncing');
   try {
     const ops = [];
@@ -1994,6 +2007,18 @@ async function doSyncToCloud() {
       if (!localIds.has(id)) ops.push({ kind: 'del', id });
     });
 
+    if (isTeamMode()) {   // العضو يرفع بس اللي صلاحياته تسمح بيه (القواعد بترفض غير كده وتبوّظ الدفعة كلها)
+      const keep = ops.filter(op => {
+        if (op.kind === 'del') return teamPerms && teamPerms.deleteTx === true;
+        let t = {}; try { t = JSON.parse(op.json); } catch (e) {}
+        const exists = cloudSnapshot.has(op.id);
+        const debt = t.type === 'debt_receivable' || t.type === 'debt_payable';
+        if (!exists) return t.type === 'income' ? teamPerms.addIncome === true : (t.type === 'expense' || t.type === 'charity') ? teamPerms.addExpense === true : debt ? teamPerms.debts === true : false;
+        if (t._deleted === true && teamPerms.deleteTx !== true) return false;
+        return teamPerms.editTx === true || (debt && teamPerms.debts === true);
+      });
+      ops.length = 0; ops.push(...keep);
+    }
     for (let i = 0; i < ops.length; i += 400) {
       const batch = db.batch();
       ops.slice(i, i + 400).forEach(op => {
@@ -2008,16 +2033,22 @@ async function doSyncToCloud() {
       });
     }
 
-    await db.collection('users').doc(uid).set({
+    const userPayload = {
       budget: getBudget() || 0,
       inventory: Array.isArray(inventoryItems) ? inventoryItems : [],
       recurring: Array.isArray(recurringExpenses) ? recurringExpenses : [],
       catBudgets: sanitizeCatBudgets(categoryBudgets),
       chargeMachines: sanitizeMachines(chargeMachines),
       txCount: transactions.filter(t => !t._deleted).length,
-      appVersion: '20.4',
+      appVersion: '20.7',
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    };
+    if (isTeamMode()) {   // العضو مايكتبش الميزانية/الثابتة، والمكن/المخزن بصلاحية بس
+      delete userPayload.budget; delete userPayload.recurring; delete userPayload.catBudgets;
+      if (!teamPerms || teamPerms.machines !== true) delete userPayload.chargeMachines;
+      if (!teamPerms || teamPerms.inventory !== true) delete userPayload.inventory;
+    }
+    await db.collection('users').doc(uid).set(userPayload, { merge: true });
 
     refreshSharedPortals();
     setSyncStatusUI('synced', currentUser.email || '');
@@ -2087,7 +2118,7 @@ async function loadCloudData(uid) {
 
     await doSyncToCloud();
 
-    if (legacyTx.length || legacyReqs.length) {
+    if (!isTeamMode() && (legacyTx.length || legacyReqs.length)) {
       const b = db.batch();
       legacyReqs.forEach(r => { if (r && r.id) b.set(userRef.collection('requests').doc(r.id), r); });
       b.update(userRef, {
@@ -2097,8 +2128,7 @@ async function loadCloudData(uid) {
       await b.commit();
     }
 
-    await loadPortalIndex(uid);
-    subscribeToRequests(uid);
+    if (!isTeamMode()) { await loadPortalIndex(uid); subscribeToRequests(uid); }
     subscribeToCloudTransactions(uid);
 
     if (cloudUserMetaUnsubscribe) { try { cloudUserMetaUnsubscribe(); } catch(e) {} }
@@ -2160,7 +2190,7 @@ async function manualCloudSyncNow() {
     return;
   }
   showToast('جاري مزامنة البيانات مع السحابة الآن...', 'info');
-  await loadCloudData(currentUser.uid);
+  await loadCloudData(wsUid());
   showToast('تمت المزامنة الكاملة بين الأجهزة بنجاح ✓', 'success');
 }
 
@@ -7314,6 +7344,7 @@ function ccFilter() {
     _ccCat = 'ops';
     const badge = document.getElementById('ccProBadge');
     if (badge) badge.hidden = hasFeature('profitCurve');
+    const tb = document.getElementById('ccTeamBadge'); if (tb) tb.hidden = hasFeature('team');
     ccFilter();
     const main = document.querySelector('#controlCenterModal .cc-main'); if (main) main.scrollTop = 0;
     return r;
@@ -7590,3 +7621,405 @@ function _schedulePC() { clearTimeout(pcTimer); pcTimer = setTimeout(() => { try
   const at = window.applyTheme;
   if (typeof at === 'function') window.applyTheme = function () { const r = at.apply(this, arguments); if (pcChart) { pcChart.destroy(); pcChart = null; } _schedulePC(); return r; };
 })();
+
+/* =========================================================
+   V20.7 — فريق العمل (برو): دعوة أعضاء بصلاحيات تحكم فيها
+   - بيانات الفريق = بيانات صاحب الحساب (مساحة عمل مشتركة)
+   - الدعوة بالإيميل، والعضو بيدخل بحسابه هو
+   - الصلاحيات متطبقة في الواجهة + في قواعد Firestore
+   ========================================================= */
+const TEAM_MAX_MEMBERS = 5;   // أقصى عدد أعضاء (نشطين + دعوات معلقة)
+const TEAM_PERMS = [
+  { k: 'addIncome',  label: 'إضافة إيرادات',            ic: 'fa-circle-arrow-down', g: 'العمليات' },
+  { k: 'addExpense', label: 'إضافة مصروفات وخير',       ic: 'fa-circle-arrow-up',   g: 'العمليات' },
+  { k: 'editTx',     label: 'تعديل العمليات',           ic: 'fa-pen',               g: 'العمليات' },
+  { k: 'deleteTx',   label: 'حذف العمليات',             ic: 'fa-trash-can',         g: 'العمليات' },
+  { k: 'debts',      label: 'الديون (عرض وإدارة)',      ic: 'fa-handshake',         g: 'الإدارة' },
+  { k: 'clients',    label: 'دفتر العملاء',             ic: 'fa-users',             g: 'الإدارة' },
+  { k: 'machines',   label: 'مكن الشحن',                ic: 'fa-bolt',              g: 'الإدارة' },
+  { k: 'inventory',  label: 'المخزن',                   ic: 'fa-boxes-stacked',     g: 'الإدارة' },
+  { k: 'totals',     label: 'رؤية الأرصدة والأرباح',    ic: 'fa-chart-line',        g: 'التقارير' },
+  { k: 'reports',    label: 'التقارير والتصدير',        ic: 'fa-file-pdf',          g: 'التقارير' }
+];
+const TEAM_PERM_KEYS = TEAM_PERMS.map(p => p.k);
+const _allPerms = v => Object.fromEntries(TEAM_PERM_KEYS.map(k => [k, v]));
+const TEAM_PRESETS = {
+  manager:    { name: 'مدير فريق', ic: 'fa-user-tie',   perms: _allPerms(true) },
+  accountant: { name: 'محاسب',     ic: 'fa-calculator', perms: { ..._allPerms(false), addIncome: true, addExpense: true, editTx: true, debts: true, clients: true, machines: true, inventory: true, totals: true, reports: true } },
+  cashier:    { name: 'كاشير',     ic: 'fa-cash-register', perms: { ..._allPerms(false), addIncome: true, addExpense: true, debts: true, machines: true } },
+  viewer:     { name: 'مشاهد',     ic: 'fa-eye',        perms: { ..._allPerms(false), totals: true, reports: true, clients: true } },
+  custom:     { name: 'مخصص',      ic: 'fa-sliders',    perms: null }
+};
+// ربط ميزات التطبيق القديمة بصلاحيات الفريق (اللي مش مربوط = ممنوع على العضو)
+const TEAM_FEATURE_MAP = { charity: 'addExpense', debts: 'debts', export: 'reports', reports: 'reports', profitCurve: 'totals' };
+
+let teamMemberships = [];     // الفرق اللي أنا عضو فيها
+let teamPendingInvites = [];  // دعوات معلقة ليّ
+let teamOwnerName = '';
+
+function isTeamMode() { return !!(workspaceUid && currentUser && workspaceUid !== currentUser.uid); }
+function wsUid() { return isTeamMode() ? workspaceUid : (currentUser && currentUser.uid); }
+function teamHas(f) {
+  if (!teamPerms) return false;
+  if (TEAM_PERM_KEYS.includes(f)) return teamPerms[f] === true;
+  const k = TEAM_FEATURE_MAP[f];
+  return !!(k && teamPerms[k] === true);
+}
+function teamDeny(perm) {
+  if (!isTeamMode() || (teamPerms && teamPerms[perm] === true)) return false;
+  showToast('ليس لديك صلاحية لهذه العملية', 'error');
+  return true;
+}
+const _origHasFeature = hasFeature;
+hasFeature = function (f) { return isTeamMode() ? teamHas(f) : _origHasFeature(f); };
+const _origGetMax = getMaxTransactions;
+getMaxTransactions = function () { return isTeamMode() ? -1 : _origGetMax(); };
+
+function applyTeamUI() {
+  const b = document.body, team = isTeamMode();
+  b.classList.toggle('team-member', team);
+  TEAM_PERM_KEYS.forEach(k => b.classList.toggle('team-no-' + k, team && !(teamPerms && teamPerms[k] === true)));
+  const canAdd = !team || ['addIncome', 'addExpense', 'debts', 'machines'].some(k => teamPerms && teamPerms[k] === true);
+  b.classList.toggle('team-no-add', !canAdd);
+  const chip = document.getElementById('teamChip');
+  if (chip) { chip.hidden = !team; chip.innerHTML = team ? `<i class="fa-solid fa-people-group"></i> فريق ${escapeHTML(teamOwnerName || '')}` : ''; }
+  if (team) {
+    const badge = document.getElementById('roleBadge');
+    if (badge) { badge.className = 'hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-violet-500/40 text-violet-400'; badge.innerHTML = '<i class="fa-solid fa-people-group"></i> عضو فريق'; }
+  }
+  const homeCard = document.getElementById('teamHomeCard');
+  if (homeCard) { const t = document.getElementById('teamHomeName'); if (t) t.textContent = teamOwnerName || 'الفريق'; }
+  const tile = document.getElementById('profileWsTile');
+  if (tile) tile.hidden = !(teamMemberships.length || team);
+  if (typeof applyRoleUI === 'function') applyRoleUI();
+  if (team) {
+    const badge2 = document.getElementById('roleBadge');
+    if (badge2) { badge2.className = 'hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-violet-500/40 text-violet-400'; badge2.innerHTML = '<i class="fa-solid fa-people-group"></i> عضو فريق'; }
+  }
+}
+
+/* ---------- تحديد مساحة العمل بعد تسجيل الدخول ---------- */
+function _wsPrefKey(uid) { return 'a7sbley_ws_v1_' + uid; }
+async function resolveWorkspace(user) {
+  workspaceUid = null; teamPerms = null; teamOwnerName = ''; teamMemberships = []; teamPendingInvites = [];
+  if (!isRealCloudUser()) return;
+  const me = user.uid;
+  try {
+    const ptrs = await db.collection('users').doc(me).collection('memberships').get();
+    for (const p of ptrs.docs) {
+      const ownerUid = p.id;
+      try {
+        const m = await db.collection('users').doc(ownerUid).collection('members').doc(me).get();
+        if (m.exists && m.data().active !== false) {
+          teamMemberships.push({ ownerUid, ownerName: (p.data().ownerName || p.data().ownerEmail || 'فريق'), perms: m.data().perms || {}, preset: m.data().preset || 'custom' });
+        } else if (!m.exists) { p.ref.delete().catch(() => {}); }
+      } catch (e) { /* مفيش صلاحية قراءة = العضوية اتلغت */ }
+    }
+  } catch (e) { console.warn('memberships:', e.code || e.message); }
+  try {
+    const email = (user.email || '').toLowerCase();
+    if (email && user.emailVerified !== false) {
+      const q = await db.collection('team_invites').where('email', '==', email).where('status', '==', 'pending').get();
+      teamPendingInvites = q.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+  } catch (e) { console.warn('invites:', e.code || e.message); }
+  const pref = localStorage.getItem(_wsPrefKey(me));
+  if (pref && pref !== 'self') {
+    const m = teamMemberships.find(x => x.ownerUid === pref);
+    if (m) { workspaceUid = m.ownerUid; teamPerms = m.perms; teamOwnerName = m.ownerName; }
+    else localStorage.removeItem(_wsPrefKey(me));
+  }
+}
+function switchWorkspace(key) {
+  if (!currentUser) return;
+  localStorage.setItem(_wsPrefKey(currentUser.uid), key || 'self');
+  location.reload();
+}
+function openWorkspaceSwitcher() {
+  const m = document.getElementById('wsModal'); if (!m) return;
+  const list = document.getElementById('wsList'); list.replaceChildren();
+  const mk = (title, sub, key, active, icon) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ws-item' + (active ? ' on' : '');
+    b.innerHTML = `<span class="ws-ic"><i class="fa-solid ${icon}"></i></span><span class="ws-tx"><b></b><small></small></span><i class="fa-solid ${active ? 'fa-circle-check' : 'fa-chevron-left'} ws-go"></i>`;
+    b.querySelector('b').textContent = title; b.querySelector('small').textContent = sub;
+    b.addEventListener('click', () => { if (!active) switchWorkspace(key); else closeWorkspaceSwitcher(); });
+    return b;
+  };
+  list.appendChild(mk('حسابي الشخصي', 'بياناتك الخاصة', 'self', !isTeamMode(), 'fa-user'));
+  teamMemberships.forEach(t => {
+    const preset = (TEAM_PRESETS[t.preset] || TEAM_PRESETS.custom).name;
+    list.appendChild(mk('فريق ' + t.ownerName, 'دورك: ' + preset, t.ownerUid, isTeamMode() && workspaceUid === t.ownerUid, 'fa-people-group'));
+  });
+  const leave = document.getElementById('wsLeave');
+  leave.hidden = !isTeamMode();
+  m.classList.remove('hidden'); m.classList.add('flex');
+}
+function closeWorkspaceSwitcher() { const m = document.getElementById('wsModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
+function leaveCurrentTeam() {
+  if (!isTeamMode()) return;
+  const owner = workspaceUid;
+  openConfirm('مغادرة الفريق؟', `هتخرج من فريق <b>${escapeHTML(teamOwnerName)}</b> وماتقدرش تدخل بياناته إلا بدعوة جديدة.`, async () => {
+    try {
+      await db.collection('users').doc(owner).collection('members').doc(currentUser.uid).delete();
+      await db.collection('users').doc(currentUser.uid).collection('memberships').doc(owner).delete();
+    } catch (e) { showToast('تعذر المغادرة', 'error'); return; }
+    switchWorkspace('self');
+  });
+}
+
+/* ---------- دعوة وصلتني ---------- */
+function maybeShowTeamInvites() {
+  if (!teamPendingInvites.length || isTeamMode()) return;
+  const inv = teamPendingInvites[0];
+  const m = document.getElementById('teamInviteModal'); if (!m) return;
+  document.getElementById('tiOwner').textContent = inv.ownerName || inv.ownerEmail || 'صاحب حساب';
+  const preset = (TEAM_PRESETS[inv.preset] || TEAM_PRESETS.custom).name;
+  document.getElementById('tiPreset').textContent = preset;
+  const ul = document.getElementById('tiPerms'); ul.replaceChildren();
+  TEAM_PERMS.filter(p => inv.perms && inv.perms[p.k] === true).forEach(p => {
+    const li = document.createElement('li'); li.innerHTML = '<i class="fa-solid fa-circle-check"></i> '; li.append(document.createTextNode(p.label)); ul.appendChild(li);
+  });
+  if (!ul.childNodes.length) { const li = document.createElement('li'); li.textContent = 'عرض فقط'; ul.appendChild(li); }
+  m._invite = inv;
+  m.classList.remove('hidden'); m.classList.add('flex');
+}
+async function acceptTeamInvite() {
+  const m = document.getElementById('teamInviteModal'); const inv = m && m._invite; if (!inv) return;
+  const me = currentUser;
+  try {
+    await db.collection('users').doc(inv.ownerUid).collection('members').doc(me.uid).set({
+      uid: me.uid, email: (me.email || '').toLowerCase(), name: me.displayName || inv.name || '', preset: inv.preset || 'custom',
+      perms: inv.perms || {}, active: true, joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await db.collection('users').doc(me.uid).collection('memberships').doc(inv.ownerUid).set({
+      ownerUid: inv.ownerUid, ownerName: inv.ownerName || '', ownerEmail: inv.ownerEmail || '', joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await db.collection('team_invites').doc(inv.id).update({ status: 'accepted', memberUid: me.uid, acceptedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    localStorage.setItem(_wsPrefKey(me.uid), inv.ownerUid);
+    showToast('تم الانضمام للفريق ✓', 'success');
+    setTimeout(() => location.reload(), 600);
+  } catch (e) {
+    console.warn(e);
+    showToast(e.code === 'permission-denied' ? 'تعذر الانضمام: تأكد إن بريدك مفعّل وإن قواعد Firestore الجديدة منشورة' : 'تعذر الانضمام للفريق', 'error');
+  }
+}
+async function declineTeamInvite() {
+  const m = document.getElementById('teamInviteModal'); const inv = m && m._invite;
+  if (inv) { try { await db.collection('team_invites').doc(inv.id).update({ status: 'declined' }); } catch (e) {} }
+  teamPendingInvites = teamPendingInvites.filter(x => !inv || x.id !== inv.id);
+  m.classList.add('hidden'); m.classList.remove('flex');
+  if (teamPendingInvites.length) setTimeout(maybeShowTeamInvites, 300);
+}
+
+/* ---------- إدارة الفريق (لصاحب الحساب البرو) ---------- */
+let _tmData = { members: [], invites: [] };
+let _tmEdit = null;   // { mode:'add'|'edit', uid?, inviteId? }
+let _tmPerms = {};
+let _tmPreset = 'cashier';
+
+function openTeamModal() {
+  if (!requireAuth()) return;
+  if (!isRealCloudUser()) { showToast('فريق العمل يحتاج حساب مسجّل (مش وضع الزائر)', 'error'); return; }
+  const m = document.getElementById('teamModal');
+  m.classList.remove('hidden'); m.classList.add('flex');
+  const allowed = hasFeature('team');
+  document.getElementById('tmLocked').hidden = allowed;
+  document.getElementById('tmMain').hidden = !allowed;
+  if (allowed) teamRefresh();
+}
+function closeTeamModal() { const m = document.getElementById('teamModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
+async function teamRefresh() {
+  const list = document.getElementById('tmList');
+  list.replaceChildren(_admEl('div', 'adm-loading', 'جاري التحميل...'));
+  try {
+    const me = currentUser.uid;
+    const [ms, is] = await Promise.all([
+      db.collection('users').doc(me).collection('members').get(),
+      db.collection('team_invites').where('ownerUid', '==', me).get()
+    ]);
+    _tmData.members = ms.docs.map(d => ({ id: d.id, ...d.data() }));
+    _tmData.invites = is.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => i.status === 'pending');
+  } catch (e) {
+    list.replaceChildren(_admEl('div', 'adm-loading err', e.code === 'permission-denied' ? 'محتاج نشر قواعد Firestore الجديدة (firestore.rules)' : 'تعذر تحميل الفريق'));
+    return;
+  }
+  renderTeamList();
+}
+function _permSummary(perms) {
+  const n = TEAM_PERM_KEYS.filter(k => perms && perms[k] === true).length;
+  return `${n} من ${TEAM_PERM_KEYS.length} صلاحيات`;
+}
+function renderTeamList() {
+  const list = document.getElementById('tmList'); list.replaceChildren();
+  const used = _tmData.members.length + _tmData.invites.length;
+  document.getElementById('tmSeatCount').textContent = `${used} / ${TEAM_MAX_MEMBERS}`;
+  document.getElementById('tmSeatBar').style.width = Math.min(100, (used / TEAM_MAX_MEMBERS) * 100) + '%';
+  document.getElementById('tmEmpty').hidden = used > 0;
+  const row = (o) => {
+    const el = document.createElement('div'); el.className = 'tm-row' + (o.off ? ' off' : '');
+    const av = document.createElement('span'); av.className = 'adm-av'; av.textContent = (o.name || o.email || '?').charAt(0).toUpperCase();
+    const body = document.createElement('div'); body.className = 'tm-row-b';
+    const t = document.createElement('b'); t.textContent = o.name || o.email;
+    const s = document.createElement('small'); s.textContent = o.name ? o.email : '';
+    const pills = document.createElement('div'); pills.className = 'tm-pills';
+    const preset = TEAM_PRESETS[o.preset] || TEAM_PRESETS.custom;
+    pills.append(_admEl('span', 'adm-role r-pro', preset.name), _admEl('span', 'adm-st ' + o.stCls, o.stTxt), _admEl('em', 'tm-ps', _permSummary(o.perms)));
+    body.append(t, s, pills);
+    const acts = document.createElement('div'); acts.className = 'tm-acts';
+    o.actions.forEach(a => { const b = document.createElement('button'); b.type = 'button'; b.className = 'tm-act ' + (a.cls || ''); b.title = a.title; b.innerHTML = `<i class="fa-solid ${a.ic}"></i>`; b.addEventListener('click', a.fn); acts.appendChild(b); });
+    el.append(av, body, acts);
+    return el;
+  };
+  _tmData.members.forEach(m => {
+    const active = m.active !== false;
+    list.appendChild(row({
+      name: m.name, email: m.email, preset: m.preset, perms: m.perms, off: !active,
+      stCls: active ? 'st-ok' : 'st-mut', stTxt: active ? 'نشط' : 'موقوف',
+      actions: [
+        { ic: 'fa-sliders', title: 'تعديل الصلاحيات', fn: () => openMemberEditor('edit', m) },
+        { ic: active ? 'fa-user-lock' : 'fa-lock-open', title: active ? 'إيقاف العضو' : 'تفعيل العضو', fn: () => teamToggleActive(m) },
+        { ic: 'fa-user-xmark', title: 'إزالة من الفريق', cls: 'del', fn: () => teamRemoveMember(m) }
+      ]
+    }));
+  });
+  _tmData.invites.forEach(i => {
+    list.appendChild(row({
+      name: i.name, email: i.email, preset: i.preset, perms: i.perms, stCls: 'st-info', stTxt: 'بانتظار القبول',
+      actions: [
+        { ic: 'fa-sliders', title: 'تعديل الصلاحيات', fn: () => openMemberEditor('invite', i) },
+        { ic: 'fa-xmark', title: 'إلغاء الدعوة', cls: 'del', fn: () => teamCancelInvite(i) }
+      ]
+    }));
+  });
+}
+
+function openMemberEditor(mode, rec) {
+  const used = _tmData.members.length + _tmData.invites.length;
+  if (mode === 'add' || !mode) {
+    if (used >= TEAM_MAX_MEMBERS) { showToast(`وصلت للحد الأقصى (${TEAM_MAX_MEMBERS} أعضاء)`, 'error'); return; }
+    _tmEdit = { mode: 'add' }; _tmPreset = 'cashier'; _tmPerms = { ...TEAM_PRESETS.cashier.perms };
+  } else {
+    _tmEdit = { mode, rec }; _tmPreset = rec.preset || 'custom'; _tmPerms = { ..._allPerms(false), ...(rec.perms || {}) };
+  }
+  const isAdd = _tmEdit.mode === 'add';
+  document.getElementById('tmEdTitle').textContent = isAdd ? 'إضافة عضو للفريق' : 'تعديل صلاحيات العضو';
+  const nameEl = document.getElementById('tmName'), emailEl = document.getElementById('tmEmail');
+  nameEl.value = isAdd ? '' : (rec.name || ''); emailEl.value = isAdd ? '' : (rec.email || ''); emailEl.disabled = !isAdd;
+  document.getElementById('tmEdHint').textContent = isAdd ? 'العضو هيدخل بنفس الإيميل ده (Google أو بريد مفعّل)، وهتظهر له دعوة لما يسجل دخول.' : '';
+  renderMemberEditor();
+  const m = document.getElementById('memberEditModal'); m.classList.remove('hidden'); m.classList.add('flex');
+}
+function closeMemberEditor() { const m = document.getElementById('memberEditModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
+function renderMemberEditor() {
+  const presets = document.getElementById('tmPresets'); presets.replaceChildren();
+  Object.entries(TEAM_PRESETS).forEach(([k, p]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'tm-preset' + (_tmPreset === k ? ' on' : '');
+    b.innerHTML = `<i class="fa-solid ${p.ic}"></i><span></span>`; b.querySelector('span').textContent = p.name;
+    b.addEventListener('click', () => { _tmPreset = k; if (p.perms) _tmPerms = { ...p.perms }; renderMemberEditor(); });
+    presets.appendChild(b);
+  });
+  const box = document.getElementById('tmPerms'); box.replaceChildren();
+  let lastG = null;
+  TEAM_PERMS.forEach(p => {
+    if (p.g !== lastG) { lastG = p.g; box.appendChild(_admEl('div', 'tm-g', p.g)); }
+    const row = document.createElement('button'); row.type = 'button'; row.className = 'tm-perm' + (_tmPerms[p.k] ? ' on' : '');
+    row.setAttribute('role', 'switch'); row.setAttribute('aria-checked', _tmPerms[p.k] ? 'true' : 'false');
+    row.innerHTML = `<span class="tm-perm-ic"><i class="fa-solid ${p.ic}"></i></span><span class="tm-perm-l"></span><span class="tm-sw"><i></i></span>`;
+    row.querySelector('.tm-perm-l').textContent = p.label;
+    row.addEventListener('click', () => { _tmPerms[p.k] = !_tmPerms[p.k]; _tmPreset = _detectPreset(); renderMemberEditor(); });
+    box.appendChild(row);
+  });
+}
+function _detectPreset() {
+  for (const [k, p] of Object.entries(TEAM_PRESETS)) {
+    if (p.perms && TEAM_PERM_KEYS.every(x => !!p.perms[x] === !!_tmPerms[x])) return k;
+  }
+  return 'custom';
+}
+async function saveMember() {
+  if (!_tmEdit) return;
+  const perms = Object.fromEntries(TEAM_PERM_KEYS.map(k => [k, !!_tmPerms[k]]));
+  const name = sanitizeString(document.getElementById('tmName').value, 60);
+  const me = currentUser;
+  try {
+    if (_tmEdit.mode === 'add') {
+      const email = (document.getElementById('tmEmail').value || '').trim().toLowerCase();
+      if (!/^[^\s@\/]+@[^\s@\/]+\.[^\s@\/]+$/.test(email)) { showToast('اكتب إيميل صحيح', 'error'); return; }
+      if (email === (me.email || '').toLowerCase()) { showToast('ده إيميلك أنت 😄', 'error'); return; }
+      if (_tmData.members.some(m => (m.email || '').toLowerCase() === email)) { showToast('العضو ده موجود في الفريق بالفعل', 'error'); return; }
+      const id = me.uid + '_' + email;
+      await db.collection('team_invites').doc(id).set({
+        ownerUid: me.uid, ownerName: me.displayName || me.email || '', ownerEmail: (me.email || '').toLowerCase(),
+        email, name, preset: _tmPreset, perms, status: 'pending', createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      showToast('تم إرسال الدعوة ✓ — هتظهر له لما يسجل دخول بالإيميل ده', 'success');
+    } else if (_tmEdit.mode === 'edit') {
+      const m = _tmEdit.rec;
+      await db.collection('users').doc(me.uid).collection('members').doc(m.id).update({ perms, preset: _tmPreset, name: name || m.name || '' });
+      showToast('تم حفظ الصلاحيات ✓', 'success');
+    } else {
+      const i = _tmEdit.rec;
+      await db.collection('team_invites').doc(i.id).update({ perms, preset: _tmPreset, name });
+      showToast('تم تحديث الدعوة ✓', 'success');
+    }
+    closeMemberEditor(); teamRefresh();
+  } catch (e) {
+    console.warn(e);
+    showToast(e.code === 'permission-denied' ? 'غير مسموح — اشتراك برو مطلوب، أو قواعد Firestore الجديدة لسه ماتنشرتش' : 'تعذر الحفظ', 'error');
+  }
+}
+async function teamToggleActive(m) {
+  try { await db.collection('users').doc(currentUser.uid).collection('members').doc(m.id).update({ active: m.active === false }); showToast(m.active === false ? 'تم تفعيل العضو' : 'تم إيقاف العضو', 'success'); teamRefresh(); }
+  catch (e) { showToast('تعذر التنفيذ', 'error'); }
+}
+function teamRemoveMember(m) {
+  openConfirm('إزالة العضو؟', `<b>${escapeHTML(m.name || m.email)}</b> هيفقد الوصول لبياناتك فوراً.`, async () => {
+    try {
+      await db.collection('users').doc(currentUser.uid).collection('members').doc(m.id).delete();
+      try { await db.collection('team_invites').doc(currentUser.uid + '_' + (m.email || '').toLowerCase()).delete(); } catch (e) {}
+      showToast('تمت الإزالة', 'info'); teamRefresh();
+    } catch (e) { showToast('تعذر الإزالة', 'error'); }
+  });
+}
+function teamCancelInvite(i) {
+  openConfirm('إلغاء الدعوة؟', `هتتلغي الدعوة المرسلة إلى <b>${escapeHTML(i.email)}</b>.`, async () => {
+    try { await db.collection('team_invites').doc(i.id).delete(); showToast('تم إلغاء الدعوة', 'info'); teamRefresh(); }
+    catch (e) { showToast('تعذر الإلغاء', 'error'); }
+  });
+}
+
+/* ---------- حماية العمليات حسب الصلاحيات (الواجهة) ---------- */
+(function hookTeamGuards() {
+  const wrap = (name, permFn) => {
+    const orig = window[name]; if (typeof orig !== 'function') return;
+    window[name] = function () {
+      if (isTeamMode()) { const p = permFn.apply(null, arguments); if (p && teamDeny(p)) return; }
+      return orig.apply(this, arguments);
+    };
+  };
+  const permForType = type => (type === 'income' ? 'addIncome' : (type === 'expense' || type === 'charity') ? 'addExpense' : isDebt(type) ? 'debts' : null);
+  wrap('openModal', type => permForType(type));
+  wrap('editTransaction', id => { const t = transactions.find(x => x.id === id); return t && isDebt(t.type) ? 'debts' : 'editTx'; });
+  wrap('requestDelete', () => 'deleteTx');
+  ['openDebtPaymentModal', 'openDebtCardModal', 'toggleDebtStatus'].forEach(n => wrap(n, () => 'debts'));
+  wrap('openChargeMachines', () => 'machines');
+  ['confirmClearData', 'loadDemoData', 'openBackupModal', 'openRecurringModal', 'openWalletTransferModal', 'openTicketsModal', 'openDrawerModal', 'openProfitModal', 'copyClientPortalLink', 'shareClientPortalWhatsApp', 'openTeamModal']
+    .forEach(n => wrap(n, () => '__owner__'));
+  wrap('openShiftSettlementModal', () => '__owner__');
+  wrap('openBudgetModal', () => '__owner__');
+})();
+(function hookTeamLifecycle() {
+  const orig = window.syncModeForCurrentUser;
+  window.syncModeForCurrentUser = function () {
+    if (isTeamMode() && !lsGet(APP_MODE_KEY)) { applyAppMode('business', false); const m = document.getElementById('modeOnboardingModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } return; }
+    return orig.apply(this, arguments);
+  };
+  const origGuest = window.maybeOfferGuestImport;
+  window.maybeOfferGuestImport = function () { if (isTeamMode()) return; return origGuest.apply(this, arguments); };
+})();
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  [['memberEditModal', closeMemberEditor], ['teamModal', closeTeamModal], ['wsModal', closeWorkspaceSwitcher]].forEach(([id, fn]) => {
+    const m = document.getElementById(id); if (m && !m.classList.contains('hidden')) fn();
+  });
+});

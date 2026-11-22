@@ -30,6 +30,41 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/users/$(userId))
         && get(/databases/$(database)/documents/users/$(userId)).data.get('disabled', false) == true;
     }
+    // ---------- فريق العمل (برو) ----------
+    // صاحب الحساب لازم يكون برو (أو أدمن) وغير موقوف
+    function ownerIsPro(ownerId) {
+      return exists(/databases/$(database)/documents/users/$(ownerId))
+        && get(/databases/$(database)/documents/users/$(ownerId)).data.get('role', 'free') in ['pro', 'admin']
+        && get(/databases/$(database)/documents/users/$(ownerId)).data.get('disabled', false) != true;
+    }
+    function isTeamMember(ownerId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(ownerId)/members/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(ownerId)/members/$(request.auth.uid)).data.get('active', false) == true
+        && ownerIsPro(ownerId);
+    }
+    function mperm(ownerId, key) {
+      return isTeamMember(ownerId)
+        && get(/databases/$(database)/documents/users/$(ownerId)/members/$(request.auth.uid)).data.perms.get(key, false) == true;
+    }
+    function memberCanCreateTx(ownerId, d) {
+      return (d.type == 'income' && mperm(ownerId, 'addIncome'))
+          || ((d.type == 'expense' || d.type == 'charity') && mperm(ownerId, 'addExpense'))
+          || ((d.type == 'debt_receivable' || d.type == 'debt_payable') && mperm(ownerId, 'debts'));
+    }
+    function memberCanUpdateTx(ownerId, d) {
+      return (mperm(ownerId, 'editTx')
+              || ((d.type == 'debt_receivable' || d.type == 'debt_payable') && mperm(ownerId, 'debts')))
+          && (d.get('_deleted', false) != true || mperm(ownerId, 'deleteTx'));
+    }
+    // العضو يكتب في مستند صاحب الحساب حقول محددة فقط، والمكن/المخزن بصلاحية
+    function memberCanWriteUserDoc(ownerId) {
+      return isTeamMember(ownerId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['updatedAt', 'txCount', 'appVersion', 'chargeMachines', 'inventory'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['chargeMachines']) || mperm(ownerId, 'machines'))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['inventory']) || mperm(ownerId, 'inventory'));
+    }
     function isStr(v, maxLen) {
       return v is string && v.size() <= maxLen;
     }
@@ -76,9 +111,35 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ---------- دعوات الفريق ----------
+    // المستند id = ownerUid + '_' + email (بحروف صغيرة)
+    match /team_invites/{inviteId} {
+      allow get, list: if signedIn() && (
+        resource.data.ownerUid == request.auth.uid
+        || (resource.data.email == request.auth.token.email && request.auth.token.email_verified == true)
+      );
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && ownerIsPro(request.auth.uid)
+        && request.resource.data.email is string
+        && request.resource.data.email == request.resource.data.email.lower()
+        && inviteId == request.auth.uid + '_' + request.resource.data.email
+        && request.resource.data.status == 'pending'
+        && request.resource.data.perms is map;
+      allow update: if signedIn() && (
+        (resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.email == resource.data.email)
+        || (resource.data.email == request.auth.token.email
+          && request.auth.token.email_verified == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'memberUid', 'acceptedAt']))
+      );
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
     // ---------- Users ----------
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin() || isTeamMember(userId);
 
       // New accounts can only start as 'free' (no self-granted admin / overrides)
       allow create: if isSuperAdmin() || (
@@ -89,7 +150,7 @@ service cloud.firestore {
         && !('disabled' in request.resource.data)
       );
 
-      allow update: if isAdmin() || (
+      allow update: if isAdmin() || memberCanWriteUserDoc(userId) || (
         isOwner(userId)
         && !isDisabled(userId)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedKeys())
@@ -100,7 +161,31 @@ service cloud.firestore {
       // Private subcollections (explicit on purpose: a recursive wildcard here would
       // also match the user document itself and bypass the protected-keys rule above)
       match /transactions/{txId} {
-        allow read, write: if isOwner(userId) && !isDisabled(userId);
+        allow read: if (isOwner(userId) && !isDisabled(userId)) || isTeamMember(userId);
+        allow create: if (isOwner(userId) && !isDisabled(userId)) || memberCanCreateTx(userId, request.resource.data);
+        allow update: if (isOwner(userId) && !isDisabled(userId)) || memberCanUpdateTx(userId, request.resource.data);
+        allow delete: if (isOwner(userId) && !isDisabled(userId)) || mperm(userId, 'deleteTx');
+      }
+
+      // أعضاء الفريق (يديرها صاحب الحساب؛ العضو بينشئ مستنده بس من خلال دعوة صحيحة)
+      match /members/{memberId} {
+        allow read: if isOwner(userId) || request.auth.uid == memberId || isAdmin();
+        allow create: if signedIn()
+          && request.auth.uid == memberId
+          && request.auth.token.email_verified == true
+          && ownerIsPro(userId)
+          && exists(/databases/$(database)/documents/team_invites/$(userId + '_' + request.auth.token.email))
+          && get(/databases/$(database)/documents/team_invites/$(userId + '_' + request.auth.token.email)).data.status == 'pending'
+          && get(/databases/$(database)/documents/team_invites/$(userId + '_' + request.auth.token.email)).data.ownerUid == userId
+          && request.resource.data.perms == get(/databases/$(database)/documents/team_invites/$(userId + '_' + request.auth.token.email)).data.perms
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.active == true;
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId) || request.auth.uid == memberId;
+      }
+      // مؤشرات عضويتي في فرق تانية (الحقيقة دايماً من مستند members عند صاحب الفريق)
+      match /memberships/{ownerId} {
+        allow read, write: if isOwner(userId);
       }
       match /portal_index/{hashId} {
         allow read, write: if isOwner(userId);
