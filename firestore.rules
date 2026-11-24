@@ -64,7 +64,8 @@ service cloud.firestore {
              .hasOnly(['updatedAt', 'txCount', 'appVersion', 'chargeMachines', 'inventory', 'clientPhones'])
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['chargeMachines']) || mperm(ownerId, 'machines'))
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['inventory']) || mperm(ownerId, 'inventory'))
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['clientPhones']) || mperm(ownerId, 'clients') || mperm(ownerId, 'debts'));
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['clientPhones']) || mperm(ownerId, 'clients') || mperm(ownerId, 'debts'))
+        && request.resource.data.get('clientPhones', {}).size() <= 500;
     }
     function isStr(v, maxLen) {
       return v is string && v.size() <= maxLen;
@@ -138,7 +139,29 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
     }
 
-    // ---------- Users ----------
+    // Server-side transaction shape validation (team members and tampered clients).
+    function validTransaction(userId, txId, d) {
+      return d.id == txId
+          && d.type in ['income','expense','charity','debt_receivable','debt_payable']
+          && d.amount is number && d.amount > 0 && d.amount <= 1000000000
+          && isStr(d.date, 10) && d.date.matches('^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$')
+          && (!('paidAmount' in d) || d.paidAmount is number)
+          && optStr(d, 'time', 20)
+          && optStr(d, 'client', 100)
+          && optStr(d, 'category', 100)
+          && optStr(d, 'paymentMethod', 50)
+          && optStr(d, 'reference', 50)
+          && optStr(d, 'notes', 200)
+          && (!('dueDate' in d) || d.dueDate == null
+              || (isStr(d.dueDate, 10) && d.dueDate.matches('^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$')))
+          && (!('status' in d) || d.status == null || d.status in ['paid','pending'])
+          && (!('_deleted' in d) || d._deleted is bool)
+          && (!('_updatedAt' in d) || d._updatedAt is number)
+          && (!('receipt' in d) || d.receipt == null
+              || (isStr(d.receipt, 800) && d.receipt.matches('^https://')));
+    }
+
+      // ---------- Users ----------
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin() || isTeamMember(userId);
 
@@ -163,8 +186,10 @@ service cloud.firestore {
       // also match the user document itself and bypass the protected-keys rule above)
       match /transactions/{txId} {
         allow read: if (isOwner(userId) && !isDisabled(userId)) || isTeamMember(userId);
-        allow create: if (isOwner(userId) && !isDisabled(userId)) || memberCanCreateTx(userId, request.resource.data);
-        allow update: if (isOwner(userId) && !isDisabled(userId)) || memberCanUpdateTx(userId, request.resource.data);
+        allow create: if ((isOwner(userId) && !isDisabled(userId)) || memberCanCreateTx(userId, request.resource.data))
+                      && validTransaction(userId, txId, request.resource.data);
+        allow update: if ((isOwner(userId) && !isDisabled(userId)) || memberCanUpdateTx(userId, request.resource.data))
+                      && validTransaction(userId, txId, request.resource.data);
         allow delete: if (isOwner(userId) && !isDisabled(userId)) || mperm(userId, 'deleteTx');
       }
 

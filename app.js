@@ -19,7 +19,7 @@
 
 /* =========================================================
    EHSEBLI / HONDA FINANCIAL MANAGER V9.3
-   PWA Edition + Push Notifications (Clean Edition)
+   PWA Edition + Push Notifications (Clean Edition / v20.10.1 mobile + security patch)
    ========================================================= */
 
 const SUPER_ADMIN_EMAILS = ['hondastore299@gmail.com'];
@@ -209,6 +209,17 @@ function offsetDate(days) {
 function money(v) { return Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
 function escapeHTML(v) {
   return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+// XSS-safe value for a JS string literal inside an inline HTML handler.
+// Quotes are emitted as \uXXXX so the HTML parser cannot turn entities back into real quotes.
+function jsAttr(v) {
+  return String(v ?? '').replace(/[\\'"&<>\r\n\t]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+}
+// Receipt images are only ever loaded from HTTPS URLs, and HTML-escaped for attributes.
+function safeReceiptURL(v) {
+  const u = String(v || '');
+  return /^https:\/\//i.test(u) && u.length <= 800 ? escapeHTML(u) : '';
 }
 function sanitizeString(str, maxLength = 500) {
   return String(str || '').replace(/[\u0000-\u001F\u007F]/g, '').slice(0, maxLength).trim();
@@ -451,7 +462,7 @@ async function handleReceiptSelected(event) {
       else { if (height > MAX_H) { width *= MAX_H / height; height = MAX_H; } }
       canvas.width = width; canvas.height = height;
       canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+      const compressedDataUrl = safeCanvasToDataURL(canvas, 'image/jpeg', 0.6);
       
       // Upload to Firebase Storage if online
       if (currentUser && navigator.onLine) {
@@ -626,8 +637,8 @@ function renderPublicPortal(clientName, sourceTransactions) {
         </td>
         <td class="py-3 px-4 text-center">
           ${t.receipt ? `
-            <img src="${t.receipt}" 
-                 onclick="viewReceiptImage('${t.receipt}')" 
+            <img src="${safeReceiptURL(t.receipt)}" 
+                 onclick="viewReceiptImage('${jsAttr(t.receipt)}')" 
                  title="معاينة" 
                  class="w-7 h-7 rounded-lg object-cover border border-orange-500/40 inline-block cursor-pointer hover:scale-110 transition shadow-sm" 
                  alt="صورة">
@@ -1850,9 +1861,14 @@ async function doSyncToCloud() {
       const j = txJSON(t);
       if (cloudSnapshot.get(t.id) !== j) ops.push({ kind: 'set', id: t.id, json: j });
     });
-    cloudSnapshot.forEach((_, id) => {
-      if (!localIds.has(id)) ops.push({ kind: 'del', id });
-    });
+    // Never mirror an empty/partial local list into destructive cloud deletes.
+    // Only an explicit user wipe (confirmClearData / exitDemoData) may remove all docs.
+    if (transactions.length > 0 || window._a7ExplicitWipe === true) {
+      cloudSnapshot.forEach((_, id) => {
+        if (!localIds.has(id)) ops.push({ kind: 'del', id });
+      });
+    }
+    window._a7ExplicitWipe = false;
 
     if (isTeamMode()) {   // العضو يرفع بس اللي صلاحياته تسمح بيه (القواعد بترفض غير كده وتبوّظ الدفعة كلها)
       const keep = ops.filter(op => {
@@ -2307,8 +2323,8 @@ function renderTransactions() {
           ${badge}
           <div class="flex items-center gap-2">
             ${item.receipt ? `
-              <img src="${item.receipt}" 
-                   onclick="viewReceiptImage('${item.receipt}')" 
+              <img src="${safeReceiptURL(item.receipt)}" 
+                   onclick="viewReceiptImage('${jsAttr(item.receipt)}')" 
                    title="اضغط لتكبير الصورة"
                    class="w-9 h-9 rounded-xl object-cover border border-orange-500/40 cursor-pointer hover:scale-110 hover:border-orange-500 transition shadow-sm shrink-0" 
                    alt="صورة العملية">
@@ -2323,7 +2339,7 @@ function renderTransactions() {
         </div>
       </td>
       <td class="py-3 px-4">
-        ${item.client ? `<button onclick="openClientLedger('${escapeHTML(item.client)}')" class="inline-flex items-center gap-1 text-xs font-black text-orange-500 hover:underline"><i class="fa-solid fa-user-circle"></i> ${escapeHTML(item.client)}</button>` : '<span class="text-slate-400 text-[10px]">-</span>'}
+        ${item.client ? `<button onclick="openClientLedger('${jsAttr(item.client)}')" class="inline-flex items-center gap-1 text-xs font-black text-orange-500 hover:underline"><i class="fa-solid fa-user-circle"></i> ${escapeHTML(item.client)}</button>` : '<span class="text-slate-400 text-[10px]">-</span>'}
       </td>
       <td class="py-3 px-4"><span class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-slate-300 font-bold text-[10px]">${escapeHTML(item.category)}</span></td>
       <td class="py-3 px-4 text-slate-500 dark:text-slate-400 font-semibold">${payMethodHTML(item.paymentMethod)}</td>
@@ -2334,9 +2350,9 @@ function renderTransactions() {
       <td class="py-3 px-4">${amount}</td>
       <td class="py-3 px-4 text-center">
         <div class="flex items-center justify-center gap-1">
-          <button onclick="shareViaWhatsApp('${item.id}')" title="مشاركة" class="p-2 rounded-xl text-emerald-500 hover:bg-emerald-500/10 transition"><i class="fa-brands fa-whatsapp text-sm"></i></button>
-          <button onclick="editTransaction('${item.id}')" title="تعديل" class="p-2 rounded-xl text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition"><i class="fa-solid fa-pen text-xs"></i></button>
-          <button onclick="requestDelete('${item.id}')" title="حذف" class="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition"><i class="fa-solid fa-trash-can text-xs"></i></button>
+          <button onclick="shareViaWhatsApp('${jsAttr(item.id)}')" title="مشاركة" class="p-2 rounded-xl text-emerald-500 hover:bg-emerald-500/10 transition"><i class="fa-brands fa-whatsapp text-sm"></i></button>
+          <button onclick="editTransaction('${jsAttr(item.id)}')" title="تعديل" class="p-2 rounded-xl text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition"><i class="fa-solid fa-pen text-xs"></i></button>
+          <button onclick="requestDelete('${jsAttr(item.id)}')" title="حذف" class="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition"><i class="fa-solid fa-trash-can text-xs"></i></button>
         </div>
       </td>
     `;
@@ -2381,8 +2397,8 @@ function renderDebts() {
           <div class="min-w-0">
             <h4 class="text-sm font-black truncate flex items-center gap-2">
               ${d.receipt ? `
-                <img src="${d.receipt}" 
-                     onclick="viewReceiptImage('${d.receipt}')" 
+                <img src="${safeReceiptURL(d.receipt)}" 
+                     onclick="viewReceiptImage('${jsAttr(d.receipt)}')" 
                      title="معاينة الفاتورة / صورة الجهاز" 
                      class="w-7 h-7 rounded-lg object-cover border border-orange-500/50 cursor-pointer hover:scale-105 transition shrink-0" 
                      alt="مرفق">
@@ -2390,7 +2406,7 @@ function renderDebts() {
               <span>${escapeHTML(d.notes || 'دين بدون بيان')}</span>
             </h4>
             <p class="text-[10px] text-slate-400 font-semibold mt-0.5">
-              ${d.client ? `<span class="text-orange-500 font-black cursor-pointer" onclick="openClientLedger('${escapeHTML(d.client)}')"><i class="fa-solid fa-user"></i> ${escapeHTML(d.client)} • </span>` : ''}
+              ${d.client ? `<span class="text-orange-500 font-black cursor-pointer" onclick="openClientLedger('${jsAttr(d.client)}')"><i class="fa-solid fa-user"></i> ${escapeHTML(d.client)} • </span>` : ''}
               ${escapeHTML(d.category)} • ${escapeHTML(d.date)} ${d.time ? '• ' + escapeHTML(formatTimeTo12Hour(d.time)) : ''}
               ${getDueDateBadge(d)}
             </p>
@@ -2418,13 +2434,13 @@ function renderDebts() {
           ${paid ? 'تم السداد بالكامل ✓' : isReceivable ? 'مستحق لي - معلق' : 'مستحق عليّ - معلق'}
         </span>
         <div class="flex flex-wrap items-center gap-1.5">
-          <button onclick="openDebtCardModal('${d.id}')" title="بطاقة مطالبة وتذكير بالدين" class="px-2.5 py-1.5 rounded-xl bg-orange-500/15 text-orange-400 hover:bg-orange-500 hover:text-white text-[10px] font-black transition flex items-center gap-1 border border-orange-500/30">
+          <button onclick="openDebtCardModal('${jsAttr(d.id)}')" title="بطاقة مطالبة وتذكير بالدين" class="px-2.5 py-1.5 rounded-xl bg-orange-500/15 text-orange-400 hover:bg-orange-500 hover:text-white text-[10px] font-black transition flex items-center gap-1 border border-orange-500/30">
             <i class="fa-solid fa-receipt"></i> <span>بطاقة مطالبة</span>
           </button>
-          ${!paid ? `<button onclick="openDebtPaymentModal('${d.id}')" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white text-[10px] font-black transition"><i class="fa-solid fa-hand-holding-dollar"></i> دفعة جزئية</button>` : ''}
-          <button onclick="toggleDebtStatus('${d.id}')" class="px-2.5 py-1.5 rounded-xl ${paid ? 'bg-slate-200 dark:bg-dark-750 text-slate-700 dark:text-slate-300' : 'bg-orange-500 text-white'} text-[10px] font-black">${paid ? 'إعادة كمعلق' : 'تم السداد ✓'}</button>
-          <button onclick="editTransaction('${d.id}')" class="p-2 rounded-xl text-slate-400 hover:text-orange-500"><i class="fa-solid fa-pen text-xs"></i></button>
-          <button onclick="requestDelete('${d.id}')" class="p-2 rounded-xl text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash-can text-xs"></i></button>
+          ${!paid ? `<button onclick="openDebtPaymentModal('${jsAttr(d.id)}')" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white text-[10px] font-black transition"><i class="fa-solid fa-hand-holding-dollar"></i> دفعة جزئية</button>` : ''}
+          <button onclick="toggleDebtStatus('${jsAttr(d.id)}')" class="px-2.5 py-1.5 rounded-xl ${paid ? 'bg-slate-200 dark:bg-dark-750 text-slate-700 dark:text-slate-300' : 'bg-orange-500 text-white'} text-[10px] font-black">${paid ? 'إعادة كمعلق' : 'تم السداد ✓'}</button>
+          <button onclick="editTransaction('${jsAttr(d.id)}')" class="p-2 rounded-xl text-slate-400 hover:text-orange-500"><i class="fa-solid fa-pen text-xs"></i></button>
+          <button onclick="requestDelete('${jsAttr(d.id)}')" class="p-2 rounded-xl text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash-can text-xs"></i></button>
         </div>
       </div>
     `;
@@ -2566,8 +2582,8 @@ function openClientLedger(clientName) {
         </td>
         <td class="py-2.5 px-3 text-center">
           ${t.receipt ? `
-            <img src="${t.receipt}" 
-                 onclick="viewReceiptImage('${t.receipt}')" 
+            <img src="${safeReceiptURL(t.receipt)}" 
+                 onclick="viewReceiptImage('${jsAttr(t.receipt)}')" 
                  title="معاينة" 
                  class="w-7 h-7 rounded-lg object-cover border border-orange-500/40 inline-block cursor-pointer hover:scale-110 transition shadow-sm" 
                  alt="صورة">
@@ -3222,8 +3238,8 @@ function switchTab(tab, shouldScroll = false) {
   document.getElementById('tabBtnTransactions').classList.toggle('active', isTx);
   document.getElementById('tabBtnDebts').classList.toggle('active', isDebts);
   document.getElementById('tabBtnClients').classList.toggle('active', isClients);
-  document.querySelectorAll('.mob-nav-btn[data-tab]').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.tab === tab);
+  document.querySelectorAll('.mob-nav-btn[data-mob-tab]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mobTab === tab);
   });
 
   if (isClients) renderClients();
@@ -3467,6 +3483,7 @@ function confirmClearData() {
   closeMenus();
   openConfirm('تصفير جميع البيانات؟', 'سيتم حذف كل المعاملات والميزانية نهائياً.', () => {
     transactions = [];
+    window._a7ExplicitWipe = true;   // allow the sync to remove cloud documents too
     lsDel(BUDGET_KEY);
     saveData({ force: true });
     refreshAll();
@@ -3891,7 +3908,7 @@ ${paid > 0 ? `💵 *المسدد:* ${money(paid)} ج.م\n` : ''}🔴 *المبل
   // هذا النظام يفتح قائمة المشاركة وتختار منها WhatsApp ليقوم بإرسال الصورة والنص معاً بضغطة زر واحدة!
   if (canvas && navigator.canShare) {
     try {
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      const blob = await new Promise(resolve => safeCanvasToBlob(canvas, resolve, 'image/png'));
       if (blob) {
         const file = new File([blob], `مطالبة_${d.client || 'عميل'}.png`, { type: 'image/png' });
         const shareData = {
@@ -3919,7 +3936,7 @@ ${paid > 0 ? `💵 *المسدد:* ${money(paid)} ج.م\n` : ''}🔴 *المبل
   let copiedImage = false;
   if (canvas && navigator.clipboard && window.ClipboardItem) {
     try {
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      const blob = await new Promise(resolve => safeCanvasToBlob(canvas, resolve, 'image/png'));
       if (blob) {
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
         copiedImage = true;
@@ -3961,7 +3978,7 @@ ${paid > 0 ? `💵 *المسدد:* ${money(paid)} ج.م\n` : ''}🔴 *المبل
   const canvas = document.getElementById('debtCardCanvas');
   if (canvas && navigator.canShare) {
     try {
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      const blob = await new Promise(resolve => safeCanvasToBlob(canvas, resolve, 'image/png'));
       if (blob) {
         const file = new File([blob], `مطالبة_${d.client || 'عميل'}.png`, { type: 'image/png' });
         if (navigator.canShare({ files: [file] })) {
@@ -4112,10 +4129,10 @@ function renderAdminRequests() {
           <div class="text-[10px] text-slate-400 mt-0.5">${escapeHTML(typeName(req.type))} • ${money(req.amount)} ج.م • ${escapeHTML(req.date)}</div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <button onclick="approveClientRequest('${req.id}')" class="px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-black hover:bg-emerald-600 transition flex items-center gap-1">
+          <button onclick="approveClientRequest('${jsAttr(req.id)}')" class="px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-black hover:bg-emerald-600 transition flex items-center gap-1">
             <i class="fa-solid fa-check"></i> موافق
           </button>
-          <button onclick="rejectClientRequest('${req.id}')" class="px-3 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white text-xs font-black transition flex items-center gap-1">
+          <button onclick="rejectClientRequest('${jsAttr(req.id)}')" class="px-3 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white text-xs font-black transition flex items-center gap-1">
             <i class="fa-solid fa-xmark"></i> رفض
           </button>
         </div>
@@ -4218,10 +4235,10 @@ function renderGlobalClientRequests() {
           <div class="text-[10px] text-orange-400 mt-0.5 font-bold">${escapeHTML(typeName(req.type))} • ${money(req.amount)} ج.م • ${escapeHTML(req.date)}</div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <button onclick="approveGlobalClientRequest('${req.id}')" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition flex items-center gap-1 shadow">
+          <button onclick="approveGlobalClientRequest('${jsAttr(req.id)}')" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition flex items-center gap-1 shadow">
             <i class="fa-solid fa-check"></i> موافق
           </button>
-          <button onclick="rejectGlobalClientRequest('${req.id}')" class="px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500 text-rose-400 hover:text-white text-xs font-black transition flex items-center gap-1">
+          <button onclick="rejectGlobalClientRequest('${jsAttr(req.id)}')" class="px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500 text-rose-400 hover:text-white text-xs font-black transition flex items-center gap-1">
             <i class="fa-solid fa-xmark"></i> رفض
           </button>
         </div>
@@ -4399,8 +4416,8 @@ function renderInventory() {
       <div class="mt-4 pt-3 border-t border-slate-200/60 dark:border-dark-800 flex items-center justify-between">
         <span class="text-[9px] text-slate-400">مخزن قطع الغيار</span>
         <div class="flex items-center gap-1">
-          <button onclick="openInventoryModal('${item.id}')" class="p-2 rounded-xl text-slate-400 hover:text-orange-500 transition"><i class="fa-solid fa-pen text-xs"></i></button>
-          <button onclick="deleteInventoryItem('${item.id}')" class="p-2 rounded-xl text-slate-400 hover:text-rose-500 transition"><i class="fa-solid fa-trash-can text-xs"></i></button>
+          <button onclick="openInventoryModal('${jsAttr(item.id)}')" class="p-2 rounded-xl text-slate-400 hover:text-orange-500 transition"><i class="fa-solid fa-pen text-xs"></i></button>
+          <button onclick="deleteInventoryItem('${jsAttr(item.id)}')" class="p-2 rounded-xl text-slate-400 hover:text-rose-500 transition"><i class="fa-solid fa-trash-can text-xs"></i></button>
         </div>
       </div>
     `;
@@ -4540,7 +4557,7 @@ function renderRecurringList() {
         <div class="font-black text-xs text-white">${escapeHTML(r.name)}</div>
         <div class="text-[10px] text-orange-400 mt-0.5">${money(r.amount)} ج.م (${r.period === 'monthly' ? 'شهرياً' : r.period === 'weekly' ? 'أسبوعياً' : 'يومياً'})</div>
       </div>
-      <button onclick="deleteRecurring('${r.id}')" class="p-2 text-rose-400 hover:text-rose-500"><i class="fa-solid fa-trash-can text-xs"></i></button>
+      <button onclick="deleteRecurring('${jsAttr(r.id)}')" class="p-2 text-rose-400 hover:text-rose-500"><i class="fa-solid fa-trash-can text-xs"></i></button>
     `;
     container.appendChild(card);
   });
@@ -4827,7 +4844,7 @@ function buildFeedCardHTML(item) {
   const sign = isInc ? '+' : '-';
 
   return `
-    <div class="flex items-center gap-3 min-w-0 flex-1" onclick="editTransaction('${item.id}')">
+    <div class="flex items-center gap-3 min-w-0 flex-1" onclick="editTransaction('${jsAttr(item.id)}')">
       <div class="w-10 h-10 rounded-2xl ${iconBg} flex items-center justify-center text-sm shrink-0">
         <i class="fa-solid ${iconCls}"></i>
       </div>
@@ -4904,7 +4921,7 @@ renderTransactions = function() {
       const card = document.createElement('div');
       card.className = 'ft-tx-feed-item';
       card.innerHTML = buildFeedCardHTML(item) + `
-        <button onclick="requestDelete('${item.id}')" class="w-8 h-8 rounded-xl bg-white/5 text-slate-400 hover:text-rose-400 flex items-center justify-center shrink-0">
+        <button onclick="requestDelete('${jsAttr(item.id)}')" class="w-8 h-8 rounded-xl bg-white/5 text-slate-400 hover:text-rose-400 flex items-center justify-center shrink-0">
           <i class="fa-solid fa-trash-can text-xs"></i>
         </button>`;
       feed.appendChild(card);
@@ -4933,7 +4950,7 @@ renderTransactions = function() {
           <div class="flex items-center gap-2.5">
             ${badge}
             <div class="flex items-center gap-2">
-              ${item.receipt ? `<img src="${item.receipt}" onclick="viewReceiptImage('${item.receipt}')" class="w-9 h-9 rounded-xl object-cover border border-orange-500/40 cursor-pointer shrink-0" alt="صورة">` : ''}
+              ${item.receipt ? `<img src="${safeReceiptURL(item.receipt)}" onclick="viewReceiptImage('${jsAttr(item.receipt)}')" class="w-9 h-9 rounded-xl object-cover border border-orange-500/40 cursor-pointer shrink-0" alt="صورة">` : ''}
               <div>
                 <div class="font-bold text-slate-800 dark:text-slate-100">${escapeHTML(item.notes || 'بدون بيان')}</div>
                 ${item.reference ? `<div class="text-[9px] text-slate-400 mt-0.5">مرجع: ${escapeHTML(item.reference)}</div>` : ''}
@@ -4942,7 +4959,7 @@ renderTransactions = function() {
           </div>
         </td>
         <td class="py-3 px-4">
-          ${item.client ? `<button onclick="openClientLedger('${escapeHTML(item.client)}')" class="inline-flex items-center gap-1 text-xs font-black text-orange-500 hover:underline"><i class="fa-solid fa-user-circle"></i> ${escapeHTML(item.client)}</button>` : '<span class="text-slate-400 text-[10px]">-</span>'}
+          ${item.client ? `<button onclick="openClientLedger('${jsAttr(item.client)}')" class="inline-flex items-center gap-1 text-xs font-black text-orange-500 hover:underline"><i class="fa-solid fa-user-circle"></i> ${escapeHTML(item.client)}</button>` : '<span class="text-slate-400 text-[10px]">-</span>'}
         </td>
         <td class="py-3 px-4"><span class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-slate-300 font-bold text-[10px]">${escapeHTML(item.category)}</span></td>
         <td class="py-3 px-4 text-slate-500 dark:text-slate-400 font-semibold">${payMethodHTML(item.paymentMethod)}</td>
@@ -4953,9 +4970,9 @@ renderTransactions = function() {
         <td class="py-3 px-4">${amount}</td>
         <td class="py-3 px-4 text-center">
           <div class="flex items-center justify-center gap-1">
-            <button onclick="shareViaWhatsApp('${item.id}')" class="p-2 rounded-xl text-emerald-500 hover:bg-emerald-500/10"><i class="fa-brands fa-whatsapp text-sm"></i></button>
-            <button onclick="editTransaction('${item.id}')" class="p-2 rounded-xl text-slate-400 hover:text-orange-500"><i class="fa-solid fa-pen text-xs"></i></button>
-            <button onclick="requestDelete('${item.id}')" class="p-2 rounded-xl text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash-can text-xs"></i></button>
+            <button onclick="shareViaWhatsApp('${jsAttr(item.id)}')" class="p-2 rounded-xl text-emerald-500 hover:bg-emerald-500/10"><i class="fa-brands fa-whatsapp text-sm"></i></button>
+            <button onclick="editTransaction('${jsAttr(item.id)}')" class="p-2 rounded-xl text-slate-400 hover:text-orange-500"><i class="fa-solid fa-pen text-xs"></i></button>
+            <button onclick="requestDelete('${jsAttr(item.id)}')" class="p-2 rounded-xl text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash-can text-xs"></i></button>
           </div>
         </td>
       `;
@@ -5142,6 +5159,7 @@ function startWithDemoMode() {
 function exitDemoData() {
   openConfirm('مسح البيانات التجريبية؟', 'سيتم تصفير البيانات التجريبية لتبدأ تسجيل حساباتك الحقيقية.', () => {
     transactions = [];
+    window._a7ExplicitWipe = true;   // allow the sync to remove cloud documents too
     lsDel(DEMO_FLAG_KEY);
     saveData({ force: true });
     refreshAll();
@@ -6606,7 +6624,7 @@ buildFeedCardHTML = function (item) {
   const time = item.time ? formatTimeTo12Hour(item.time) : '';
   const sub = [item.client ? `<span class="tx-cl">${escapeHTML(item.client)}</span>` : '', payMethodHTML(item.paymentMethod), escapeHTML(time || item.date)].filter(Boolean).join(' <i class="tx-dot"></i> ');
   return `
-    <div class="tx-m-left" onclick="editTransaction('${item.id}')">
+    <div class="tx-m-left" onclick="editTransaction('${jsAttr(item.id)}')">
       <span class="tx-ic ${m.cls}"><i class="fa-solid ${m.icon}"></i></span>
       <div class="tx-t"><b>${title}</b><small>${sub}</small></div>
     </div>
@@ -6667,7 +6685,7 @@ renderTransactions = function () {
       const card = document.createElement('div');
       card.className = 'ft-tx-feed-item tx-card';
       card.innerHTML = buildFeedCardHTML(item) +
-        `<button type="button" onclick="requestDelete('${item.id}')" class="tx-del" aria-label="حذف"><i class="fa-solid fa-trash-can"></i></button>`;
+        `<button type="button" onclick="requestDelete('${jsAttr(item.id)}')" class="tx-del" aria-label="حذف"><i class="fa-solid fa-trash-can"></i></button>`;
       feed.appendChild(card);
     }
     if (tbody) {
@@ -6677,7 +6695,7 @@ renderTransactions = function () {
       tr.innerHTML = `
         <td class="tx-c1"><div class="tx-main">
           <span class="tx-ic ${m.cls}"><i class="fa-solid ${m.icon}"></i></span>
-          ${item.receipt ? `<img src="${escapeHTML(item.receipt)}" class="tx-rcpt" alt="صورة العملية" title="تكبير الصورة" onclick="viewReceiptImage(this.src)">` : ''}
+          ${item.receipt ? `<img src="${safeReceiptURL(item.receipt)}" class="tx-rcpt" alt="صورة العملية" title="تكبير الصورة" onclick="viewReceiptImage(this.src)">` : ''}
           <div class="tx-t"><b>${escapeHTML(item.notes || item.category || 'بدون بيان')}</b>
             <small><span class="tx-cat">${escapeHTML(item.category || m.label)}</span>${item.reference ? ` <i class="tx-dot"></i> مرجع: ${escapeHTML(item.reference)}` : ''}</small></div>
         </div></td>
@@ -6686,9 +6704,9 @@ renderTransactions = function () {
         <td class="tx-c4"><div class="tx-time"><i class="fa-regular fa-clock"></i> ${escapeHTML(time || '—')}</div><small>${escapeHTML(item.date)}</small></td>
         <td class="tx-c5"><div class="tx-amt ${m.cls} money-val">${m.sign}${money(item.amount)} <small>ج.م</small></div></td>
         <td class="tx-c6"><div class="tx-acts">
-          <button type="button" onclick="shareViaWhatsApp('${item.id}')" title="مشاركة" class="wa"><i class="fa-brands fa-whatsapp"></i></button>
-          <button type="button" onclick="editTransaction('${item.id}')" title="تعديل"><i class="fa-solid fa-pen"></i></button>
-          <button type="button" onclick="requestDelete('${item.id}')" title="حذف" class="del"><i class="fa-solid fa-trash-can"></i></button>
+          <button type="button" onclick="shareViaWhatsApp('${jsAttr(item.id)}')" title="مشاركة" class="wa"><i class="fa-brands fa-whatsapp"></i></button>
+          <button type="button" onclick="editTransaction('${jsAttr(item.id)}')" title="تعديل"><i class="fa-solid fa-pen"></i></button>
+          <button type="button" onclick="requestDelete('${jsAttr(item.id)}')" title="حذف" class="del"><i class="fa-solid fa-trash-can"></i></button>
         </div></td>`;
       const cl = tr.querySelector('[data-client]');
       if (cl) cl.addEventListener('click', () => openClientLedger(item.client));
@@ -8046,7 +8064,7 @@ function syncThemeColorMeta() {
 const CLIENT_PHONES_KEY = 'ehsebli_client_phones_v1';
 
 /* ---------- أرقام العملاء ---------- */
-function _ckey(name) { return String(name || '').trim().toLowerCase(); }
+function _ckey(name) { return String(name || '').trim().toLowerCase().slice(0, 80); }
 function normalizePhone(raw) {
   let d = String(raw || '').replace(/[٠-٩]/g, c => String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[^\d+]/g, '');
   if (!d) return '';
@@ -8075,7 +8093,7 @@ function saveClientPhones() {
 function setClientPhone(name, raw) {
   const phone = normalizePhone(raw);
   if (!name || !String(name).trim() || !phone) return false;
-  clientPhones[_ckey(name)] = { name: String(name).trim().slice(0, 60), phone };
+  clientPhones[_ckey(name)] = { name: String(name).trim().slice(0, 60), phone };  // key capped by _ckey()
   saveClientPhones();
   return true;
 }
@@ -8158,7 +8176,26 @@ function remindClient(name) {
 }
 
 /* ---------- بطاقة المطالبة (صورة احترافية جديدة) ---------- */
-function _loadImg(src) { return new Promise(res => { if (!src) return res(null); const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }); }
+function safeCanvasToBlob(canvas, cb, type, quality) {
+  try { canvas.toBlob(cb, type, quality); }
+  catch (e) { console.warn('Canvas export blocked (cross-origin image):', e); cb(null); }
+}
+function safeCanvasToDataURL(canvas, type, quality) {
+  try { return canvas.toDataURL(type, quality); }
+  catch (e) { console.warn('Canvas export blocked (cross-origin image):', e); return ''; }
+}
+function _loadImg(src) {
+  return new Promise(res => {
+    if (!src) return res(null);
+    const im = new Image();
+    // Firebase Storage receipts are cross-origin: without this the canvas is tainted
+    // and toBlob()/toDataURL() throw SecurityError on real phones.
+    if (/^https?:\/\//i.test(String(src))) im.crossOrigin = 'anonymous';
+    im.onload = () => res(im);
+    im.onerror = () => res(null);
+    im.src = src;
+  });
+}
 function _fit(ctx, text, maxW) {
   let t = String(text || '');
   if (ctx.measureText(t).width <= maxW) return t;
@@ -8258,7 +8295,7 @@ async function openDebtCardModal(debtId) {
   showToast('جاري تصميم بطاقة المطالبة...', 'info');
   const canvas = document.getElementById('debtCardCanvas');
   try { await drawDebtCardCanvas(debt, canvas); } catch (e) { console.warn(e); showToast('تعذر تصميم البطاقة', 'error'); return; }
-  const dataUrl = canvas.toDataURL('image/png');
+  const dataUrl = safeCanvasToDataURL(canvas, 'image/png');
   const img = document.getElementById('debtCardImg'); if (img) img.src = dataUrl;
   const dl = document.getElementById('downloadDebtCardBtn');
   if (dl) { dl.href = dataUrl; dl.download = `مطالبة_${debt.client || 'عميل'}_${debt.date}.png`; }
@@ -8271,7 +8308,7 @@ function closeDebtCardModal() {
 }
 async function shareDebtCardImage() {
   const d = currentCardDebt, canvas = document.getElementById('debtCardCanvas'); if (!d || !canvas) return;
-  const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+  const blob = await new Promise(r => safeCanvasToBlob(canvas, r, 'image/png'));
   if (!blob) return;
   const file = new File([blob], `مطالبة_${d.client || 'عميل'}.png`, { type: 'image/png' });
   try {
@@ -8393,3 +8430,33 @@ async function loginWithGoogleRedirect() {
   try { await auth.signInWithRedirect(provider); }
   catch (e) { hideAuthLoading(); showLoginWall(); showLoginError(_loginErrorText(e && e.code) || 'تعذر بدء تسجيل الدخول'); }
 }
+
+
+/* =========================================================
+   MOBILE LAYOUT FAILSAFE — v20.10.1
+   The mobile CSS hides [data-mob-view] sections and relies on JS to reveal them.
+   If any init code throws, the screen goes blank. This gate keeps sections visible
+   by default and only enables the hide/show system once JS is confirmed alive.
+   ========================================================= */
+(function initMobileFailsafe() {
+  const activeSel = '[data-mob-view].mob-active-block, [data-mob-view].mob-active-grid';
+  function enable() { try { document.body.classList.add('mob-js-ready'); } catch (e) {} }
+  function activate(target) {
+    try { if (typeof navigateSegmented === 'function') { navigateSegmented(target); return true; } } catch (e) {}
+    return false;
+  }
+  function boot() {
+    if (!document.querySelector(activeSel)) {
+      const t = (typeof currentActiveView === 'string' && currentActiveView) || 'home';
+      if (!activate(t)) activate('home');
+    }
+    enable();
+    setTimeout(() => {
+      if (!document.querySelector(activeSel)) {
+        document.body.classList.remove('mob-js-ready');   // show everything rather than a blank screen
+      }
+    }, 1500);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else boot();
+})();

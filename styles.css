@@ -874,11 +874,11 @@ html:not(.dark) .ft-tx-feed-item {
   }
   body[data-mode="personal"] .mob-nav-btn.active { color: #00a8ff !important; }
 
-  [data-mob-view] { display: none !important; }
-  [data-mob-view].mob-active-block { display: block !important; }
-  [data-mob-view].mob-active-grid { display: grid !important; }
-  body[data-mode="personal"] [data-mob-view].business-only { display: none !important; }
-  body[data-mode="business"] [data-mob-view].personal-only { display: none !important; }
+  body.mob-js-ready [data-mob-view] { display: none !important; }
+  body.mob-js-ready [data-mob-view].mob-active-block { display: block !important; }
+  body.mob-js-ready [data-mob-view].mob-active-grid { display: grid !important; }
+  body.mob-js-ready[data-mode="personal"] [data-mob-view].business-only { display: none !important; }
+  body.mob-js-ready[data-mode="business"] [data-mob-view].personal-only { display: none !important; }
 }
 
 .demo-banner-bar {
@@ -2307,3 +2307,43 @@ body .team-home[hidden] { display: none !important; }
 .dc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dc-sec { min-height: 46px; border-radius: 14px; border: 1px solid var(--u-line); background: var(--u-bg2); color: var(--u-fg); font: 800 12.5px 'Cairo', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; } .dc-sec:hover { border-color: #f97316; color: #f97316; }
 .lg-alt { width: 100%; margin-top: 12px; min-height: 44px; border-radius: 13px; cursor: pointer; border: 1px solid rgba(251,191,36,.4); background: rgba(251,191,36,.08); color: #fbbf24; font: 800 12px/1.6 'Cairo', sans-serif; } .lg-alt[hidden] { display: none; }
+
+
+/* =========================================================
+   📱 v20.10.1 — mobile usability / safe-area fixes
+   ========================================================= */
+@media (max-width: 767px) {
+  html { -webkit-text-size-adjust: 100%; }
+  body { min-height: 100dvh; }
+  #mobileBottomNav {
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-inline: 4px;
+  }
+  .mob-nav-btn, .qa-tile, .tx-chip, button, a { touch-action: manipulation; }
+  .mob-nav-btn { min-height: 48px; }
+  /* Sheets must scroll internally on short screens instead of vanishing */
+  .tx-root, .pf-root, #quickAddSheet {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    -webkit-overflow-scrolling: touch;
+  }
+  .tx-sheet, .pf-card.dc-card, #quickAddSheet .qa-sheet {
+    max-height: calc(100dvh - 24px) !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tx-body, .pf-body { overscroll-behavior: contain; }
+  /* Make touch targets tappable in the transactions table */
+  #transactionsTbody button, .tx-acts button, .tx-del {
+    min-width: 44px; min-height: 44px;
+  }
+  [data-mob-view] { width: 100%; max-width: 100%; }
+  /* New v20.10 client-phone field stays full width */
+  .tx-phone { width: 100%; }
+  .tx-phone input { width: 100%; min-width: 0; }
+  /* Keep the WhatsApp reminder buttons visible and tappable */
+  .cl-btn.wa, .db-btn.wa { min-width: 44px; min-height: 44px; flex: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tx-sheet, .pf-card, .qa-sheet { animation: none !important; }
+}
