@@ -250,137 +250,7 @@ function normalizeTransaction(t) {
   };
 }
 
-/* =========================================================
-   PWA: MANDATORY MOBILE INSTALL DIALOG (إجباري عند الفتح)
-   ========================================================= */
-function isAppStandalone() {
-  return window.matchMedia('(display-mode: standalone)').matches || 
-         window.navigator.standalone === true ||
-         document.referrer.includes('android-app://');
-}
-
-function checkForcedInstallDialog() {
-  // إذا كان التطبيق مثبت ومفتوح بالفعل كتطبيق، لا تظهر الرسالة
-  if (isAppStandalone()) {
-    document.body.classList.add('pwa-standalone');
-    const hBtn = document.getElementById('headerInstallBtn');
-    if (hBtn) hBtn.classList.add('hidden');
-    return;
-  }
-
-  // إظهار زر التثبيت في الهيدر والقائمة دائماً
-  const hBtn = document.getElementById('headerInstallBtn');
-  if (hBtn) {
-    hBtn.classList.remove('hidden');
-    hBtn.classList.add('flex');
-  }
-
-  // إظهار النافذة إجبارياً بعد نصف ثانية من فتح الموقع
-  setTimeout(() => {
-    showMobileInstallModal();
-  }, 600);
-}
-
-function showMobileInstallModal() {
-  const modal = document.getElementById('mobileInstallModal');
-  if (!modal) return;
-  modal.style.display = 'flex';
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
-
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  const iosHelper = document.getElementById('iosInstallHelper');
-  const androidHelper = document.getElementById('androidInstallHelper');
-  const acceptBtn = document.getElementById('mobileInstallAcceptBtn');
-
-  if (isIOS) {
-    if (iosHelper) iosHelper.classList.remove('hidden');
-    if (androidHelper) androidHelper.classList.add('hidden');
-    if (acceptBtn) {
-      acceptBtn.innerHTML = '<i class="fa-solid fa-arrow-up-from-bracket"></i> <span>طريقة التثبيت على الآيفون</span>';
-      acceptBtn.onclick = () => {
-        showToast('اضغط زر المشاركة ⬆️ أسفل الشاشة ثم اختر "إضافة إلى الشاشة الرئيسية"', 'info');
-      };
-    }
-  } else {
-    if (iosHelper) iosHelper.classList.add('hidden');
-    // On Android
-    if (acceptBtn) {
-      acceptBtn.innerHTML = '<i class="fa-solid fa-download text-base"></i> <span>تثبيت التطبيق الآن</span>';
-      acceptBtn.onclick = triggerMobileAppInstall;
-    }
-  }
-}
-
-function dismissMobileInstall() {
-  const modal = document.getElementById('mobileInstallModal');
-  if (modal) {
-    modal.style.display = 'none';
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-  }
-}
-
-async function triggerMobileAppInstall() {
-  if (deferredInstallPrompt) {
-    try {
-      await deferredInstallPrompt.prompt();
-      const choice = await deferredInstallPrompt.userChoice;
-      if (choice.outcome === 'accepted') {
-        showToast('جاري تثبيت التطبيق على جهازك بنجاح 🎉', 'success');
-        dismissMobileInstall();
-      } else {
-        showToast('تم إلغاء التثبيت، يمكنك التثبيت لاحقاً من القائمة', 'info');
-      }
-    } catch(err) {
-      console.warn("Prompt error:", err);
-    }
-    deferredInstallPrompt = null;
-    return;
-  }
-
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  if (isIOS) {
-    showToast('على الآيفون: اضغط زر المشاركة ⬆️ ثم "إضافة إلى الشاشة الرئيسية"', 'info');
-  } else {
-    // If browser didn't fire prompt yet or user needs guidance:
-    const androidHelper = document.getElementById('androidInstallHelper');
-    if (androidHelper) androidHelper.classList.remove('hidden');
-    showToast('من قائمة المتصفح (⋮) بالأعلى اختر [تثبيت التطبيق] أو [إضافة للشاشة الرئيسية]', 'info');
-  }
-}
-
-function installApp() {
-  showMobileInstallModal();
-}
-
-function initInstallPrompt() {
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    const btn = document.getElementById('installAppBtn');
-    if (btn) btn.classList.remove('hidden');
-    // Call forced dialog
-    checkForcedInstallDialog();
-  });
-
-  window.addEventListener('appinstalled', () => {
-    deferredInstallPrompt = null;
-    const btn = document.getElementById('installAppBtn');
-    if (btn) btn.classList.add('hidden');
-    const hBtn = document.getElementById('headerInstallBtn');
-    if (hBtn) hBtn.classList.add('hidden');
-    dismissMobileInstall();
-    showToast('تم تثبيت التطبيق بنجاح 🎉', 'success');
-  });
-
-  if (isAppStandalone()) {
-    document.body.classList.add('pwa-standalone');
-  } else {
-    // Always trigger forced dialog on load
-    checkForcedInstallDialog();
-  }
-}
+/* (قائمة التثبيت اتنقلت لقسم V20.8 في آخر الملف) */
 
 /* =========================================================
    PWA: SHARE TARGET
@@ -1278,7 +1148,7 @@ function loginAsGuest() {
   // لازم ننادي دي عشان تمسح بيانات الحساب اللي كان متعلم قبله لو فيه
   handleUserSwitch(currentUser.uid); 
   
-  showToast('مرحباً بك في وضع الزائر 👋', 'success');
+  if (!window._guestSilent) showToast('مرحباً بك في وضع الزائر 👋', 'success');
   hideLoginWall();
   const userProfile = document.getElementById('userProfile');
   if (userProfile) {
@@ -1426,25 +1296,6 @@ function changePhoneNumber() {
   document.getElementById('otpInput').value = '';
 }
 
-async function loginWithGoogle() {
-  const provider = new firebase.auth.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-  try {
-    const result = await auth.signInWithPopup(provider);
-    showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success');
-  } catch (error) {
-    if (error.code === 'auth/popup-blocked') await auth.signInWithRedirect(provider);
-    else showToast('تعذر تسجيل الدخول: ' + error.message, 'error');
-  }
-}
-
-async function handleRedirectResult() {
-  try {
-    const result = await auth.getRedirectResult();
-    if (result && result.user) showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success');
-  } catch (error) {}
-}
-
 /* =========================================================
    CATEGORIES & DEMO
    ========================================================= */
@@ -1572,15 +1423,6 @@ function hideLoginWall() {
   document.body.classList.remove('not-authed');
   document.getElementById('loginWall').classList.add('hidden');
 }
-function showPinLock() {
-  if (isPortalModeActive) return;
-  lsDel(PIN_ACTIVE_KEY);
-  document.getElementById('lockScreen').classList.remove('hidden');
-  document.getElementById('lockScreen').classList.add('flex');
-  document.getElementById('unlockPinInput').value = '';
-  document.getElementById('unlockError').classList.add('hidden');
-  setTimeout(() => document.getElementById('unlockPinInput').focus(), 150);
-}
 function hidePinLock() {
   document.getElementById('lockScreen').classList.add('hidden');
   document.getElementById('lockScreen').classList.remove('flex');
@@ -1610,6 +1452,7 @@ function handleUserSwitch(uid) {
    ========================================================= */
 function applySignedOutState() {
   lsDel(PIN_ACTIVE_KEY);
+  closeAllOverlays();
   currentUser = null;
   userRole = 'free';
   isSuperAdmin = false;
@@ -1669,7 +1512,7 @@ function _tourFirstVisible(selectors) {
 function _tourBlocked() {
   const b = document.body.classList;
   if (b.contains('not-authed') || b.contains('auth-pending')) return true;
-  return ['authLoading', 'loginWall', 'lockScreen', 'modeOnboardingModal', 'userProfileModal', 'guestImportModal'].some(id => {
+  return ['authLoading', 'loginWall', 'lockScreen', 'modeOnboardingModal', 'userProfileModal', 'guestImportModal', 'mobileInstallModal', 'pinModal', 'teamInviteModal'].some(id => {
     const el = document.getElementById(id);
     return el && !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none';
   });
@@ -1833,6 +1676,7 @@ auth.onAuthStateChanged(async user => {
 
   if (user) {
     currentUser = user;
+    localStorage.removeItem(GUEST_SESSION_KEY);
     handleUserSwitch(user.uid);
     hideLoginWall();
     syncModeForCurrentUser();
@@ -1884,7 +1728,8 @@ auth.onAuthStateChanged(async user => {
       scheduleLibPrefetch();
     });
   } else {
-    applySignedOutState();
+    if (localStorage.getItem(GUEST_SESSION_KEY) === '1') { window._guestSilent = true; try { loginAsGuest(); } finally { window._guestSilent = false; } }
+    else applySignedOutState();
   }
 });
 
@@ -1894,11 +1739,11 @@ function logout() {
   if (isRealCloudUser()) {
     openConfirm('تسجيل الخروج؟', 'سيتم إنهاء الجلسة. بياناتك محفوظة في السحابة بأمان.', () => auth.signOut());
   } else {
-    openConfirm('الخروج من وضع الزائر؟', 'بيانات الزائر محفوظة على هذا الجهاز فقط ومنفصلة تماماً عن أي حساب، وهتلاقيها لما تدخل كزائر تاني.', () => applySignedOutState());
+    openConfirm('الخروج من وضع الزائر؟', 'بيانات الزائر محفوظة على هذا الجهاز فقط ومنفصلة تماماً عن أي حساب، وهتلاقيها لما تدخل كزائر تاني.', () => { localStorage.removeItem(GUEST_SESSION_KEY); applySignedOutState(); });
   }
 }
 function logoutFromLock() {
-  if (isRealCloudUser()) auth.signOut(); else applySignedOutState();
+  if (isRealCloudUser()) auth.signOut(); else { localStorage.removeItem(GUEST_SESSION_KEY); applySignedOutState(); }
 }
 
 /* =========================================================
@@ -3337,41 +3182,6 @@ function reportBox(title, value, color) {
 /* =========================================================
    PIN SECURITY
    ========================================================= */
-function openPinModal() {
-  if (!requireAuth()) return;
-  closeMenus();
-  const modal = document.getElementById('pinModal');
-  document.getElementById('pinInput').value = '';
-  document.getElementById('pinError').classList.add('hidden');
-  document.getElementById('pinTitle').textContent = !getPin() ? 'إنشاء PIN' : 'تغيير PIN';
-  document.getElementById('pinActionBtn').textContent = !getPin() ? 'تفعيل القفل' : 'تغيير الرمز';
-  modal.classList.remove('hidden'); modal.classList.add('flex');
-  setTimeout(() => document.getElementById('pinInput').focus(), 100);
-}
-function closePinModal() {
-  document.getElementById('pinModal').classList.add('hidden');
-  document.getElementById('pinModal').classList.remove('flex');
-}
-async function handlePinAction() {
-  const pin = document.getElementById('pinInput').value.trim();
-  const error = document.getElementById('pinError');
-  if (!/^\d{4,6}$/.test(pin)) {
-    error.textContent = 'PIN يجب أن يكون من 4 إلى 6 أرقام';
-    error.classList.remove('hidden');
-    return;
-  }
-  try {
-    await savePinEverywhere(pin);
-  } catch (e) {
-    error.textContent = 'تعذّر حفظ الرمز، تأكد من الاتصال بالإنترنت وحاول مرة أخرى';
-    error.classList.remove('hidden');
-    return;
-  }
-  closePinModal();
-  updatePinUI();
-  showToast('تم حفظ PIN بنجاح', 'success');
-  showPinLock();
-}
 function confirmRemovePin() {
   if (!requireAuth()) return;
   closeMenus();
@@ -3382,51 +3192,6 @@ function confirmRemovePin() {
     showToast('تمت إزالة رمز القفل', 'success');
   });
 }
-async function unlockApp() {
-  const input = document.getElementById('unlockPinInput');
-  const entered = input.value.trim();
-  const stored = getPin();
-  if (!stored) { hidePinLock(); return; }
-  let ok = false;
-  try { ok = await verifyPin(entered); } catch (e) { ok = false; }
-  if (ok) {
-    hidePinLock(); input.value = '';
-    // ترقية الرمز القديم (SHA-256 محلي) إلى v3 متزامن مع السحابة
-    if (!parsePinRecord(stored)) { try { await savePinEverywhere(entered); updatePinUI(); } catch (e) { /* هيترقّى المرة الجاية */ } }
-  }
-  else {
-    document.getElementById('unlockError').classList.remove('hidden');
-    input.value = '';
-    input.focus();
-  }
-}
-async function forgotPinUnlock() {
-  if (!currentUser) return;
-  const user = currentUser;
-  const providers = (user.providerData || []).map(p => p.providerId);
-  try {
-    if (providers.includes('google.com')) {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      const res = await user.reauthenticateWithPopup(provider);
-      if (res.user && res.user.uid === user.uid) {
-        await clearPinEverywhere();
-        updatePinUI();
-        hidePinLock();
-        showToast('تم التحقق — أزيل القفل', 'success');
-      }
-    } else {
-      const pwd = prompt('أدخل كلمة السر لتأكيد هويتك:');
-      if (!pwd) return;
-      const cred = firebase.auth.EmailAuthProvider.credential(user.email, pwd);
-      await user.reauthenticateWithCredential(cred);
-      await clearPinEverywhere();
-      updatePinUI();
-      hidePinLock();
-      showToast('تم التحقق — أزيل القفل', 'success');
-    }
-  } catch (error) { showToast('فشل التحقق من الهوية', 'error'); }
-}
-
 /* =========================================================
    TABS & TOAST
    ========================================================= */
@@ -7688,7 +7453,10 @@ function applyTeamUI() {
     if (badge) { badge.className = 'hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-violet-500/40 text-violet-400'; badge.innerHTML = '<i class="fa-solid fa-people-group"></i> عضو فريق'; }
   }
   const homeCard = document.getElementById('teamHomeCard');
-  if (homeCard) { const t = document.getElementById('teamHomeName'); if (t) t.textContent = teamOwnerName || 'الفريق'; }
+  if (homeCard) {
+    homeCard.hidden = !(team && !(teamPerms && teamPerms.totals === true));
+    const t = document.getElementById('teamHomeName'); if (t) t.textContent = teamOwnerName || 'الفريق';
+  }
   const tile = document.getElementById('profileWsTile');
   if (tile) tile.hidden = !(teamMemberships.length || team);
   if (typeof applyRoleUI === 'function') applyRoleUI();
@@ -8023,3 +7791,500 @@ document.addEventListener('keydown', e => {
     const m = document.getElementById(id); if (m && !m.classList.contains('hidden')) fn();
   });
 });
+
+/* =========================================================
+   V20.8 — صفحة الدخول، قفل الـ PIN، قائمة التثبيت
+   ========================================================= */
+const GUEST_SESSION_KEY = 'a7sbley_guest_session_v1';
+const PIN_FAIL_KEY = 'a7sbley_pin_fail_v1';
+const INSTALL_DESKTOP_KEY = 'a7sbley_install_desktop_next_v1';
+const INSTALL_DONE_KEY = 'a7sbley_installed_v1';
+const INSTALL_DESKTOP_COOLDOWN = 30 * 24 * 3600 * 1000;   // الكمبيوتر: مرة كل 30 يوم
+const PIN_MAX_TRIES = 5;
+const PIN_LOCKOUT_MS = 30 * 1000;
+
+/* ---------- أدوات المنصة ---------- */
+function _plat() {
+  const ua = navigator.userAgent || '';
+  const ios = /iPad|iPhone|iPod/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1);
+  const android = /Android/i.test(ua);
+  const inApp = /FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|Twitter|TikTok|MicroMessenger/i.test(ua);
+  const safariIOS = ios && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA|DuckDuckGo/.test(ua);
+  return { ios, android, mobile: ios || android || /Mobi/i.test(ua), inApp, safariIOS, desktop: !(ios || android || /Mobi/i.test(ua)) };
+}
+function isAppStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+         window.navigator.standalone === true ||
+         document.referrer.includes('android-app://');
+}
+
+/* =========================================================
+   1) تسجيل الدخول
+   ========================================================= */
+function showLoginError(msg) {
+  const el = document.getElementById('loginError'); if (!el) return;
+  el.textContent = msg; el.hidden = false;
+}
+function clearLoginError() { const el = document.getElementById('loginError'); if (el) { el.hidden = true; el.textContent = ''; } }
+function setGoogleBusy(busy) {
+  const btn = document.getElementById('googleLoginBtn'); if (!btn) return;
+  btn.disabled = busy; btn.classList.toggle('busy', busy); btn.setAttribute('aria-busy', busy ? 'true' : 'false');
+  const t = btn.querySelector('.lg-g-t'); if (t) t.textContent = busy ? 'جاري الاتصال بجوجل...' : 'الدخول بحساب Google';
+}
+function _loginErrorText(code) {
+  return ({
+    'auth/network-request-failed': 'مفيش اتصال بالإنترنت. اتأكد من الشبكة وحاول تاني.',
+    'auth/unauthorized-domain': 'الدومين ده مش مضاف في Firebase (Authorized domains). أضفه من إعدادات Authentication.',
+    'auth/operation-not-allowed': 'تسجيل الدخول بجوجل مش مفعّل في Firebase.',
+    'auth/too-many-requests': 'محاولات كتير. استنى شوية وجرّب تاني.',
+    'auth/user-disabled': 'الحساب ده موقوف. تواصل مع الإدارة.',
+    'auth/web-storage-unsupported': 'المتصفح بيمنع التخزين (الكوكيز). فعّلها أو افتح الموقع في متصفح تاني.',
+    'auth/operation-not-supported-in-this-environment': 'المتصفح ده مش بيدعم تسجيل الدخول بجوجل. افتح الموقع في Chrome أو Safari.',
+    'auth/account-exists-with-different-credential': 'الإيميل ده مسجّل بطريقة دخول تانية.'
+  })[code] || '';
+}
+async function loginWithGoogle() {
+  if (window._googleBusy) return;
+  const p = _plat();
+  if (p.inApp) {
+    showLoginError('جوجل بتمنع تسجيل الدخول من داخل تطبيقات زي فيسبوك وإنستجرام. افتح الرابط في Chrome أو Safari ثم سجّل دخولك.');
+    return;
+  }
+  window._googleBusy = true; setGoogleBusy(true); clearLoginError();
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  try {
+    const result = await auth.signInWithPopup(provider);
+    localStorage.removeItem(GUEST_SESSION_KEY);
+    showToast(`أهلاً بك يا ${(result.user && result.user.displayName) || 'صديقنا'} 👋`, 'success');
+  } catch (error) {
+    const code = error && error.code;
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request' || code === 'auth/user-cancelled') {
+      /* المستخدم قفل النافذة — مفيش داعي لرسالة */
+    } else if (code === 'auth/popup-blocked') {
+      try { await auth.signInWithRedirect(provider); return; }
+      catch (e2) { showLoginError('المتصفح منع نافذة الدخول. اسمح بالنوافذ المنبثقة لهذا الموقع وحاول تاني.'); }
+    } else {
+      showLoginError(_loginErrorText(code) || ('تعذر تسجيل الدخول' + (code ? ` (${code})` : '')));
+    }
+  } finally {
+    window._googleBusy = false; setGoogleBusy(false);
+  }
+}
+async function handleRedirectResult() {
+  try {
+    const result = await auth.getRedirectResult();
+    if (result && result.user) { localStorage.removeItem(GUEST_SESSION_KEY); showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success'); }
+  } catch (error) {
+    const t = _loginErrorText(error && error.code);
+    if (t) { showLoginError(t); }
+  }
+}
+(function hookLoginWall() {
+  const orig = window.showLoginWall;
+  window.showLoginWall = function () {
+    const r = orig.apply(this, arguments);
+    window._googleBusy = false; setGoogleBusy(false); clearLoginError();
+    const ib = document.getElementById('loginInstallBtn'); if (ib) ib.hidden = isAppStandalone();
+    return r;
+  };
+  const og = window.loginAsGuest;
+  window.loginAsGuest = function () {
+    localStorage.setItem(GUEST_SESSION_KEY, '1');
+    return og.apply(this, arguments);
+  };
+  const oh = window.hideAuthLoading;
+  window.hideAuthLoading = function () {
+    const r = oh.apply(this, arguments);
+    clearTimeout(window._authSlowT); clearTimeout(window._authFailT);
+    const s = document.getElementById('authSlow'); if (s) s.hidden = true;
+    if (typeof scheduleInstallPrompt === 'function') scheduleInstallPrompt(1400);
+    return r;
+  };
+})();
+// لو التحقق من الحساب علّق (نت ضعيف): نطمّن المستخدم، وبعدها ندخّله بدل ما يفضل على شاشة التحميل
+window._authSlowT = setTimeout(() => { const s = document.getElementById('authSlow'); if (s && document.body.classList.contains('auth-pending')) s.hidden = false; }, 6000);
+window._authFailT = setTimeout(() => {
+  if (!document.body.classList.contains('auth-pending')) return;
+  hideAuthLoading();
+  if (localStorage.getItem(GUEST_SESSION_KEY) === '1') { window._guestSilent = true; loginAsGuest(); window._guestSilent = false; }
+  else { showLoginWall(); showLoginError('الاتصال بطيء. تقدر تدخل كزائر دلوقتي أو تحاول تاني.'); }
+}, 12000);
+
+function closeAllOverlays() {
+  document.querySelectorAll('[id$="Modal"]').forEach(m => {
+    if (m.id === 'mobileInstallModal') return;
+    m.classList.add('hidden'); m.classList.remove('flex');
+  });
+  try { closeQuickAdd(false); } catch (e) {}
+}
+
+/* =========================================================
+   2) لوحة أرقام موحّدة (القفل + إنشاء الرمز)
+   ========================================================= */
+function createPinPad(host, opts) {
+  const o = Object.assign({ maxLen: 6, minLen: 4, onSubmit() {}, onChange() {} }, opts);
+  host.classList.add('pn');
+  host.innerHTML =
+    `<div class="pn-dots" aria-live="polite">${'<i></i>'.repeat(o.maxLen)}</div>` +
+    `<div class="pn-keys">` +
+    [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button type="button" class="pn-key" data-k="${n}" aria-label="${n}">${n}</button>`).join('') +
+    `<button type="button" class="pn-key pn-aux" data-k="back" aria-label="مسح"><i class="fa-solid fa-delete-left"></i></button>` +
+    `<button type="button" class="pn-key" data-k="0" aria-label="0">0</button>` +
+    `<button type="button" class="pn-key pn-ok" data-k="ok" aria-label="تأكيد" disabled><i class="fa-solid fa-check"></i></button>` +
+    `</div>`;
+  const dots = Array.from(host.querySelectorAll('.pn-dots i'));
+  const okBtn = host.querySelector('.pn-ok');
+  let value = '', locked = false, submitTimer = null;
+  const api = {
+    get value() { return value; },
+    press(k) {
+      if (locked) return;
+      clearTimeout(submitTimer);
+      if (k === 'back') value = value.slice(0, -1);
+      else if (k === 'ok') { if (value.length >= o.minLen) o.onSubmit(value); return; }
+      else if (/^\d$/.test(k) && value.length < o.maxLen) value += k;
+      else return;
+      render();
+      if (value.length === o.maxLen) submitTimer = setTimeout(() => o.onSubmit(value), 140);
+    },
+    reset() { clearTimeout(submitTimer); value = ''; render(); },
+    shake() {
+      host.classList.remove('shake'); void host.offsetWidth; host.classList.add('shake');
+      if (navigator.vibrate) { try { navigator.vibrate([60, 40, 60]); } catch (e) {} }
+    },
+    setLocked(b) { locked = !!b; host.classList.toggle('locked', locked); host.querySelectorAll('.pn-key').forEach(k => { k.disabled = locked || (k.classList.contains('pn-ok') && value.length < o.minLen); }); }
+  };
+  function render() {
+    dots.forEach((d, i) => d.classList.toggle('on', i < value.length));
+    okBtn.disabled = locked || value.length < o.minLen;
+    o.onChange(value);
+  }
+  host.addEventListener('click', e => { const b = e.target.closest('.pn-key'); if (b && !b.disabled) api.press(b.getAttribute('data-k')); });
+  render();
+  return api;
+}
+let _lockPad = null, _setupPad = null;
+function _activePad() {
+  const lock = document.getElementById('lockScreen');
+  if (lock && !lock.classList.contains('hidden')) return _lockPad;
+  const m = document.getElementById('pinModal');
+  if (m && !m.classList.contains('hidden')) return _setupPad;
+  return null;
+}
+document.addEventListener('keydown', e => {
+  const pad = _activePad(); if (!pad || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (/^[0-9]$/.test(e.key)) { pad.press(e.key); e.preventDefault(); }
+  else if (e.key === 'Backspace') { pad.press('back'); e.preventDefault(); }
+  else if (e.key === 'Enter') { pad.press('ok'); e.preventDefault(); }
+});
+
+/* ---------- شاشة القفل ---------- */
+let _lockTimer = null;
+function _pinFailState() { try { return JSON.parse(lsGet(PIN_FAIL_KEY) || '{}'); } catch (e) { return {}; } }
+function _renderLockState() {
+  const err = document.getElementById('unlockError');
+  const st = _pinFailState();
+  const left = Math.ceil(((st.until || 0) - Date.now()) / 1000);
+  clearInterval(_lockTimer);
+  if (left > 0) {
+    _lockPad && _lockPad.setLocked(true);
+    err.hidden = false; err.textContent = `محاولات كتير غلط — جرّب بعد ${left} ثانية`;
+    _lockTimer = setInterval(() => {
+      const l = Math.ceil(((_pinFailState().until || 0) - Date.now()) / 1000);
+      if (l <= 0) { clearInterval(_lockTimer); _lockPad && _lockPad.setLocked(false); err.hidden = true; }
+      else err.textContent = `محاولات كتير غلط — جرّب بعد ${l} ثانية`;
+    }, 500);
+  } else { _lockPad && _lockPad.setLocked(false); }
+}
+function showPinLock() {
+  if (isPortalModeActive) return;
+  lsDel(PIN_ACTIVE_KEY);
+  const el = document.getElementById('lockScreen');
+  if (!_lockPad) _lockPad = createPinPad(document.getElementById('lkPad'), {
+    onSubmit: pin => { document.getElementById('unlockPinInput').value = pin; unlockApp(); },
+    onChange: v => { const e = document.getElementById('unlockError'); if (v && v.length && e && !(_pinFailState().until > Date.now())) e.hidden = true; }
+  });
+  _lockPad.reset();
+  el.classList.remove('hidden'); el.classList.add('flex');
+  const name = document.getElementById('lkUser');
+  if (name) name.textContent = (currentUser && (currentUser.displayName || currentUser.email)) || '';
+  const av = document.getElementById('lkAvatar');
+  if (av) av.src = (currentUser && currentUser.photoURL) ? currentUser.photoURL : 'logo.png';
+  const fb = document.getElementById('lkForgot'); if (fb) fb.innerHTML = '<i class="fa-solid fa-key"></i> نسيت الرمز؟';
+  document.getElementById('unlockError').hidden = true;
+  _renderLockState();
+}
+async function unlockApp() {
+  const input = document.getElementById('unlockPinInput');
+  const entered = (input.value || '').trim();
+  const stored = getPin();
+  if (!stored) { hidePinLock(); return; }
+  const st0 = _pinFailState();
+  if ((st0.until || 0) > Date.now()) { _renderLockState(); return; }
+  let ok = false;
+  try { ok = await verifyPin(entered); } catch (e) { ok = false; }
+  const err = document.getElementById('unlockError');
+  if (ok) {
+    lsDel(PIN_FAIL_KEY);
+    input.value = ''; if (_lockPad) _lockPad.reset();
+    hidePinLock();
+    if (!parsePinRecord(stored)) { try { await savePinEverywhere(entered); updatePinUI(); } catch (e) { /* هيترقّى المرة الجاية */ } }
+    return true;
+  }
+  const st = _pinFailState();
+  const count = (st.count || 0) + 1;
+  input.value = '';
+  if (count >= PIN_MAX_TRIES) {
+    lsSet(PIN_FAIL_KEY, JSON.stringify({ count: 0, until: Date.now() + PIN_LOCKOUT_MS }));
+    if (_lockPad) { _lockPad.reset(); _lockPad.shake(); }
+    _renderLockState();
+  } else {
+    lsSet(PIN_FAIL_KEY, JSON.stringify({ count, until: 0 }));
+    err.hidden = false; { const rem = PIN_MAX_TRIES - count; err.textContent = 'الرمز غير صحيح — ' + (rem === 1 ? 'باقي محاولة واحدة' : rem === 2 ? 'باقي محاولتين' : `باقي ${rem} محاولات`); }
+    if (_lockPad) { _lockPad.reset(); _lockPad.shake(); }
+  }
+  return false;
+}
+async function forgotPinUnlock() {
+  if (!currentUser) return;
+  const user = currentUser;
+  if (!isRealCloudUser()) {   // زائر: مفيش هوية نتحقق منها → إزالة القفل بتمسح بيانات الزائر
+    openConfirm('نسيت الرمز؟', 'إزالة القفل في وضع الزائر <b>هتمسح كل بيانات الزائر</b> المحفوظة على الجهاز، لأن مفيش حساب نتحقق منه. تكمّل؟', () => {
+      const suffix = '::' + user.uid;
+      Object.keys(localStorage).filter(k => k.endsWith(suffix)).forEach(k => localStorage.removeItem(k));
+      transactions = []; inventoryItems = []; recurringExpenses = []; chargeMachines = []; categoryBudgets = {};
+      hidePinLock(); loadAllLocal(); refreshAll(); updatePinUI();
+      showToast('تم مسح بيانات الزائر وإزالة القفل', 'info');
+    });
+    return;
+  }
+  const providers = (user.providerData || []).map(p => p.providerId);
+  try {
+    if (providers.includes('google.com')) {
+      const res = await user.reauthenticateWithPopup(new firebase.auth.GoogleAuthProvider());
+      if (res.user && res.user.uid === user.uid) { await clearPinEverywhere(); updatePinUI(); hidePinLock(); showToast('تم التحقق — أزيل القفل', 'success'); }
+    } else {
+      const pwd = prompt('أدخل كلمة السر لتأكيد هويتك:');
+      if (!pwd) return;
+      await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email, pwd));
+      await clearPinEverywhere(); updatePinUI(); hidePinLock(); showToast('تم التحقق — أزيل القفل', 'success');
+    }
+  } catch (error) {
+    const c = error && error.code;
+    if (c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request') return;
+    showToast(c === 'auth/popup-blocked' ? 'المتصفح منع نافذة التحقق. اسمح بالنوافذ المنبثقة وحاول تاني.' : 'فشل التحقق من الهوية. جرّب تسجّل خروج وتدخل من جديد.', 'error');
+  }
+}
+
+/* ---------- إنشاء / تغيير الرمز (خطوتين: كتابة ثم تأكيد) ---------- */
+let _setupStep = 1, _setupFirst = '';
+function _setupUI() {
+  const s1 = document.getElementById('pnStep1'), s2 = document.getElementById('pnStep2');
+  if (s1) s1.classList.toggle('on', true); if (s2) s2.classList.toggle('on', _setupStep === 2);
+  const had = !!getPin();
+  document.getElementById('pinTitle').textContent = _setupStep === 1 ? (had ? 'تغيير رمز القفل' : 'إنشاء رمز القفل') : 'أكّد الرمز';
+  document.getElementById('pinSub').textContent = _setupStep === 1 ? 'اختار رمز من 4 إلى 6 أرقام' : 'اكتب نفس الرمز تاني للتأكيد';
+}
+function _setupError(msg) { const e = document.getElementById('pinError'); e.textContent = msg || ''; e.hidden = !msg; }
+function openPinModal() {
+  if (!requireAuth()) return;
+  closeMenus();
+  const m = document.getElementById('pinModal');
+  if (!_setupPad) _setupPad = createPinPad(document.getElementById('pinPadHost'), { onSubmit: pinSetupSubmit, onChange: v => { if (v && v.length) _setupError(''); } });
+  _setupStep = 1; _setupFirst = ''; _setupPad.reset(); _setupError('');
+  _setupUI();
+  document.getElementById('pinRemoveBtn').hidden = !getPin();
+  m.classList.remove('hidden'); m.classList.add('flex');
+}
+function closePinModal() {
+  const m = document.getElementById('pinModal');
+  if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+}
+async function pinSetupSubmit(pin) {
+  if (!/^\d{4,6}$/.test(pin)) { _setupError('الرمز لازم يكون من 4 إلى 6 أرقام'); _setupPad.shake(); return; }
+  if (_setupStep === 1) { _setupFirst = pin; _setupStep = 2; _setupPad.reset(); _setupUI(); return; }
+  if (pin !== _setupFirst) {
+    _setupError('الرمزين مش متطابقين — ابدأ من الأول');
+    _setupPad.shake(); _setupStep = 1; _setupFirst = ''; _setupPad.reset(); _setupUI(); return;
+  }
+  try { await savePinEverywhere(pin); }
+  catch (e) { _setupError('تعذّر حفظ الرمز، اتأكد من الاتصال وحاول تاني'); _setupPad.reset(); return; }
+  closePinModal(); updatePinUI(); markPinActive();
+  showToast('تم تفعيل قفل التطبيق ✓', 'success');
+}
+function handlePinAction() { if (_setupPad) _setupPad.press('ok'); }
+function removePinFlow() {
+  openConfirm('إزالة قفل التطبيق؟', 'التطبيق هيفتح من غير رمز على كل أجهزتك.', async () => {
+    try { await clearPinEverywhere(); } catch (e) { showToast('تعذّرت إزالة القفل', 'error'); return; }
+    updatePinUI(); closePinModal(); showToast('تمت إزالة القفل', 'info');
+  });
+}
+
+/* =========================================================
+   3) قائمة تثبيت التطبيق
+   - الكمبيوتر: مرة واحدة كل 30 يوم
+   - الموبايل: كل مرة تفتح الموقع (طالما مش مثبّت)
+   ========================================================= */
+let _installTimer = null, _installShownThisLoad = false;
+function installEligible() {
+  if (isAppStandalone()) return false;
+  if (localStorage.getItem(INSTALL_DONE_KEY) === '1') return false;
+  if (isPortalModeActive || new URLSearchParams(location.search).has('client')) return false;
+  const p = _plat();
+  return p.mobile ? true : !!deferredInstallPrompt;
+}
+function _installBlocked() {
+  if (document.body.classList.contains('auth-pending')) return true;
+  const vis = id => { const e = document.getElementById(id); return !!e && !e.classList.contains('hidden') && getComputedStyle(e).display !== 'none'; };
+  const sus = document.getElementById('suspendedScreen');
+  return vis('lockScreen') || vis('modeOnboardingModal') || vis('teamInviteModal') || vis('guestImportModal') || (sus && !sus.hidden) || !!(typeof _tourDriver !== 'undefined' && _tourDriver);
+}
+function scheduleInstallPrompt(delay = 1200) {
+  clearTimeout(_installTimer);
+  if (_installShownThisLoad || !installEligible()) return;
+  const p = _plat();
+  if (!p.mobile && Date.now() < Number(localStorage.getItem(INSTALL_DESKTOP_KEY) || 0)) return;
+  const deadline = Date.now() + 60000;
+  const tick = () => {
+    if (_installShownThisLoad || !installEligible()) return;
+    if (_installBlocked()) { if (Date.now() < deadline) _installTimer = setTimeout(tick, 900); return; }
+    _installShownThisLoad = true;
+    if (!p.mobile) localStorage.setItem(INSTALL_DESKTOP_KEY, String(Date.now() + INSTALL_DESKTOP_COOLDOWN));
+    showMobileInstallModal();
+  };
+  _installTimer = setTimeout(tick, delay);
+}
+function showMobileInstallModal() {
+  const modal = document.getElementById('mobileInstallModal'); if (!modal) return;
+  const p = _plat();
+  const set = (id, fn) => { const e = document.getElementById(id); if (e) fn(e); };
+  set('insDevice', e => { e.textContent = p.ios ? 'الآيفون' : p.android ? 'الموبايل' : 'الكمبيوتر'; });
+  const hasPrompt = !!deferredInstallPrompt;
+  set('insIos', e => { e.hidden = !p.ios; });
+  set('insIosWarn', e => { e.hidden = !(p.ios && !p.safariIOS); });
+  set('insManual', e => { e.hidden = p.ios || hasPrompt; });
+  set('insManualText', e => {
+    e.innerHTML = p.android
+      ? 'من قائمة المتصفح <b>⋮</b> اختار <b>«تثبيت التطبيق»</b> أو <b>«إضافة إلى الشاشة الرئيسية»</b>.'
+      : 'اضغط أيقونة التثبيت <b>⊕</b> في شريط العنوان، أو من قائمة المتصفح اختار <b>«تثبيت احسبلي»</b>.';
+  });
+  set('mobileInstallAcceptBtn', btn => {
+    btn.hidden = !hasPrompt;
+    btn.innerHTML = `<i class="fa-solid fa-download"></i> <span>تثبيت على ${p.android ? 'الموبايل' : 'الكمبيوتر'} الآن</span>`;
+  });
+  set('insLater', e => { e.textContent = (p.ios || (!hasPrompt)) ? 'تمام، فهمت' : 'مش دلوقتي'; });
+  modal.classList.remove('hidden'); modal.classList.add('flex');
+  requestAnimationFrame(() => modal.classList.add('open'));
+}
+function dismissMobileInstall() {
+  const modal = document.getElementById('mobileInstallModal'); if (!modal) return;
+  modal.classList.remove('open');
+  setTimeout(() => { if (!modal.classList.contains('open')) { modal.classList.add('hidden'); modal.classList.remove('flex'); } }, 230);
+}
+async function triggerMobileAppInstall() {
+  if (!deferredInstallPrompt) return;
+  try {
+    await deferredInstallPrompt.prompt();
+    const choice = await deferredInstallPrompt.userChoice;
+    if (choice.outcome === 'accepted') { localStorage.setItem(INSTALL_DONE_KEY, '1'); showToast('جاري تثبيت التطبيق 🎉', 'success'); }
+    else showToast('تقدر تثبّته في أي وقت من الإعدادات', 'info');
+  } catch (err) { console.warn('install prompt error', err); }
+  deferredInstallPrompt = null;
+  dismissMobileInstall();
+}
+function installApp() { showMobileInstallModal(); }
+function checkForcedInstallDialog() { scheduleInstallPrompt(600); }
+function initInstallPrompt() {
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    scheduleInstallPrompt(900);
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    localStorage.setItem(INSTALL_DONE_KEY, '1');
+    dismissMobileInstall();
+    showToast('تم تثبيت التطبيق بنجاح 🎉', 'success');
+  });
+  if (isAppStandalone()) {
+    document.body.classList.add('pwa-standalone');
+    localStorage.setItem(INSTALL_DONE_KEY, '1');   // اتثبّت فعلاً على الجهاز ده
+  } else {
+    scheduleInstallPrompt(1500);
+  }
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const m = document.getElementById('mobileInstallModal');
+  if (m && !m.classList.contains('hidden')) dismissMobileInstall();
+  const pm = document.getElementById('pinModal');
+  if (pm && !pm.classList.contains('hidden')) closePinModal();
+});
+
+/* =========================================================
+   V20.9 — نافذة تسجيل العملية (واجهة مبسّطة وسلسة)
+   ========================================================= */
+function txAddAmount(n) {
+  const el = document.getElementById('formAmount'); if (!el) return;
+  el.value = n === 0 ? '' : String(Math.round(((Number(el.value) || 0) + n) * 100) / 100);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.focus({ preventScroll: true });
+}
+function _txChips(hostId, select, onPick) {
+  const host = document.getElementById(hostId); if (!host || !select) return;
+  host.replaceChildren();
+  Array.from(select.options).forEach(o => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tx-chip' + (o.value === select.value ? ' on' : '');
+    b.textContent = o.textContent; b.setAttribute('aria-pressed', o.value === select.value ? 'true' : 'false');
+    b.addEventListener('click', () => {
+      select.value = o.value;
+      host.querySelectorAll('.tx-chip').forEach(c => { const on = c === b; c.classList.toggle('on', on); c.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+      if (onPick) onPick(o.value);
+    });
+    host.appendChild(b);
+  });
+}
+function txSyncUI() {
+  const modal = document.getElementById('transactionModal'); if (!modal) return;
+  const sheet = modal.querySelector('.tx-sheet');
+  const sel = document.querySelector('input[name="txType"]:checked');
+  if (sheet && sel) sheet.setAttribute('data-type', sel.value);
+  _txChips('txCatChips', document.getElementById('formCategory'));
+  _txChips('txPayChips', document.getElementById('formPaymentMethod'));
+  const more = document.getElementById('txMore');
+  if (more) more.open = !!((document.getElementById('formReference') || {}).value || currentReceiptData);
+}
+(function hookTransactionModal() {
+  const otc = window.onTypeChange;
+  window.onTypeChange = function () { const r = otc.apply(this, arguments); try { txSyncUI(); } catch (e) { console.warn(e); } return r; };
+  const om = window.openModal;
+  window.openModal = function () {
+    const r = om.apply(this, arguments);
+    const m = document.getElementById('transactionModal');
+    if (m && !m.classList.contains('hidden')) { try { txSyncUI(); } catch (e) { console.warn(e); } }
+    return r;
+  };
+})();
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const m = document.getElementById('transactionModal');
+  if (!m || m.classList.contains('hidden')) return;
+  const c = document.getElementById('confirmModal');
+  if (c && !c.classList.contains('hidden')) return;
+  closeModal();
+});
+
+/* ---------- لون شريط المتصفح/النظام حسب المظهر ---------- */
+function syncThemeColorMeta() {
+  const dark = document.documentElement.classList.contains('dark');
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', dark ? '#0f1117' : '#f1f5f9');
+}
+(function hookThemeColor() {
+  const at = window.applyTheme;
+  if (typeof at === 'function') window.applyTheme = function () { const r = at.apply(this, arguments); syncThemeColorMeta(); return r; };
+  document.addEventListener('DOMContentLoaded', syncThemeColorMeta);
+  syncThemeColorMeta();
+})();

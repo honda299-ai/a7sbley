@@ -36,7 +36,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20.7">
+  <link rel="stylesheet" href="styles.css?v=20.9">
 
   <!-- Driver.js for Elegant Tutorial -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
@@ -293,7 +293,7 @@
     </nav>
 
     <!-- بطاقة العضو (لما الأرصدة مخفية عنه) -->
-    <section id="teamHomeCard" class="team-home no-print" data-mob-view="home" data-mob-display="block">
+    <section id="teamHomeCard" class="team-home no-print" data-mob-view="home" data-mob-display="block" hidden>
       <div class="team-home-ic"><i class="fa-solid fa-people-group"></i></div>
       <div><b>أنت بتشتغل ضمن فريق <span id="teamHomeName"></span></b><small>استخدم زر <i class="fa-solid fa-plus"></i> لإضافة العمليات المسموحة لك.</small></div>
     </section>
@@ -899,142 +899,149 @@
 
   <!-- AUTH LOADING -->
   <div id="authLoading" class="fixed inset-0 z-[400] bg-dark-950 items-center justify-center flex">
-    <div class="text-center text-white">
-      <div class="w-20 h-20 rounded-3xl mx-auto animate-float overflow-hidden shadow-2xl border border-orange-500/30">
-        <img src="logo.png" class="w-full h-full object-contain" alt="احسبلي">
-      </div>
-      <div class="mt-4 text-sm font-black">احسبلي</div>
-      <div class="mt-1 text-[10px] text-slate-400">جاري التحقق...</div>
+    <div class="al-box">
+      <div class="al-logo"><span class="al-ring"></span><img src="logo.png" alt="احسبلي"></div>
+      <div class="al-name">احسبلي</div>
+      <div class="al-sub">جاري تجهيز حسابك...</div>
+      <div id="authSlow" class="al-slow" hidden>الاتصال بطيء شوية — لسه بنحاول</div>
     </div>
   </div>
 
   <!-- LOGIN WALL -->
-  <div id="loginWall" class="hidden fixed inset-0 z-[300] bg-gradient-to-br from-slate-950 to-black text-white items-center justify-center p-4 overflow-y-auto">
-    <div class="relative w-full max-w-md py-6">
-      <div class="text-center">
-        <div class="w-24 h-24 rounded-3xl mx-auto overflow-hidden shadow-2xl border-2 border-orange-500/40">
-          <img src="logo.png" class="w-full h-full object-contain" alt="احسبلي">
+  <div id="loginWall" class="hidden fixed inset-0 z-[300] lg-root">
+    <div class="lg-bg" aria-hidden="true"><i class="lg-blob a"></i><i class="lg-blob b"></i><i class="lg-grid"></i></div>
+    <div class="lg-shell">
+      <section class="lg-brand">
+        <div class="lg-logo"><img src="logo.png" alt="احسبلي"></div>
+        <h1 class="lg-name">احسبلي</h1>
+        <p class="lg-tag">نظامك المالي الذكي للمحل والبيت</p>
+        <ul class="lg-feats">
+          <li><span><i class="fa-solid fa-handshake"></i></span><div><b>الديون والعملاء</b><small>تابع كل دين وكل عميل ونسبة السداد</small></div></li>
+          <li><span><i class="fa-solid fa-bolt"></i></span><div><b>مكن الشحن وجرد الدرج</b><small>أرصدة وسجل تعديلات لكل مكنة</small></div></li>
+          <li><span><i class="fa-solid fa-chart-area"></i></span><div><b>تقارير وأرباح</b><small>منحنى الأرباح وملخصات جاهزة</small></div></li>
+          <li><span><i class="fa-solid fa-people-group"></i></span><div><b>فريق عمل بصلاحيات</b><small>ضيف موظفينك وحدد اللي يشوفوه</small></div></li>
+        </ul>
+      </section>
+
+      <section class="lg-card" aria-labelledby="lgTitle">
+        <div class="lg-card-logo"><img src="logo.png" alt=""></div>
+        <h2 id="lgTitle">أهلاً بيك 👋</h2>
+        <p class="lg-sub">سجّل دخولك عشان بياناتك تتزامن وتتأمن على كل أجهزتك.</p>
+
+        <button id="googleLoginBtn" type="button" class="lg-google" onclick="loginWithGoogle()">
+          <svg class="lg-g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>
+          <span class="lg-g-t">الدخول بحساب Google</span>
+          <i class="lg-spin" aria-hidden="true"></i>
+        </button>
+
+        <div class="lg-or"><span>أو</span></div>
+
+        <button type="button" class="lg-guest" onclick="loginAsGuest()">
+          <span class="lg-guest-ic"><i class="fa-solid fa-user-secret"></i></span>
+          <span class="lg-guest-tx"><b>جرّب كزائر</b><small>بدون تسجيل — بياناتك على جهازك فقط</small></span>
+          <i class="fa-solid fa-chevron-left lg-guest-go"></i>
+        </button>
+
+        <p id="loginError" class="lg-err" role="alert" hidden></p>
+
+        <div class="lg-trust">
+          <span><i class="fa-solid fa-shield-halved"></i> مؤمّن</span>
+          <span><i class="fa-solid fa-cloud"></i> مزامنة سحابية</span>
+          <span><i class="fa-solid fa-wifi"></i> يشتغل أوفلاين</span>
         </div>
-        <h1 class="text-2xl font-black mt-3">احسبلي</h1>
-        <div class="text-[10px] font-black text-orange-400 tracking-[.25em] mt-0.5">a7sbley Financial System</div>
-      </div>
-
-      <div class="grid grid-cols-2 gap-2 mt-6 p-1 rounded-2xl bg-white/5 border border-white/10">
-        <button id="loginTabGoogle" onclick="switchLoginMethod('google')" class="login-method-tab active">
-          <i class="fa-brands fa-google"></i><span>Google</span>
-        </button>
-        <button id="loginTabGuest" onclick="switchLoginMethod('guest')" class="login-method-tab">
-          <i class="fa-solid fa-user-secret"></i><span>دخول كزائر (Guest)</span>
-        </button>
-      </div>
-
-      <div id="loginPanelGoogle" class="login-panel mt-4 space-y-3">
-        <button onclick="loginWithGoogle()" class="w-full py-3.5 rounded-2xl bg-white text-slate-900 font-black text-sm flex items-center justify-center gap-2 shadow hover:bg-slate-100 transition">
-          <i class="fa-brands fa-google text-red-500 text-lg"></i> الدخول بحساب Google
-        </button>
-      </div>
-
-      <div id="loginPanelGuest" class="login-panel hidden mt-4 space-y-3">
-        <div class="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-xs text-orange-400 font-bold text-center">
-          وضع الزائر (Guest): سيتم الدخول محلياً على جهازك فوراً بدون تسجيل بريد إلكتروني.
-        </div>
-        <button onclick="loginAsGuest()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow hover:brightness-110 transition">
-          <i class="fa-solid fa-user-secret text-lg"></i> الدخول كزائر الآن
-        </button>
-      </div>
+        <button id="loginInstallBtn" type="button" class="lg-install" onclick="showMobileInstallModal()"><i class="fa-solid fa-download"></i> ثبّت التطبيق على جهازك</button>
+      </section>
     </div>
   </div>
 
   <!-- TRANSACTION MODAL -->
-  <div id="transactionModal" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/75" onclick="closeModal()"></div>
-    <div class="relative bg-white dark:bg-dark-900 rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-xl w-full border-t sm:border border-slate-200 dark:border-dark-750 z-10 modal-enter max-h-[95vh] overflow-y-auto">
-      <div class="p-4 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between bg-slate-50/50 dark:bg-dark-850/50 sticky top-0 z-10">
-        <div class="flex items-center gap-3">
-          <div id="modalIconBox" class="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center">
-            <i class="fa-solid fa-plus"></i>
-          </div>
-          <h3 id="modalTitle" class="text-base font-black">إضافة عملية</h3>
-        </div>
-        <button onclick="closeModal()" class="w-9 h-9 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-dark-800 flex items-center justify-center">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
+  <div id="transactionModal" class="tx-root hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="tx-backdrop" onclick="closeModal()"></div>
+    <div class="tx-sheet" data-type="expense">
+      <div class="tx-grab" aria-hidden="true"></div>
+      <div class="tx-head">
+        <div id="modalIconBox" class="tx-head-ic"><i class="fa-solid fa-plus"></i></div>
+        <h3 id="modalTitle" class="tx-title">إضافة عملية</h3>
+        <button type="button" class="tx-x" onclick="closeModal()" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
-      <form id="transactionForm" onsubmit="handleFormSubmit(event)" class="p-4 space-y-3.5">
-        <div>
-          <label class="field-label">نوع العملية</label>
-          <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
-            <label class="cursor-pointer">
-              <input type="radio" name="txType" value="expense" class="peer sr-only" onchange="onTypeChange()" checked>
-              <div class="type-tile peer-checked:border-rose-500 peer-checked:bg-rose-500/10 peer-checked:text-rose-500">
-                <i class="fa-solid fa-arrow-trend-down"></i><span>مصروف</span>
-              </div>
+      <form id="transactionForm" onsubmit="handleFormSubmit(event)" class="tx-form">
+        <div class="tx-scroll">
+          <div class="tx-types" role="radiogroup" aria-label="نوع العملية">
+            <label class="tx-type" style="--c:#f43f5e">
+              <input type="radio" name="txType" value="expense" class="tx-sr" onchange="onTypeChange()" checked>
+              <span><i class="fa-solid fa-circle-arrow-up"></i> مصروف</span>
             </label>
-            <label class="cursor-pointer">
-              <input type="radio" name="txType" value="income" class="peer sr-only" onchange="onTypeChange()">
-              <div class="type-tile peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 peer-checked:text-emerald-500">
-                <i class="fa-solid fa-arrow-trend-up"></i><span>دخل</span>
-              </div>
+            <label class="tx-type" style="--c:#10b981">
+              <input type="radio" name="txType" value="income" class="tx-sr" onchange="onTypeChange()">
+              <span><i class="fa-solid fa-circle-arrow-down"></i> دخل</span>
             </label>
-            <label class="cursor-pointer">
-              <input type="radio" name="txType" value="charity" class="peer sr-only" onchange="onTypeChange()">
-              <div class="type-tile peer-checked:border-orange-500 peer-checked:bg-orange-500/10 peer-checked:text-orange-500">
-                <i class="fa-solid fa-hand-holding-heart"></i><span>خير</span>
-              </div>
+            <label class="tx-type" style="--c:#f59e0b">
+              <input type="radio" name="txType" value="charity" class="tx-sr" onchange="onTypeChange()">
+              <span><i class="fa-solid fa-hand-holding-heart"></i> خير</span>
             </label>
-            <label class="business-only cursor-pointer">
-              <input type="radio" name="txType" value="debt_receivable" class="peer sr-only" onchange="onTypeChange()">
-              <div class="type-tile peer-checked:border-cyan-500 peer-checked:bg-cyan-500/10 peer-checked:text-cyan-500">
-                <i class="fa-solid fa-user-plus"></i><span>دين ليا</span>
-              </div>
+            <label class="tx-type business-only" style="--c:#06b6d4">
+              <input type="radio" name="txType" value="debt_receivable" class="tx-sr" onchange="onTypeChange()">
+              <span><i class="fa-solid fa-user-plus"></i> دين ليّ</span>
             </label>
-            <label class="business-only cursor-pointer">
-              <input type="radio" name="txType" value="debt_payable" class="peer sr-only" onchange="onTypeChange()">
-              <div class="type-tile peer-checked:border-purple-500 peer-checked:bg-purple-500/10 peer-checked:text-purple-500">
-                <i class="fa-solid fa-user-minus"></i><span>دين عليا</span>
-              </div>
+            <label class="tx-type business-only" style="--c:#a855f7">
+              <input type="radio" name="txType" value="debt_payable" class="tx-sr" onchange="onTypeChange()">
+              <span><i class="fa-solid fa-user-minus"></i> دين عليّ</span>
             </label>
           </div>
-        </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label class="field-label">المبلغ (ج.م) *</label>
-            <input type="number" step="0.01" min="0.01" required id="formAmount" placeholder="0.00" class="form-input">
+          <div class="tx-amount">
+            <label for="formAmount" class="tx-lbl">المبلغ</label>
+            <div class="tx-amount-row">
+              <input type="number" step="0.01" min="0.01" required id="formAmount" inputmode="decimal" placeholder="0" class="tx-amount-input" autocomplete="off">
+              <span class="tx-cur">ج.م</span>
+            </div>
+            <div class="tx-quick" aria-label="إضافة سريعة للمبلغ">
+              <button type="button" onclick="txAddAmount(10)">+10</button>
+              <button type="button" onclick="txAddAmount(50)">+50</button>
+              <button type="button" onclick="txAddAmount(100)">+100</button>
+              <button type="button" onclick="txAddAmount(500)">+500</button>
+              <button type="button" class="tx-quick-clear" onclick="txAddAmount(0)" aria-label="مسح المبلغ"><i class="fa-solid fa-delete-left"></i></button>
+            </div>
           </div>
-          <div>
-            <label class="field-label">التاريخ *</label>
-            <input type="date" required id="formDate" class="form-input">
-          </div>
-          <div>
-            <label class="field-label">الوقت *</label>
-            <input type="time" required id="formTime" class="form-input">
-          </div>
-        </div>
 
-        <div id="debtDueDateWrapper" class="hidden">
-          <label class="field-label flex items-center justify-between text-orange-500">
-            <span><i class="fa-solid fa-calendar-check"></i> تاريخ استحقاق الدين (تذكير بالسداد)</span>
-            <span class="text-[10px] text-slate-400">اختياري</span>
-          </label>
-          <input type="date" id="formDueDate" class="form-input border-orange-500/40">
-        </div>
-
-        <div class="business-only">
-          <label class="field-label">اسم العميل (اختياري)</label>
-          <input type="text" id="formClient" list="clientsDatalist" maxlength="60" placeholder="مثال: أحمد" class="form-input">
-          <datalist id="clientsDatalist"></datalist>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label class="field-label">التصنيف *</label>
-            <select id="formCategory" class="form-input"></select>
+          <div class="tx-field">
+            <label class="tx-lbl">التصنيف</label>
+            <div id="txCatChips" class="tx-chips"></div>
+            <select id="formCategory" class="tx-hidden" aria-hidden="true" tabindex="-1"></select>
           </div>
-          <div>
-            <label class="field-label">طريقة الدفع</label>
-            <select id="formPaymentMethod" class="form-input">
+
+          <div class="tx-field">
+            <label id="notesLabel" for="formNotes" class="tx-lbl">البيان</label>
+            <input type="text" id="formNotes" maxlength="200" placeholder="مثال: صيانة جهاز" class="tx-in" autocomplete="off">
+          </div>
+
+          <div class="business-only tx-field">
+            <label for="formClient" class="tx-lbl">اسم العميل <em>اختياري</em></label>
+            <div class="tx-icon-in"><i class="fa-solid fa-user"></i><input type="text" id="formClient" list="clientsDatalist" maxlength="60" placeholder="مثال: أحمد" class="tx-in" autocomplete="off"></div>
+            <datalist id="clientsDatalist"></datalist>
+          </div>
+
+          <div id="debtDueDateWrapper" class="hidden tx-field tx-due">
+            <label for="formDueDate" class="tx-lbl"><i class="fa-solid fa-calendar-check"></i> موعد السداد <em>اختياري — بنفكّرك قبل الموعد</em></label>
+            <input type="date" id="formDueDate" class="tx-in">
+          </div>
+
+          <div class="tx-two">
+            <div class="tx-field">
+              <label for="formDate" class="tx-lbl">التاريخ</label>
+              <input type="date" required id="formDate" class="tx-in">
+            </div>
+            <div class="tx-field">
+              <label for="formTime" class="tx-lbl">الوقت</label>
+              <input type="time" required id="formTime" class="tx-in">
+            </div>
+          </div>
+
+          <div class="tx-field">
+            <label class="tx-lbl">طريقة الدفع</label>
+            <div id="txPayChips" class="tx-chips"></div>
+            <select id="formPaymentMethod" class="tx-hidden" aria-hidden="true" tabindex="-1">
               <option value="نقدي">نقدي 💵</option>
               <option value="إنستاباي (InstaPay)">إنستاباي ⚡</option>
               <option value="فودافون كاش / محفظة">محفظة 📱</option>
@@ -1043,46 +1050,36 @@
               <option value="آجل / معلق">آجل</option>
             </select>
           </div>
-        </div>
 
-        <div class="business-only">
-          <label class="field-label">المرجع (اختياري)</label>
-          <input type="text" id="formReference" maxlength="50" placeholder="INV-1025" class="form-input">
-        </div>
-
-        <div>
-          <label id="notesLabel" class="field-label">البيان</label>
-          <input type="text" id="formNotes" maxlength="200" placeholder="مثال: صيانة جهاز" class="form-input">
-        </div>
-
-        <div>
-          <label class="field-label flex items-center justify-between">
-            <span>صورة الفاتورة (اختياري)</span>
-            <button type="button" id="removeReceiptBtn" onclick="clearReceiptImage()" class="hidden text-[10px] text-rose-500 font-bold">
-              <i class="fa-solid fa-trash-can"></i> إزالة
-            </button>
-          </label>
-          <div class="flex items-center gap-3">
-            <label class="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-slate-300 dark:border-dark-750 bg-slate-50 dark:bg-dark-850 hover:border-orange-500 cursor-pointer text-sm font-bold text-slate-500 dark:text-slate-400">
-              <i class="fa-solid fa-camera text-orange-500"></i>
-              <span id="receiptUploadText">تصوير / اختيار</span>
-              <input type="file" id="formReceiptFile" accept="image/*" capture="environment" class="hidden" onchange="handleReceiptSelected(event)">
-            </label>
-            <div id="receiptPreviewBox" class="hidden w-12 h-12 rounded-xl overflow-hidden border border-orange-500/40 shrink-0 cursor-pointer" onclick="viewReceiptImage(currentReceiptData)">
-              <img id="receiptPreviewImg" src="" class="w-full h-full object-cover" alt="معاينة">
+          <details id="txMore" class="tx-more">
+            <summary><i class="fa-solid fa-sliders"></i> تفاصيل إضافية <em>مرجع • صورة فاتورة</em><i class="fa-solid fa-chevron-down tx-more-go"></i></summary>
+            <div class="business-only tx-field">
+              <label for="formReference" class="tx-lbl">المرجع <em>اختياري</em></label>
+              <input type="text" id="formReference" maxlength="50" placeholder="INV-1025" class="tx-in" autocomplete="off">
             </div>
-          </div>
+            <div class="tx-field">
+              <label class="tx-lbl tx-lbl-row"><span>صورة الفاتورة <em>اختياري</em></span>
+                <button type="button" id="removeReceiptBtn" onclick="clearReceiptImage()" class="hidden tx-rm"><i class="fa-solid fa-trash-can"></i> إزالة</button>
+              </label>
+              <div class="tx-rcpt-row">
+                <label class="tx-rcpt-btn">
+                  <i class="fa-solid fa-camera"></i>
+                  <span id="receiptUploadText">تصوير / اختيار</span>
+                  <input type="file" id="formReceiptFile" accept="image/*" capture="environment" class="hidden" onchange="handleReceiptSelected(event)">
+                </label>
+                <div id="receiptPreviewBox" class="hidden tx-rcpt-prev" onclick="viewReceiptImage(currentReceiptData)">
+                  <img id="receiptPreviewImg" src="" alt="معاينة">
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <div id="barakaBox" class="hidden tx-baraka"><i class="fa-solid fa-wand-magic-sparkles"></i> تقبل الله منك وأخلف عليك بالبركة 🤲</div>
         </div>
 
-        <div id="barakaBox" class="hidden p-3 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-orange-500/30 text-xs text-orange-500">
-          <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> تقبل الله منك وأخلف عليك بالبركة 🤲
-        </div>
-
-        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-dark-800 sticky bottom-0 bg-white dark:bg-dark-900 pb-3">
-          <button type="button" onclick="closeModal()" class="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-500">إلغاء</button>
-          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-orange-600 to-orange-500 text-white">
-            <i class="fa-solid fa-check"></i> <span id="submitText">حفظ</span>
-          </button>
+        <div class="tx-foot">
+          <button type="button" onclick="closeModal()" class="tx-cancel">إلغاء</button>
+          <button type="submit" class="tx-save"><i class="fa-solid fa-check"></i> <span id="submitText">حفظ العملية</span></button>
         </div>
       </form>
     </div>
@@ -1251,22 +1248,19 @@
     </div>
   </div>
 
-  <!-- PIN MODAL -->
-  <div id="pinModal" class="fixed inset-0 z-[80] hidden items-center justify-center p-3">
-    <div class="fixed inset-0 bg-black/85"></div>
-    <div class="relative bg-white dark:bg-dark-900 rounded-3xl shadow-2xl max-w-sm w-full border border-slate-200 dark:border-dark-750 p-5 modal-enter">
-      <div class="text-center">
-        <div class="w-14 h-14 rounded-3xl bg-purple-500/10 text-purple-500 flex items-center justify-center mx-auto">
-          <i class="fa-solid fa-lock text-xl"></i>
-        </div>
-        <h3 id="pinTitle" class="text-lg font-black mt-3">قفل التطبيق</h3>
-        <p class="u-note">الـ PIN بيمنع فتح التطبيق من جهازك، لكنه مش تشفير للبيانات المخزنة.</p>
-      </div>
-      <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"
-        class="w-full mt-4 text-center tracking-[.5em] text-2xl font-black py-3 rounded-2xl border border-slate-200 dark:border-dark-750 bg-slate-50 dark:bg-dark-850 focus:outline-none focus:ring-2 focus:ring-orange-500">
-      <p id="pinError" class="hidden text-center text-[10px] text-rose-500 font-bold mt-2"></p>
-      <button id="pinActionBtn" onclick="handlePinAction()" class="w-full mt-4 py-3 rounded-2xl bg-orange-500 text-white font-black text-sm">تأكيد</button>
-      <button onclick="closePinModal()" class="w-full mt-2 py-2.5 text-xs font-bold text-slate-400">إلغاء</button>
+  <!-- PIN SETUP MODAL -->
+  <div id="pinModal" class="pf-root hidden" onclick="closePinModal()" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
+    <div class="pf-card pf-dialog pn-card" onclick="event.stopPropagation()">
+      <div class="pf-grab" aria-hidden="true"></div>
+      <div class="pn-ic"><i class="fa-solid fa-lock"></i></div>
+      <h3 id="pinTitle" class="gim-t">إنشاء رمز القفل</h3>
+      <p id="pinSub" class="pn-sub">اختار رمز من 4 إلى 6 أرقام</p>
+      <div class="pn-steps" aria-hidden="true"><i id="pnStep1" class="on"></i><i id="pnStep2"></i></div>
+      <div id="pinPadHost"></div>
+      <p id="pinError" class="lk-err" role="alert" hidden></p>
+      <p class="u-note">الرمز بيمنع فتح التطبيق من جهازك، لكنه مش تشفير للبيانات المخزنة.</p>
+      <button id="pinRemoveBtn" type="button" class="pn-remove" hidden onclick="removePinFlow()"><i class="fa-solid fa-lock-open"></i> إزالة القفل</button>
+      <button type="button" class="gim-btn" onclick="closePinModal()">إلغاء</button>
     </div>
   </div>
 
@@ -1400,92 +1394,58 @@
   </div>
 
   <!-- LOCK SCREEN -->
-  <div id="lockScreen" class="hidden fixed inset-0 z-[200] bg-dark-950 text-white items-center justify-center p-5">
-    <div class="relative w-full max-w-sm text-center">
-      <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-400 flex items-center justify-center mx-auto">
-        <i class="fa-solid fa-lock text-2xl"></i>
+  <div id="lockScreen" class="hidden fixed inset-0 z-[200] lk-root" role="dialog" aria-modal="true" aria-labelledby="lkTitle">
+    <div class="lg-bg" aria-hidden="true"><i class="lg-blob a"></i><i class="lg-blob b"></i><i class="lg-grid"></i></div>
+    <div class="lk-card">
+      <div class="lk-avatar"><img id="lkAvatar" src="logo.png" alt=""></div>
+      <h2 id="lkTitle" class="lk-title">أهلاً بعودتك</h2>
+      <p id="lkUser" class="lk-user"></p>
+      <p class="lk-sub">اكتب رمز القفل لفتح التطبيق</p>
+      <div id="lkPad"></div>
+      <input id="unlockPinInput" type="password" inputmode="numeric" maxlength="6" tabindex="-1" aria-hidden="true" class="lk-hidden-input">
+      <p id="unlockError" class="lk-err" role="alert" hidden></p>
+      <div class="lk-links">
+        <button id="lkForgot" type="button" onclick="forgotPinUnlock()"><i class="fa-solid fa-key"></i> نسيت الرمز؟</button>
+        <button type="button" onclick="logoutFromLock()"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button>
       </div>
-      <h2 class="text-xl font-black mt-4">احسبلي</h2>
-      <p class="text-xs text-slate-400 mt-1">التطبيق مقفول</p>
-      <input id="unlockPinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"
-        class="w-full mt-5 text-center tracking-[.5em] text-2xl font-black py-3.5 rounded-2xl bg-dark-900 border border-dark-750 focus:outline-none focus:ring-2 focus:ring-orange-500"
-        onkeydown="if(event.key==='Enter') unlockApp()">
-      <button onclick="unlockApp()" class="w-full mt-3 py-3.5 rounded-2xl bg-orange-500 text-white font-black">فتح</button>
-      <p id="unlockError" class="hidden text-xs text-rose-400 font-bold mt-2">PIN خطأ</p>
-      <button onclick="forgotPinUnlock()" class="w-full mt-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-xs">
-        <i class="fa-solid fa-key"></i> نسيت الرمز؟
-      </button>
-      <button onclick="logoutFromLock()" class="mt-3 text-[11px] font-bold text-slate-500">
-        <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
-      </button>
     </div>
   </div>
 
   <div id="printReport" class="print-only"></div>
 
-  <!-- MOBILE INSTALL DIALOG (إجباري عند الفتح) -->
-  <div id="mobileInstallModal" class="hidden fixed inset-0 z-[500] items-center justify-center p-4 bg-black/85 backdrop-blur-md transition-all duration-300">
-    <div class="relative w-full max-w-sm rounded-3xl bg-gradient-to-b from-[#161922] to-[#090a0f] border-2 border-orange-500/50 p-6 shadow-[0_20px_60px_-15px_rgba(249,115,22,0.4)] text-center modal-enter overflow-hidden">
-      <!-- Glow ambient light -->
-      <div class="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-48 bg-orange-500/25 blur-3xl pointer-events-none rounded-full"></div>
+  <!-- INSTALL APP -->
+  <div id="mobileInstallModal" class="ins-root hidden" role="dialog" aria-modal="true" aria-labelledby="insTitle">
+    <div class="ins-backdrop" onclick="dismissMobileInstall()"></div>
+    <div class="ins-card">
+      <div class="ins-grab" aria-hidden="true"></div>
+      <button type="button" class="ins-x" onclick="dismissMobileInstall()" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button>
+      <div class="ins-hero">
+        <div class="ins-icon"><img src="logo.png" alt="احسبلي"></div>
+        <span class="ins-badge"><i class="fa-solid fa-circle-check"></i> مجاني • بدون متجر</span>
+      </div>
+      <h3 id="insTitle" class="ins-title">ثبّت احسبلي على <span id="insDevice">جهازك</span></h3>
+      <p class="ins-sub">افتحه من الشاشة الرئيسية زي أي تطبيق — أسرع وأنضف وبيشتغل حتى من غير إنترنت.</p>
 
-      <!-- App Logo with animated glow ring -->
-      <div class="relative mx-auto w-24 h-24 mb-4 mt-1">
-        <div class="absolute inset-0 rounded-3xl bg-gradient-to-tr from-orange-600 to-amber-400 blur-lg opacity-60 animate-pulse"></div>
-        <img src="logo.png" class="relative w-full h-full rounded-3xl object-contain border-2 border-orange-500/60 shadow-2xl" alt="احسبلي">
+      <ul class="ins-feats">
+        <li><span style="--c:#f59e0b"><i class="fa-solid fa-bolt"></i></span> فتح فوري بلمسة واحدة</li>
+        <li><span style="--c:#10b981"><i class="fa-solid fa-wifi"></i></span> سجّل عملياتك حتى بدون نت</li>
+        <li><span style="--c:#06b6d4"><i class="fa-solid fa-expand"></i></span> شاشة كاملة من غير شريط المتصفح</li>
+      </ul>
+
+      <div id="insIos" class="ins-steps" hidden>
+        <div id="insIosWarn" class="ins-warn" hidden><i class="fa-solid fa-triangle-exclamation"></i> افتح الموقع في <b>Safari</b> عشان تقدر تثبّته.</div>
+        <ol>
+          <li><span>1</span><div>اضغط زر <b>المشاركة</b> <i class="fa-solid fa-arrow-up-from-bracket ins-ico"></i> أسفل الشاشة</div></li>
+          <li><span>2</span><div>اختار <b>«إضافة إلى الشاشة الرئيسية»</b> <i class="fa-regular fa-square-plus ins-ico"></i></div></li>
+          <li><span>3</span><div>اضغط <b>«إضافة»</b> وهتلاقي الأيقونة على شاشتك</div></li>
+        </ol>
+      </div>
+      <div id="insManual" class="ins-steps" hidden>
+        <p id="insManualText"></p>
       </div>
 
-      <h3 class="text-xl font-black text-white">تثبيت تطبيق احسبلي</h3>
-      <p class="text-xs font-bold text-orange-400 mt-1">a7sbley Financial App</p>
-      <p class="text-xs text-slate-300 mt-2 leading-relaxed">
-        للحصول على أفضل تجربة وسرعة، يرجى تثبيت التطبيق على جهازك.
-      </p>
-
-      <!-- Benefits features -->
-      <div class="mt-4 p-3.5 rounded-2xl bg-white/5 border border-white/10 text-right space-y-2.5 text-xs font-bold text-slate-200">
-        <div class="flex items-center gap-2.5">
-          <div class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-            <i class="fa-solid fa-bolt text-xs"></i>
-          </div>
-          <span>تشغيل فوري بلمسة واحدة بدون متصفح</span>
-        </div>
-        <div class="flex items-center gap-2.5">
-          <div class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-            <i class="fa-solid fa-wifi text-xs"></i>
-          </div>
-          <span>تسجيل الحسابات والعمليات حتى بدون إنترنت</span>
-        </div>
-        <div class="flex items-center gap-2.5">
-          <div class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
-            <i class="fa-solid fa-shield-halved text-xs"></i>
-          </div>
-          <span>مزامنة سحابية آمنة وتنبيهات مالية</span>
-        </div>
-      </div>
-
-      <!-- Action buttons -->
-      <div class="mt-6 space-y-2.5">
-        <button id="mobileInstallAcceptBtn" onclick="triggerMobileAppInstall()"
-          class="w-full py-4 px-4 rounded-2xl font-black text-sm text-white bg-gradient-to-r from-orange-600 via-orange-500 to-amber-500 shadow-[0_10px_30px_-5px_rgba(249,115,22,0.7)] hover:shadow-[0_15px_35px_-4px_rgba(249,115,22,0.9)] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 border border-amber-400/30">
-          <i class="fa-solid fa-download text-base"></i>
-          <span>تثبيت التطبيق الآن</span>
-        </button>
-
-        <button onclick="dismissMobileInstall()"
-          class="w-full py-3 px-4 rounded-2xl text-xs font-black text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 active:scale-[0.98] transition">
-          المتابعة من المتصفح (لاحقاً) ←
-        </button>
-      </div>
-
-      <!-- Android manual guidance -->
-      <div id="androidInstallHelper" class="hidden mt-3 p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-[11px] text-orange-300 text-center leading-relaxed font-bold">
-        إذا لم تظهر نافذة التثبيت تلقائياً: اضغط على قائمة المتصفح <strong class="text-white">(⋮)</strong> بالأعلى واختر <strong class="text-white">"تثبيت التطبيق"</strong>.
-      </div>
-
-      <!-- iOS specific instructions box -->
-      <div id="iosInstallHelper" class="hidden mt-3 p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-[11px] text-orange-300 text-center leading-relaxed font-bold">
-        على الآيفون: اضغط على زر المشاركة <span class="text-white font-black text-sm">⬆️</span> أسفل الشاشة ثم اختر <strong class="text-white">"إضافة إلى الشاشة الرئيسية"</strong>.
-      </div>
+      <button id="mobileInstallAcceptBtn" type="button" class="ins-cta" onclick="triggerMobileAppInstall()"><i class="fa-solid fa-download"></i> <span>تثبيت الآن</span></button>
+      <button id="insLater" type="button" class="ins-later" onclick="dismissMobileInstall()">مش دلوقتي</button>
     </div>
   </div>
 
@@ -2098,6 +2058,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20.7"></script>
+  <script src="app.js?v=20.9"></script>
 </body>
 </html>
