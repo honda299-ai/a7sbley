@@ -1,20 +1,26 @@
 /* =========================================================
-   A7SBLEY / EHSEBLI — Service Worker V11.5
+   A7SBLY / EHSEBLI — Service Worker V11.5
    PWA Engine + Offline Precache + Push Notifications
    ========================================================= */
 
-const VERSION = '20.10.1';
-const CACHE_VERSION = `a7sbley-v${VERSION}`;
-const RUNTIME_CACHE = `a7sbley-runtime-v${VERSION}`;
+const VERSION = '20.10.3-bilingual';
+const CACHE_VERSION = `a7sbly-bilingual-v${VERSION}`;
+const RUNTIME_CACHE = `a7sbly-bilingual-runtime-v${VERSION}`;
 
 // Must all succeed, otherwise install fails and is retried (no silent half-cache)
 const CORE_ASSETS = [
   './',
   './index.html',
-  './styles.css',
-  './tailwind.css',
-  './manifest.json',
-  './app.js',
+  './index-ar.html',
+  './index-en.html',
+  './styles-ar.css',
+  './styles-en.css',
+  './tailwind-ar.css',
+  './tailwind-en.css',
+  './app-ar.js',
+  './app-en.js',
+  './manifest-ar.json',
+  './manifest-en.json',
   './logo.png',
   './icon-192.png',
   './icon-512.png',
@@ -53,7 +59,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
     await Promise.all(
-      keys.filter((k) => k.startsWith('a7sbley-') && k !== CACHE_VERSION && k !== RUNTIME_CACHE)
+      keys.filter((k) => (k.startsWith('a7sbly-') || k.startsWith('a7sbley-')) && k !== CACHE_VERSION && k !== RUNTIME_CACHE)
           .map((k) => caches.delete(k))
     );
     await self.clients.claim();
@@ -116,7 +122,7 @@ self.addEventListener('fetch', (event) => {
 /* ---------- Push Notifications ---------- */
 self.addEventListener('push', (event) => {
   let data = {
-    title: 'احسبلي | a7sbley',
+    title: 'احسبلي | a7sbly',
     body: 'لديك تنبيه جديد في الحسابات',
     icon: './icon-192.png',
     badge: './icon-192.png',
@@ -134,7 +140,7 @@ self.addEventListener('push', (event) => {
     icon: data.icon || './icon-192.png',
     badge: data.badge || './icon-192.png',
     vibrate: [200, 100, 200],
-    tag: data.tag || 'a7sbley-notification',
+    tag: data.tag || 'a7sbly-notification',
     renotify: true,
     data: { url: data.url || './', ...data.data }
   }));
@@ -162,12 +168,12 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
   if (event.data?.type === 'SHOW_LOCAL_NOTIFICATION') {
     const { title, body, url } = event.data;
-    self.registration.showNotification(title || 'احسبلي | a7sbley', {
+    self.registration.showNotification(title || 'a7sbly', {
       body: body || '',
       icon: './icon-192.png',
       badge: './icon-192.png',
       vibrate: [200, 100, 200],
-      tag: 'a7sbley-local-notification',
+      tag: 'a7sbly-local-notification',
       data: { url: url || './' }
     });
   }

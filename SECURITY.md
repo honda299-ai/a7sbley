@@ -2,19 +2,19 @@
 
 ## Supported Versions
 
-Only the latest released version of a7sbley (احسبلي) receives security fixes.
+Only the latest released version of a7sbly (احسبلي) receives security fixes.
 
 | Version | Supported |
 | ------- | --------- |
-| 20.10.1.x  | ✅ |
-| < 20.10.1  | ❌ |
+| 20.10.2-ar.x  | ✅ |
+| < 20.10.2-ar  | ❌ |
 
 ## Reporting a Vulnerability
 
 Please **do not open a public issue** for security problems.
 
 - Report privately via GitHub: *Security → Report a vulnerability* on this repository,
-  or by email to **hondastore299@gmail.com** with the subject `a7sbley security`.
+  or by email to **hondastore299@gmail.com** with the subject `a7sbly security`.
 - Include: what you found, steps to reproduce, and the affected version/URL.
 - You can expect an acknowledgement within **72 hours** and a status update at least every **7 days**.
 - If the report is accepted we will fix it, release an update, and credit you (if you wish).

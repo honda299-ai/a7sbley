@@ -1,0 +1,51 @@
+{
+  "name": "a7sbly Financial Manager",
+  "short_name": "a7sbly",
+  "description": "Smart professional finance management — expenses, debts, clients, budgets and cloud sync",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "a7sbly-financial-app-en",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#090a0f",
+  "theme_color": "#0f1117",
+  "categories": [
+    "finance",
+    "business",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

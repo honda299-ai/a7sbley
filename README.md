@@ -1,14 +1,14 @@
-# احسبلي / a7sbley — v20.10.1
+# احسبلي / a7sbly — v20.10.2-ar
 
 تطبيق إدارة مالية (PWA) يعمل بالـ Firebase. كل ملفات التطبيق موجودة في جذر الريبو —
 لا يوجد مجلد داخلي. ارفع محتوى هذا المجلد مباشرةً إلى GitHub.
 
 ## الملفات الأساسية
-- `index.html` — الصفحة الرئيسية (تحمّل `app.js?v=20.10.1` فقط).
+- `index.html` — الصفحة الرئيسية (تحمّل `app.js?v=20.10.2-ar` فقط).
 - `app.js` — كل منطق التطبيق (المصدر الوحيد وقت التشغيل).
 - `styles.css` — التنسيقات + إصلاحات الموبايل.
 - `tailwind.css` — أدوات Tailwind.
-- `service-worker.js` — PWA / offline (الإصدار `20.10.1`).
+- `service-worker.js` — PWA / offline (الإصدار `20.10.2-ar`).
 - `firestore.rules`, `storage.rules`, `database.rules.json` — قواعد الأمان.
 
 ## قبل النشر على الإنترنت
@@ -31,7 +31,14 @@
 git init
 git checkout -b main
 git add .
-git commit -m "a7sbley v20.10.1 - mobile fixes + security patches"
+git commit -m "a7sbly v20.10.2-ar - mobile fixes + security patches"
 git remote add origin https://github.com/<USER>/<REPO>.git
 git push -u origin main
 ```
+
+
+## Languages / اللغات
+
+- Open `index.html` — it remembers your choice in `localStorage.a7sbly_lang`.
+- Use the floating **EN / ع** button to switch language at any time. Data is preserved.
+- Arabic: `index-ar.html`, English: `index-en.html`.
