@@ -60,6 +60,7 @@ const AUDIT_KEY = 'ehsebli_audit_v1';
    ========================================================= */
 let categoryBudgets = {};
 let chargeMachines = [];
+let clientPhones = {};
 let workspaceUid = null;
 let teamPerms = null;
 const CHARGE_KEY = 'ehsebli_charge_machines_v1';
@@ -1165,6 +1166,7 @@ function loginAsGuest() {
   loadAuditLog();
   loadCatBudgets();
   loadChargeMachines();
+  loadClientPhones();
   refreshAll();
   syncModeForCurrentUser();
   navigateSegmented('home');
@@ -1438,7 +1440,7 @@ function handleUserSwitch(uid) {
   auditLogs = [];
   categoryBudgets = {};
   chargeMachines = [];
-  workspaceUid = null; teamPerms = null;
+  workspaceUid = null; teamPerms = null; clientPhones = {};
   lastDeletedId = null;
   localStorage.setItem(LAST_UID_KEY, uid);
 }
@@ -1465,7 +1467,7 @@ function applySignedOutState() {
   auditLogs = [];
   categoryBudgets = {};
   chargeMachines = [];
-  workspaceUid = null; teamPerms = null;
+  workspaceUid = null; teamPerms = null; clientPhones = {};
   if (typeof applyTeamUI === 'function') applyTeamUI();
   if (typeof clearNotices === 'function') clearNotices();
   if (typeof hideSuspendedScreen === 'function') hideSuspendedScreen();
@@ -1512,7 +1514,7 @@ function _tourFirstVisible(selectors) {
 function _tourBlocked() {
   const b = document.body.classList;
   if (b.contains('not-authed') || b.contains('auth-pending')) return true;
-  return ['authLoading', 'loginWall', 'lockScreen', 'modeOnboardingModal', 'userProfileModal', 'guestImportModal', 'mobileInstallModal', 'pinModal', 'teamInviteModal'].some(id => {
+  return ['authLoading', 'loginWall', 'lockScreen', 'modeOnboardingModal', 'userProfileModal', 'guestImportModal', 'mobileInstallModal', 'pinModal', 'teamInviteModal', 'clientPhoneModal'].some(id => {
     const el = document.getElementById(id);
     return el && !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none';
   });
@@ -1885,13 +1887,15 @@ async function doSyncToCloud() {
       catBudgets: sanitizeCatBudgets(categoryBudgets),
       chargeMachines: sanitizeMachines(chargeMachines),
       txCount: transactions.filter(t => !t._deleted).length,
-      appVersion: '20.7',
+      clientPhones: sanitizeClientPhones(clientPhones),
+      appVersion: '20.10',
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     if (isTeamMode()) {   // العضو مايكتبش الميزانية/الثابتة، والمكن/المخزن بصلاحية بس
       delete userPayload.budget; delete userPayload.recurring; delete userPayload.catBudgets;
       if (!teamPerms || teamPerms.machines !== true) delete userPayload.chargeMachines;
       if (!teamPerms || teamPerms.inventory !== true) delete userPayload.inventory;
+      if (!teamPerms || !(teamPerms.clients === true || teamPerms.debts === true)) delete userPayload.clientPhones;
     }
     await db.collection('users').doc(uid).set(userPayload, { merge: true });
 
@@ -1954,6 +1958,10 @@ async function loadCloudData(uid) {
         chargeMachines = sanitizeMachines(data.chargeMachines);
         lsSet(CHARGE_KEY, JSON.stringify(chargeMachines));
       }
+      if (data.clientPhones && typeof data.clientPhones === 'object') {
+        clientPhones = sanitizeClientPhones(data.clientPhones);
+        lsSet(CLIENT_PHONES_KEY, JSON.stringify(clientPhones));
+      }
     }
 
     transactions = mergeTransactions(mergeTransactions(transactions, cloudTx), legacyTx);
@@ -2011,6 +2019,10 @@ async function loadCloudData(uid) {
           if (typeof mcRenderList === 'function' && !_mcId) mcRenderList();
           else if (_mcId && _mcFind()) mcRenderDetail();
         }
+      }
+      if (d.clientPhones && typeof d.clientPhones === 'object') {
+        const incP = sanitizeClientPhones(d.clientPhones);
+        if (JSON.stringify(incP) !== JSON.stringify(clientPhones)) { clientPhones = incP; lsSet(CLIENT_PHONES_KEY, JSON.stringify(clientPhones)); needRefresh = true; }
       }
       if (needRefresh) refreshAll();
     });
@@ -2096,6 +2108,7 @@ function loadAllLocal() {
   loadAuditLog();
   loadCatBudgets();
   loadChargeMachines();
+  loadClientPhones();
   checkOverdueDebtsAlert();
 }
 
@@ -2950,6 +2963,7 @@ function downloadBackup() {
     recurring: recurringExpenses,
     categoryBudgets: sanitizeCatBudgets(categoryBudgets),
     chargeMachines: sanitizeMachines(chargeMachines),
+    clientPhones: sanitizeClientPhones(clientPhones),
     count: transactions.length
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
@@ -2980,6 +2994,7 @@ function restoreBackup(event) {
         if (backup.budget !== undefined) lsSet(BUDGET_KEY, Number(backup.budget) || 0);
         if (Array.isArray(backup.inventory)) { inventoryItems = backup.inventory; lsSet(INVENTORY_KEY, JSON.stringify(inventoryItems)); }
         if (Array.isArray(backup.recurring)) { recurringExpenses = backup.recurring; lsSet(RECURRING_KEY, JSON.stringify(recurringExpenses)); }
+        if (backup.clientPhones && typeof backup.clientPhones === 'object') { clientPhones = sanitizeClientPhones(backup.clientPhones); lsSet(CLIENT_PHONES_KEY, JSON.stringify(clientPhones)); }
         if (Array.isArray(backup.chargeMachines)) { chargeMachines = sanitizeMachines(backup.chargeMachines); lsSet(CHARGE_KEY, JSON.stringify(chargeMachines)); }
         if (backup.categoryBudgets && typeof backup.categoryBudgets === 'object') { categoryBudgets = sanitizeCatBudgets(backup.categoryBudgets); lsSet(CATBUDGET_KEY, JSON.stringify(categoryBudgets)); }
         saveData({ force: true });
@@ -3850,253 +3865,6 @@ function exportClientLedgerPDF() {
    DEBT REMINDER CARD (توليد بطاقة المطالبة والتذكير)
    ========================================================= */
 let currentCardDebt = null;
-
-async function openDebtCardModal(debtId) {
-  const debt = transactions.find(t => t.id === debtId);
-  if (!debt) return;
-  currentCardDebt = debt;
-  showToast('جاري تصميم بطاقة المطالبة...', 'info');
-
-  const canvas = document.getElementById('debtCardCanvas');
-  const ctx = canvas.getContext('2d');
-  
-  // High-res canvas for crystal clear quality
-  const W = 800;
-  const hasImage = !!debt.receipt;
-  const H = hasImage ? 1080 : 880;
-  canvas.width = W;
-  canvas.height = H;
-
-  // Background Gradient
-  const bgGrad = ctx.createLinearGradient(0, 0, W, H);
-  bgGrad.addColorStop(0, '#11141c');
-  bgGrad.addColorStop(0.5, '#090a0f');
-  bgGrad.addColorStop(1, '#050608');
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, W, H);
-
-  // Outer Glowing Border
-  ctx.strokeStyle = '#f97316';
-  ctx.lineWidth = 6;
-  ctx.strokeRect(15, 15, W - 30, H - 30);
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(24, 24, W - 48, H - 48);
-
-  // Ambient top light
-  const ambientGrad = ctx.createRadialGradient(W / 2, 0, 10, W / 2, 0, 450);
-  ambientGrad.addColorStop(0, 'rgba(249, 115, 22, 0.25)');
-  ambientGrad.addColorStop(1, 'transparent');
-  ctx.fillStyle = ambientGrad;
-  ctx.fillRect(0, 0, W, 400);
-
-  // Load Logo
-  try {
-    const logoImg = new Image();
-    logoImg.src = 'logo.png';
-    await new Promise((resolve) => {
-      logoImg.onload = resolve;
-      logoImg.onerror = resolve;
-    });
-    if (logoImg.complete && logoImg.naturalWidth !== 0) {
-      ctx.drawImage(logoImg, 50, 45, 90, 90);
-    }
-  } catch (e) {}
-
-  // Header Title
-  ctx.direction = 'rtl';
-  ctx.textAlign = 'right';
-
-  ctx.font = '900 34px Cairo, sans-serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText('احسبلي | a7sbley', W - 50, 80);
-
-  ctx.font = '700 18px Cairo, sans-serif';
-  ctx.fillStyle = '#f97316';
-  ctx.fillText('إشعار استحقاق مالي ومطالبة خدمة', W - 50, 115);
-
-  // Divider
-  ctx.strokeStyle = 'rgba(249, 115, 22, 0.35)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(50, 155);
-  ctx.lineTo(W - 50, 155);
-  ctx.stroke();
-
-  // Meta row (Date & Reference)
-  ctx.font = '700 15px Cairo, sans-serif';
-  ctx.fillStyle = '#94a3b8';
-  ctx.fillText(`تاريخ التسجيل: ${debt.date} ${debt.time ? `(${debt.time})` : ''}`, W - 50, 195);
-  
-  ctx.textAlign = 'left';
-  ctx.fillText(`المرجع: #${debt.id.slice(-6).toUpperCase()}`, 50, 195);
-
-  // Client Box
-  ctx.textAlign = 'right';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-  ctx.lineWidth = 1;
-  roundRect(ctx, 50, 225, W - 100, 95, 16, true, true);
-
-  ctx.font = '700 15px Cairo, sans-serif';
-  ctx.fillStyle = '#f97316';
-  ctx.fillText('العميل / الطرف المحترم:', W - 75, 260);
-
-  ctx.font = '900 24px Cairo, sans-serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(debt.client || 'عميل محترم', W - 75, 295);
-
-  // Service Details Box
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
-  roundRect(ctx, 50, 335, W - 100, 105, 16, true, true);
-
-  ctx.font = '700 15px Cairo, sans-serif';
-  ctx.fillStyle = '#f97316';
-  ctx.fillText('تفاصيل الخدمة / العملية:', W - 75, 370);
-
-  ctx.font = '800 21px Cairo, sans-serif';
-  ctx.fillStyle = '#f1f5f9';
-  const notesText = debt.notes || debt.category || 'خدمة صيانة وسوفت وير';
-  ctx.fillText(notesText.slice(0, 50), W - 75, 410);
-
-  let currentY = 460;
-
-  // Optional: Image of Device / Receipt
-  if (hasImage) {
-    try {
-      const receiptImg = new Image();
-      receiptImg.crossOrigin = 'anonymous';
-      receiptImg.src = debt.receipt;
-      await new Promise((resolve) => {
-        receiptImg.onload = resolve;
-        receiptImg.onerror = resolve;
-      });
-
-      if (receiptImg.complete && receiptImg.naturalWidth !== 0) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.strokeStyle = 'rgba(249, 115, 22, 0.3)';
-        roundRect(ctx, 50, currentY, W - 100, 200, 16, true, true);
-
-        // Draw image clipped inside
-        ctx.save();
-        ctx.beginPath();
-        roundRect(ctx, 55, currentY + 5, W - 110, 190, 12, false, false);
-        ctx.clip();
-        
-        // draw cover
-        const imgRatio = receiptImg.width / receiptImg.height;
-        const boxW = W - 110;
-        const boxH = 190;
-        let dw = boxW;
-        let dh = boxW / imgRatio;
-        if (dh < boxH) {
-          dh = boxH;
-          dw = boxH * imgRatio;
-        }
-        const dx = 55 + (boxW - dw) / 2;
-        const dy = (currentY + 5) + (boxH - dh) / 2;
-        ctx.drawImage(receiptImg, dx, dy, dw, dh);
-        ctx.restore();
-
-        // Badge on image
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        roundRect(ctx, W - 190, currentY + 15, 120, 30, 8, true, false);
-        ctx.font = '800 13px Cairo, sans-serif';
-        ctx.fillStyle = '#fbbf24';
-        ctx.fillText('📷 صورة الجهاز', W - 85, currentY + 36);
-
-        currentY += 215;
-      }
-    } catch (e) {
-      console.warn("Failed drawing card receipt image:", e);
-    }
-  }
-
-  // Financial Big Box
-  const total = Number(debt.amount) || 0;
-  const paidAmt = Number(debt.paidAmount) || 0;
-  const remaining = Math.max(0, total - paidAmt);
-
-  const finGrad = ctx.createLinearGradient(50, currentY, W - 50, currentY + 140);
-  finGrad.addColorStop(0, 'rgba(234, 88, 12, 0.25)');
-  finGrad.addColorStop(1, 'rgba(249, 115, 22, 0.08)');
-  ctx.fillStyle = finGrad;
-  ctx.strokeStyle = '#f97316';
-  ctx.lineWidth = 2;
-  roundRect(ctx, 50, currentY, W - 100, 140, 20, true, true);
-
-  // Labels inside financial box
-  ctx.font = '700 15px Cairo, sans-serif';
-  ctx.fillStyle = '#cbd5e1';
-  ctx.fillText('إجمالي المبلغ:', W - 80, currentY + 45);
-  ctx.fillText('المسدد منه:', W - 80, currentY + 95);
-
-  ctx.textAlign = 'left';
-  ctx.font = '800 18px Cairo, sans-serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(`${money(total)} ج.م`, W / 2 + 30, currentY + 45);
-  ctx.fillText(`${money(paidAmt)} ج.م`, W / 2 + 30, currentY + 95);
-
-  // Big Highlight for Remaining Amount
-  ctx.fillStyle = '#ea580c';
-  roundRect(ctx, 65, currentY + 20, (W / 2) - 80, 100, 16, true, false);
-
-  ctx.textAlign = 'center';
-  ctx.font = '700 14px Cairo, sans-serif';
-  ctx.fillStyle = '#ffedd5';
-  ctx.fillText('المتبقي المطلوب سداده', 65 + ((W / 2) - 80) / 2, currentY + 52);
-
-  ctx.font = '900 28px Cairo, sans-serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(`${money(remaining)} ج.م`, 65 + ((W / 2) - 80) / 2, currentY + 95);
-
-  currentY += 160;
-
-  // Formal polite footer text
-  ctx.textAlign = 'right';
-  ctx.font = '700 13px Cairo, sans-serif';
-  ctx.fillStyle = '#94a3b8';
-  ctx.fillText('• يرجى التكرم بسداد المبلغ المستحق أعلاه لإغلاق حساب العملية، شاكرين ومقدرين حسن تعاونكم معنا.', W - 50, currentY);
-
-  if (debt.dueDate) {
-    ctx.fillStyle = '#f59e0b';
-    ctx.fillText(`• موعد الاستحقاق المتفق عليه: ${debt.dueDate}`, W - 50, currentY + 28);
-  }
-
-  // Watermark footer
-  ctx.textAlign = 'center';
-  ctx.font = '800 12px Cairo, sans-serif';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-  ctx.fillText('احسبلي | a7sbley Financial Management System', W / 2, H - 25);
-
-  // Convert canvas to image
-  const dataUrl = canvas.toDataURL('image/png', 0.95);
-  const previewImg = document.getElementById('debtCardImg');
-  const downloadBtn = document.getElementById('downloadDebtCardBtn');
-  
-  if (previewImg) previewImg.src = dataUrl;
-  if (downloadBtn) {
-    downloadBtn.href = dataUrl;
-    downloadBtn.download = `مطالبة_${debt.client || 'عميل'}_${debt.date}.png`;
-  }
-
-  // Open modal
-  const modal = document.getElementById('debtCardModal');
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-  }
-}
-
-function closeDebtCardModal() {
-  const modal = document.getElementById('debtCardModal');
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-  }
-  currentCardDebt = null;
-}
 
 async function shareDebtCardWhatsApp() {
   if (!currentCardDebt) return;
@@ -5798,12 +5566,13 @@ function readGuestScope() {
     tx, inv: Array.isArray(inv) ? inv : [], rec: Array.isArray(rec) ? rec : [],
     budget: Number(localStorage.getItem(scopedKey(BUDGET_KEY, GUEST_UID)) || 0),
     cat: sanitizeCatBudgets(rd(CATBUDGET_KEY, {})),
-    machines: sanitizeMachines(rd(CHARGE_KEY, []))
+    machines: sanitizeMachines(rd(CHARGE_KEY, [])),
+    phones: sanitizeClientPhones(rd(CLIENT_PHONES_KEY, {}))
   };
 }
 function guestHasData() {
   const g = readGuestScope();
-  return g.tx.some(t => !t._deleted) || g.inv.length > 0 || g.rec.length > 0 || g.machines.length > 0 || g.budget > 0 || Object.keys(g.cat).length > 0;
+  return g.tx.some(t => !t._deleted) || g.inv.length > 0 || g.rec.length > 0 || g.machines.length > 0 || Object.keys(g.phones).length > 0 || g.budget > 0 || Object.keys(g.cat).length > 0;
 }
 function openGuestImportModal() {
   if (!isRealCloudUser()) return;
@@ -5848,6 +5617,8 @@ function importGuestData() {
   g.machines.forEach(m => { if (!mIds.has(m.id)) chargeMachines.push(m); });
   chargeMachines = sanitizeMachines(chargeMachines);
   lsSet(CHARGE_KEY, JSON.stringify(chargeMachines));
+  clientPhones = sanitizeClientPhones({ ...g.phones, ...clientPhones });
+  lsSet(CLIENT_PHONES_KEY, JSON.stringify(clientPhones));
   lsSet(INVENTORY_KEY, JSON.stringify(inventoryItems));
   lsSet(RECURRING_KEY, JSON.stringify(recurringExpenses));
   lsSet(CATBUDGET_KEY, JSON.stringify(categoryBudgets));
@@ -7022,7 +6793,7 @@ renderClients = function () {
     card.innerHTML = `
       <div class="cl-top">
         <span class="cl-av"></span>
-        <div class="cl-id"><b class="cl-name"></b><small>${c.count} معاملة • آخر تعامل ${escapeHTML(_ago(c.last))}</small></div>
+        <div class="cl-id"><b class="cl-name"></b><small>${c.count} معاملة • آخر تعامل ${escapeHTML(_ago(c.last))}</small><small class="cl-phone"></small></div>
         <span class="cl-st st-${stCls}">${stTxt}</span>
       </div>
       <div class="cl-stats">
@@ -7034,16 +6805,20 @@ renderClients = function () {
       <div class="cl-acts">
         <button type="button" class="cl-btn pri" data-a="ledger"><i class="fa-solid fa-folder-open"></i> كشف الحساب</button>
         <button type="button" class="cl-btn" data-a="debt" title="دين جديد"><i class="fa-solid fa-plus"></i> دين</button>
-        <button type="button" class="cl-btn" data-a="income" title="إيراد جديد"><i class="fa-solid fa-plus"></i> دخل</button>
+        <button type="button" class="cl-btn wa" data-a="wa" title="واتساب العميل" aria-label="واتساب العميل"><i class="fa-brands fa-whatsapp"></i></button>
+        <button type="button" class="cl-btn ic" data-a="phone" title="رقم العميل" aria-label="رقم العميل"><i class="fa-solid fa-phone"></i></button>
       </div>`;
     card.querySelector('.cl-av').textContent = c.name.charAt(0).toUpperCase();
     card.querySelector('.cl-name').textContent = c.name;
+    { const ph = getClientPhone(c.name); const pe = card.querySelector('.cl-phone'); pe.textContent = ph ? '📞 ' + formatPhoneDisplay(ph) : 'مفيش رقم واتساب'; if (!ph) pe.classList.add('none'); }
     card.addEventListener('click', e => {
       const b = e.target.closest('button[data-a]');
       if (!b) { openClientLedger(c.name); return; }
       const a = b.getAttribute('data-a');
       if (a === 'ledger') openClientLedger(c.name);
-      else clientQuickAdd(c.name, a === 'debt' ? 'debt_receivable' : 'income');
+      else if (a === 'wa') remindClient(c.name);
+      else if (a === 'phone') askClientPhone(c.name, null);
+      else clientQuickAdd(c.name, 'debt_receivable');
     });
     container.appendChild(card);
   });
@@ -7218,8 +6993,9 @@ renderDebts = function () {
         </div>` : ''}
       <div class="db-acts">
         ${!i.isPaid ? `<button type="button" class="db-btn pri" data-a="pay"><i class="fa-solid fa-coins"></i> تسديد</button>` : ''}
-        <button type="button" class="db-btn" data-a="card"><i class="fa-solid fa-receipt"></i> بطاقة مطالبة</button>
+        ${!i.isPaid && i.rec ? `<button type="button" class="db-btn wa" data-a="remind"><i class="fa-brands fa-whatsapp"></i> تذكير</button>` : ''}
         <button type="button" class="db-btn" data-a="toggle">${i.isPaid ? '<i class="fa-solid fa-rotate-left"></i> إعادة فتح' : '<i class="fa-solid fa-check-double"></i> تسوية كاملة'}</button>
+        <button type="button" class="db-ib" data-a="card" title="بطاقة مطالبة (صورة)"><i class="fa-solid fa-image"></i></button>
         <button type="button" class="db-ib" data-a="edit" title="تعديل"><i class="fa-solid fa-pen"></i></button>
         <button type="button" class="db-ib del" data-a="del" title="حذف"><i class="fa-solid fa-trash-can"></i></button>
       </div>`;
@@ -7227,7 +7003,9 @@ renderDebts = function () {
     const sub = card.querySelector('.db-sub');
     if (d.client) {
       const c = document.createElement('button'); c.type = 'button'; c.className = 'db-client'; c.innerHTML = '<i class="fa-solid fa-user"></i> ';
-      c.append(document.createTextNode(d.client)); c.addEventListener('click', ev => { ev.stopPropagation(); openClientLedger(d.client); });
+      c.append(document.createTextNode(d.client));
+      if (getClientPhone(d.client)) { const w2 = document.createElement('i'); w2.className = 'fa-brands fa-whatsapp db-wa-ok'; c.appendChild(w2); }
+      c.addEventListener('click', ev => { ev.stopPropagation(); openClientLedger(d.client); });
       sub.appendChild(c);
     }
     sub.append(document.createTextNode(`${d.category || ''} • ${d.date}${d.time ? ' • ' + formatTimeTo12Hour(d.time) : ''}`));
@@ -7243,6 +7021,7 @@ renderDebts = function () {
       const b = ev.target.closest('button[data-a]'); if (!b) return;
       const a = b.getAttribute('data-a');
       if (a === 'pay') openDebtPaymentModal(d.id);
+      else if (a === 'remind') sendDebtReminder(d.id);
       else if (a === 'card') openDebtCardModal(d.id);
       else if (a === 'toggle') toggleDebtStatus(d.id);
       else if (a === 'edit') editTransaction(d.id);
@@ -7843,34 +7622,6 @@ function _loginErrorText(code) {
     'auth/account-exists-with-different-credential': 'الإيميل ده مسجّل بطريقة دخول تانية.'
   })[code] || '';
 }
-async function loginWithGoogle() {
-  if (window._googleBusy) return;
-  const p = _plat();
-  if (p.inApp) {
-    showLoginError('جوجل بتمنع تسجيل الدخول من داخل تطبيقات زي فيسبوك وإنستجرام. افتح الرابط في Chrome أو Safari ثم سجّل دخولك.');
-    return;
-  }
-  window._googleBusy = true; setGoogleBusy(true); clearLoginError();
-  const provider = new firebase.auth.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-  try {
-    const result = await auth.signInWithPopup(provider);
-    localStorage.removeItem(GUEST_SESSION_KEY);
-    showToast(`أهلاً بك يا ${(result.user && result.user.displayName) || 'صديقنا'} 👋`, 'success');
-  } catch (error) {
-    const code = error && error.code;
-    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request' || code === 'auth/user-cancelled') {
-      /* المستخدم قفل النافذة — مفيش داعي لرسالة */
-    } else if (code === 'auth/popup-blocked') {
-      try { await auth.signInWithRedirect(provider); return; }
-      catch (e2) { showLoginError('المتصفح منع نافذة الدخول. اسمح بالنوافذ المنبثقة لهذا الموقع وحاول تاني.'); }
-    } else {
-      showLoginError(_loginErrorText(code) || ('تعذر تسجيل الدخول' + (code ? ` (${code})` : '')));
-    }
-  } finally {
-    window._googleBusy = false; setGoogleBusy(false);
-  }
-}
 async function handleRedirectResult() {
   try {
     const result = await auth.getRedirectResult();
@@ -8288,3 +8039,357 @@ function syncThemeColorMeta() {
   document.addEventListener('DOMContentLoaded', syncThemeColorMeta);
   syncThemeColorMeta();
 })();
+
+/* =========================================================
+   V20.10 — أرقام العملاء + تذكير واتساب مباشر + بطاقة مطالبة جديدة + ثبات تسجيل جوجل
+   ========================================================= */
+const CLIENT_PHONES_KEY = 'ehsebli_client_phones_v1';
+
+/* ---------- أرقام العملاء ---------- */
+function _ckey(name) { return String(name || '').trim().toLowerCase(); }
+function normalizePhone(raw) {
+  let d = String(raw || '').replace(/[٠-٩]/g, c => String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[^\d+]/g, '');
+  if (!d) return '';
+  if (d.startsWith('+')) d = d.slice(1);
+  else if (d.startsWith('00')) d = d.slice(2);
+  else if (d.startsWith('0')) d = '20' + d.slice(1);            // 010... → 2010...
+  else if (d.length === 10 && d.startsWith('1')) d = '20' + d;   // 10xxxxxxxx (من غير صفر)
+  return /^\d{10,15}$/.test(d) ? d : '';
+}
+function formatPhoneDisplay(intl) { return (intl && intl.startsWith('20') && intl.length === 12) ? '0' + intl.slice(2) : (intl ? '+' + intl : ''); }
+function getClientPhone(name) { const p = clientPhones[_ckey(name)]; return p ? p.phone : ''; }
+function sanitizeClientPhones(obj) {
+  const out = {};
+  if (!obj || typeof obj !== 'object') return out;
+  Object.keys(obj).slice(0, 500).forEach(k => {
+    const v = obj[k]; const phone = normalizePhone(v && v.phone);
+    if (phone && k) out[String(k).slice(0, 80)] = { name: sanitizeString((v && v.name) || k, 60), phone };
+  });
+  return out;
+}
+function loadClientPhones() { clientPhones = sanitizeClientPhones(_safeJSON(lsGet(CLIENT_PHONES_KEY), {})); }
+function saveClientPhones() {
+  lsSet(CLIENT_PHONES_KEY, JSON.stringify(clientPhones));
+  if (isRealCloudUser()) syncToCloud();
+}
+function setClientPhone(name, raw) {
+  const phone = normalizePhone(raw);
+  if (!name || !String(name).trim() || !phone) return false;
+  clientPhones[_ckey(name)] = { name: String(name).trim().slice(0, 60), phone };
+  saveClientPhones();
+  return true;
+}
+function removeClientPhone(name) { delete clientPhones[_ckey(name)]; saveClientPhones(); }
+
+/* ---------- نافذة رقم العميل ---------- */
+let _cpName = '', _cpCallback = null;
+function askClientPhone(name, callback) {
+  _cpName = name; _cpCallback = callback || null;
+  const m = document.getElementById('clientPhoneModal'); if (!m) return;
+  document.getElementById('cpSub').textContent = 'العميل: ' + name;
+  const cur = getClientPhone(name);
+  const input = document.getElementById('cpInput'); input.value = cur ? formatPhoneDisplay(cur) : '';
+  document.getElementById('cpError').hidden = true;
+  document.getElementById('cpSend').hidden = !callback;
+  document.getElementById('cpSave').className = 'gim-btn' + (callback ? '' : ' gim-btn-p');
+  m.classList.remove('hidden'); m.classList.add('flex');
+  setTimeout(() => { try { input.focus({ preventScroll: true }); } catch (e) {} }, 120);
+}
+function closeClientPhoneModal() { const m = document.getElementById('clientPhoneModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } _cpCallback = null; }
+function saveClientPhoneFromModal(andSend) {
+  const input = document.getElementById('cpInput'); const err = document.getElementById('cpError');
+  const raw = input.value.trim();
+  if (!raw && getClientPhone(_cpName)) { removeClientPhone(_cpName); const cb0 = null; closeClientPhoneModal(); refreshClientViews(); showToast('تم حذف الرقم', 'info'); return cb0; }
+  if (!setClientPhone(_cpName, raw)) { err.textContent = 'اكتب رقم صحيح (مثال: 01012345678)'; err.hidden = false; return; }
+  const cb = _cpCallback;
+  closeClientPhoneModal(); refreshClientViews();
+  showToast('تم حفظ رقم العميل ✓', 'success');
+  if (andSend && cb) setTimeout(cb, 200);
+}
+document.addEventListener('keydown', e => {
+  const m = document.getElementById('clientPhoneModal');
+  if (!m || m.classList.contains('hidden')) return;
+  if (e.key === 'Escape') closeClientPhoneModal();
+  else if (e.key === 'Enter' && e.target && e.target.id === 'cpInput') { e.preventDefault(); saveClientPhoneFromModal(!document.getElementById('cpSend').hidden); }
+});
+function refreshClientViews() { try { renderClients(); renderDebts(); } catch (e) {} }
+
+/* ---------- الواتساب المباشر ---------- */
+function openWhatsAppTo(phone, text) {
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+  const w = window.open(url, '_blank', 'noopener');
+  if (!w) location.href = url;
+}
+function _shopSignature() { return (currentUser && currentUser.displayName) ? currentUser.displayName : 'احسبلي'; }
+function _fmtDueAr(dateStr) { try { return new Date(dateStr + 'T12:00:00').toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return dateStr; } }
+function buildDebtReminderText(d) {
+  const i = _debtInfo(d);
+  const name = d.client || 'حضرتك';
+  const lines = [`السلام عليكم يا ${name} 🌸`];
+  if (i.overdue) lines.push(`نفكّر حضرتك بموعد سداد المستحق اللي عدّى بتاريخ ${_fmtDueAr(d.dueDate)}.`);
+  else lines.push('تذكير ودّي بخصوص المستحق التالي:');
+  lines.push('', `📌 ${d.notes || d.category || 'خدمة'}`, `📅 بتاريخ ${_fmtDueAr(d.date)}`);
+  if (i.paid > 0) lines.push(`💵 اتسدد: ${money(i.paid)} ج.م من ${money(i.total)} ج.م`);
+  lines.push(`💰 *المتبقي: ${money(i.rem)} ج.م*`);
+  if (!i.overdue && d.dueDate) lines.push(`⏰ موعد السداد: ${_fmtDueAr(d.dueDate)}`);
+  lines.push('', 'لو سددت بالفعل تجاهل الرسالة 🙏، ولو في أي استفسار أنا تحت أمرك.', `— ${_shopSignature()}`);
+  return lines.join('\n');
+}
+function sendDebtReminder(debtId) {
+  const d = transactions.find(t => t.id === debtId);
+  if (!d) return;
+  if (!d.client || !d.client.trim()) { showToast('اكتب اسم العميل في الدين الأول (تعديل ←  اسم العميل)', 'error'); return; }
+  const phone = getClientPhone(d.client);
+  if (!phone) { askClientPhone(d.client, () => sendDebtReminder(debtId)); return; }
+  openWhatsAppTo(phone, buildDebtReminderText(d));
+}
+function remindClient(name) {
+  const phone = getClientPhone(name);
+  if (!phone) { askClientPhone(name, () => remindClient(name)); return; }
+  const pending = getActiveTransactions().filter(t => t.type === 'debt_receivable' && t.client && _ckey(t.client) === _ckey(name) && t.status !== 'paid')
+    .map(t => ({ t, i: _debtInfo(t) })).filter(x => x.i.rem > 0);
+  if (!pending.length) { openWhatsAppTo(phone, `السلام عليكم يا ${name} 🌸\nإزيك؟ ${_shopSignature()}`); return; }
+  const total = pending.reduce((s, x) => s + x.i.rem, 0);
+  const lines = [`السلام عليكم يا ${name} 🌸`, 'تذكير ودّي بالمستحقات الآتية:', ''];
+  pending.slice(0, 5).forEach(x => lines.push(`• ${x.t.notes || x.t.category || 'خدمة'} (${x.t.date}): ${money(x.i.rem)} ج.م${x.i.overdue ? ' ⚠️ متأخر' : ''}`));
+  if (pending.length > 5) lines.push(`… و${pending.length - 5} عمليات أخرى`);
+  lines.push('', `💰 *إجمالي المتبقي: ${money(total)} ج.م*`, '', 'لو سددت بالفعل تجاهل الرسالة 🙏', `— ${_shopSignature()}`);
+  openWhatsAppTo(phone, lines.join('\n'));
+}
+
+/* ---------- بطاقة المطالبة (صورة احترافية جديدة) ---------- */
+function _loadImg(src) { return new Promise(res => { if (!src) return res(null); const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }); }
+function _fit(ctx, text, maxW) {
+  let t = String(text || '');
+  if (ctx.measureText(t).width <= maxW) return t;
+  while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+  return t + '…';
+}
+function _rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+async function drawDebtCardCanvas(d, canvas) {
+  const i = _debtInfo(d);
+  try { await Promise.all([document.fonts.load('900 40px Cairo'), document.fonts.load('700 24px Cairo')]); } catch (e) {}
+  const [logo, receipt] = await Promise.all([_loadImg('logo.png'), _loadImg(d.receipt)]);
+  const W = 900, PAD = 40, CX = 40, CW = W - 80;
+  const rows = [['الخدمة / البيان', d.notes || d.category || '—'], ['تاريخ العملية', _fmtDueAr(d.date)]];
+  if (d.dueDate) rows.push(['موعد السداد', _fmtDueAr(d.dueDate)]);
+  rows.push(['إجمالي المبلغ', `${money(i.total)} ج.م`]);
+  if (i.paid > 0) rows.push(['المسدد', `${money(i.paid)} ج.م`]);
+  const phone = getClientPhone(d.client);
+  const rcptH = receipt ? 230 : 0;
+  const cardTop = 175, innerTop = cardTop + 40;
+  const H = innerTop + 100 + 40 + 220 + 70 + rows.length * 64 + (receipt ? rcptH + 20 : 0) + 130 + 100;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.direction = 'rtl'; ctx.textBaseline = 'alphabetic';
+  const F = (w, s) => `${w} ${s}px Cairo, "Segoe UI", sans-serif`;
+
+  // الخلفية
+  ctx.fillStyle = '#eef2f7'; ctx.fillRect(0, 0, W, H);
+  // الشريط العلوي
+  const g = ctx.createLinearGradient(0, 0, W, 240); g.addColorStop(0, '#ea580c'); g.addColorStop(.55, '#f97316'); g.addColorStop(1, '#fbbf24');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, 250);
+  ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.arc(120, 40, 150, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(W - 40, 230, 110, 0, Math.PI * 2); ctx.fill();
+  // الشعار + العنوان
+  const lx = W - PAD - 92;
+  if (logo) { ctx.save(); _rr(ctx, lx, 38, 92, 92, 26); ctx.clip(); ctx.fillStyle = '#0c0d13'; ctx.fillRect(lx, 38, 92, 92); ctx.drawImage(logo, lx, 38, 92, 92); ctx.restore(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.8)'; _rr(ctx, lx, 38, 92, 92, 26); ctx.stroke(); }
+  ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; ctx.font = F(900, 44); ctx.fillText('تذكير بالسداد', lx - 22, 84);
+  ctx.font = F(700, 22); ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillText(_shopSignature(), lx - 22, 120);
+  ctx.textAlign = 'left'; ctx.font = F(700, 20); ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillText(new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }), PAD, 70);
+
+  // البطاقة البيضاء
+  ctx.save(); ctx.shadowColor = 'rgba(15,23,42,.18)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 14;
+  ctx.fillStyle = '#fff'; _rr(ctx, CX, cardTop, CW, H - cardTop - 90, 40); ctx.fill(); ctx.restore();
+
+  let y = innerTop;
+  // العميل
+  const ax = CX + CW - 38 - 36;
+  ctx.fillStyle = '#fed7aa'; ctx.beginPath(); ctx.arc(ax, y + 38, 38, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#c2410c'; ctx.textAlign = 'center'; ctx.font = F(900, 36); ctx.fillText((d.client || '؟').charAt(0).toUpperCase(), ax, y + 51);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#0f172a'; ctx.font = F(900, 34); ctx.fillText(_fit(ctx, d.client || 'عميل', 430), ax - 54, y + 36);
+  ctx.font = F(700, 20); ctx.fillStyle = '#64748b'; ctx.fillText(phone ? '📞 ' + formatPhoneDisplay(phone) : (d.category || 'مستحقات'), ax - 54, y + 70);
+  // الحالة
+  const st = i.isPaid ? ['تم السداد ✓', '#059669', '#d1fae5'] : i.overdue ? [`متأخر ${Math.abs(i.dueDiff)} يوم`, '#be123c', '#ffe4e6']
+    : (i.dueDiff !== null ? (i.dueDiff === 0 ? ['يستحق اليوم', '#b45309', '#fef3c7'] : [`يستحق خلال ${i.dueDiff} يوم`, '#b45309', '#fef3c7']) : ['مستحق السداد', '#475569', '#e2e8f0']);
+  ctx.font = F(800, 22); const pw = ctx.measureText(st[0]).width + 44;
+  ctx.fillStyle = st[2]; _rr(ctx, CX + 36, y + 22, pw, 52, 26); ctx.fill();
+  ctx.fillStyle = st[1]; ctx.textAlign = 'center'; ctx.fillText(st[0], CX + 36 + pw / 2, y + 57);
+  y += 100;
+  ctx.fillStyle = '#e2e8f0'; ctx.fillRect(CX + 36, y, CW - 72, 2); y += 50;
+
+  // المبلغ المتبقي
+  ctx.textAlign = 'center'; ctx.font = F(700, 24); ctx.fillStyle = '#64748b'; ctx.fillText(i.isPaid ? 'إجمالي المبلغ' : 'المبلغ المتبقي', W / 2, y);
+  y += 86; const amtCol = i.isPaid ? '#059669' : (i.overdue ? '#e11d48' : '#ea580c');
+  ctx.font = F(900, 92); ctx.fillStyle = amtCol; ctx.fillText(money(i.isPaid ? i.total : i.rem), W / 2 + 28, y);
+  ctx.font = F(900, 30); ctx.fillStyle = '#94a3b8'; const aw = (ctx.font = F(900, 92), ctx.measureText(money(i.isPaid ? i.total : i.rem)).width); ctx.font = F(900, 30); ctx.fillText('ج.م', W / 2 + 28 - aw / 2 - 40, y - 4);
+  y += 50;
+  // شريط السداد
+  const pct = i.total > 0 ? Math.min(100, Math.round((i.paid / i.total) * 100)) : 0;
+  const bx = CX + 60, bw = CW - 120;
+  ctx.fillStyle = '#e2e8f0'; _rr(ctx, bx, y, bw, 20, 10); ctx.fill();
+  if (pct > 0) { const bg2 = ctx.createLinearGradient(bx, 0, bx + bw, 0); bg2.addColorStop(0, '#10b981'); bg2.addColorStop(1, '#34d399'); ctx.fillStyle = bg2; _rr(ctx, bx, y, Math.max(20, bw * pct / 100), 20, 10); ctx.fill(); }
+  ctx.font = F(700, 20); ctx.fillStyle = '#64748b'; ctx.textAlign = 'right'; ctx.fillText(`سُدد ${money(i.paid)} من ${money(i.total)} ج.م`, bx + bw, y + 52);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#059669'; ctx.font = F(900, 22); ctx.fillText(`${pct}%`, bx, y + 52);
+  y += 90;
+
+  // تفاصيل
+  rows.forEach((r, idx) => {
+    if (idx % 2 === 0) { ctx.fillStyle = '#f8fafc'; _rr(ctx, CX + 30, y - 8, CW - 60, 58, 16); ctx.fill(); }
+    ctx.textAlign = 'right'; ctx.font = F(700, 22); ctx.fillStyle = '#64748b'; ctx.fillText(r[0], CX + CW - 54, y + 30);
+    ctx.textAlign = 'left'; ctx.font = F(800, 23); ctx.fillStyle = '#0f172a'; ctx.fillText(_fit(ctx, r[1], 430), CX + 54, y + 30);
+    y += 64;
+  });
+  if (receipt) {
+    y += 14; const rw = CW - 120, rh = rcptH - 10;
+    ctx.save(); _rr(ctx, CX + 60, y, rw, rh, 20); ctx.clip();
+    const sc = Math.max(rw / receipt.width, rh / receipt.height); ctx.drawImage(receipt, CX + 60 + (rw - receipt.width * sc) / 2, y + (rh - receipt.height * sc) / 2, receipt.width * sc, receipt.height * sc); ctx.restore();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#e2e8f0'; _rr(ctx, CX + 60, y, rw, rh, 20); ctx.stroke(); y += rcptH;
+  }
+  // ختام
+  y += 40; ctx.textAlign = 'center'; ctx.font = F(700, 22); ctx.fillStyle = '#475569';
+  ctx.fillText('يرجى التكرم بالسداد في أقرب وقت ممكن', W / 2, y); ctx.font = F(800, 22); ctx.fillStyle = '#ea580c'; ctx.fillText('شكراً لحسن تعاملكم معنا 🤍', W / 2, y + 40);
+  ctx.font = F(800, 18); ctx.fillStyle = 'rgba(71,85,105,.7)'; ctx.fillText('احسبلي | a7sbley', W / 2, H - 38);
+  return canvas;
+}
+async function openDebtCardModal(debtId) {
+  const debt = transactions.find(t => t.id === debtId);
+  if (!debt) return;
+  currentCardDebt = debt;
+  showToast('جاري تصميم بطاقة المطالبة...', 'info');
+  const canvas = document.getElementById('debtCardCanvas');
+  try { await drawDebtCardCanvas(debt, canvas); } catch (e) { console.warn(e); showToast('تعذر تصميم البطاقة', 'error'); return; }
+  const dataUrl = canvas.toDataURL('image/png');
+  const img = document.getElementById('debtCardImg'); if (img) img.src = dataUrl;
+  const dl = document.getElementById('downloadDebtCardBtn');
+  if (dl) { dl.href = dataUrl; dl.download = `مطالبة_${debt.client || 'عميل'}_${debt.date}.png`; }
+  const modal = document.getElementById('debtCardModal');
+  modal.classList.remove('hidden'); modal.classList.add('flex');
+}
+function closeDebtCardModal() {
+  const m = document.getElementById('debtCardModal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+  currentCardDebt = null;
+}
+async function shareDebtCardImage() {
+  const d = currentCardDebt, canvas = document.getElementById('debtCardCanvas'); if (!d || !canvas) return;
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+  if (!blob) return;
+  const file = new File([blob], `مطالبة_${d.client || 'عميل'}.png`, { type: 'image/png' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'بطاقة مطالبة', text: buildDebtReminderText(d) }); return; }
+  } catch (err) { if (err && err.name === 'AbortError') return; }
+  let copied = false;
+  try { if (navigator.clipboard && window.ClipboardItem) { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); copied = true; } } catch (e) {}
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+  showToast(copied ? 'تم نسخ الصورة وحفظها — الصقها في واتساب' : 'تم حفظ الصورة — أرفقها في واتساب', 'success');
+}
+
+/* ---------- حقل الرقم في نموذج العملية + شريط الرقم في كشف الحساب ---------- */
+(function hookClientPhoneUI() {
+  const bind = () => {
+    const nameEl = document.getElementById('formClient'), phEl = document.getElementById('formClientPhone');
+    if (!nameEl || !phEl || nameEl._phBound) return; nameEl._phBound = true;
+    const fill = () => { const p = getClientPhone(nameEl.value); if (p && !phEl.value) phEl.value = formatPhoneDisplay(p); };
+    nameEl.addEventListener('change', fill); nameEl.addEventListener('blur', fill); nameEl.addEventListener('input', () => { if (clientPhones[_ckey(nameEl.value)]) fill(); });
+  };
+  document.addEventListener('DOMContentLoaded', bind); bind();
+  const om = window.openModal;
+  window.openModal = function () {
+    const r = om.apply(this, arguments);
+    try { const nameEl = document.getElementById('formClient'), phEl = document.getElementById('formClientPhone'); if (phEl) { phEl.value = ''; if (nameEl && nameEl.value) { const p = getClientPhone(nameEl.value); if (p) phEl.value = formatPhoneDisplay(p); } } } catch (e) {}
+    return r;
+  };
+  const hs = window.handleFormSubmit;
+  window.handleFormSubmit = async function (e) {
+    const nameEl = document.getElementById('formClient'), phEl = document.getElementById('formClientPhone');
+    const name = nameEl && nameEl.value.trim(), raw = phEl && phEl.value.trim();
+    const r = await hs.apply(this, arguments);
+    try {
+      const m = document.getElementById('transactionModal');
+      if (name && raw && m && m.classList.contains('hidden')) {
+        if (!setClientPhone(name, raw)) showToast('اتحفظت العملية — بس رقم العميل غير صحيح فاتجاهلناه', 'info');
+      }
+    } catch (err) { console.warn(err); }
+    return r;
+  };
+  const ol = window.openClientLedger;
+  window.openClientLedger = function (clientName) {
+    const r = ol.apply(this, arguments);
+    try {
+      const bar = document.getElementById('clientPhoneBar'); if (!bar) return r;
+      const phone = getClientPhone(clientName);
+      bar.replaceChildren();
+      const info = document.createElement('div'); info.className = 'cl-pb-i';
+      info.innerHTML = `<i class="fa-brands fa-whatsapp"></i><span></span>`;
+      info.querySelector('span').textContent = phone ? formatPhoneDisplay(phone) : 'مفيش رقم واتساب للعميل';
+      const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'cl-pb-b'; edit.innerHTML = phone ? '<i class="fa-solid fa-pen"></i> تعديل' : '<i class="fa-solid fa-plus"></i> إضافة رقم';
+      edit.addEventListener('click', () => askClientPhone(clientName, null));
+      bar.append(info, edit);
+      if (phone) { const wa = document.createElement('button'); wa.type = 'button'; wa.className = 'cl-pb-b wa'; wa.innerHTML = '<i class="fa-brands fa-whatsapp"></i> تذكير'; wa.addEventListener('click', () => remindClient(clientName)); bar.appendChild(wa); }
+    } catch (e) { console.warn(e); }
+    return r;
+  };
+})();
+
+/* =========================================================
+   تسجيل جوجل: ثبات أعلى (إلغاء التعليق، شاشة تحميل فورية، طريقة بديلة)
+   ========================================================= */
+let _googleFails = 0, _googleAttempt = 0;
+(function hookAuthLoadingText() {
+  const o = window.showAuthLoading;
+  window.showAuthLoading = function (txt) {
+    const r = o.apply(this, arguments);
+    const s = document.querySelector('#authLoading .al-sub'); if (s) s.textContent = txt || 'جاري تجهيز حسابك...';
+    return r;
+  };
+})();
+function showAltLogin(show) { const b = document.getElementById('loginAltBtn'); if (b) b.hidden = !show; }
+function _afterGoogleSuccess() {
+  localStorage.removeItem(GUEST_SESSION_KEY);
+  showAuthLoading('جاري تسجيل الدخول...');
+  setTimeout(() => {   // لو معالج الحساب ماردش، نرجّع صفحة الدخول بدل شاشة فاضية
+    if (document.body.classList.contains('auth-pending') && !currentUser) { hideAuthLoading(); showLoginWall(); showLoginError('اتأخر تجهيز الحساب. جرّب تاني.'); showAltLogin(true); }
+  }, 15000);
+}
+async function loginWithGoogle() {
+  const now = Date.now();
+  if (window._googleBusy && now - (window._googleStartedAt || 0) < 1500) return;   // منع الضغط المزدوج السريع
+  const p = _plat();
+  if (p.inApp) { showLoginError('جوجل بتمنع تسجيل الدخول من داخل تطبيقات زي فيسبوك وإنستجرام. افتح الرابط في Chrome أو Safari.'); return; }
+  const attempt = ++_googleAttempt;
+  window._googleBusy = true; window._googleStartedAt = now; setGoogleBusy(true); clearLoginError();
+  const guard = setTimeout(() => {
+    if (attempt === _googleAttempt && window._googleBusy) { window._googleBusy = false; setGoogleBusy(false); showAltLogin(true); showLoginError('جوجل مارجعتش بنتيجة. جرّب تاني أو استخدم الطريقة البديلة.'); }
+  }, 60000);
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  try {
+    const result = await auth.signInWithPopup(provider);
+    if (attempt !== _googleAttempt) return;
+    _googleFails = 0; _afterGoogleSuccess();
+    showToast(`أهلاً بك يا ${(result.user && result.user.displayName) || 'صديقنا'} 👋`, 'success');
+  } catch (error) {
+    if (attempt !== _googleAttempt) return;
+    const code = error && error.code;
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request' || code === 'auth/user-cancelled') {
+      // أحياناً النافذة بتقفل بعد نجاح الدخول فعلاً — نستنى لحظة ونتأكد
+      await new Promise(r => setTimeout(r, 1600));
+      if (auth.currentUser) { _afterGoogleSuccess(); }
+      else { _googleFails++; if (_googleFails >= 2) showAltLogin(true); }
+    } else if (code === 'auth/popup-blocked') {
+      showAltLogin(true); showLoginError('المتصفح منع نافذة جوجل. اسمح بالنوافذ المنبثقة أو استخدم الطريقة البديلة.');
+    } else {
+      showAltLogin(true);
+      showLoginError(_loginErrorText(code) || ('تعذر تسجيل الدخول' + (code ? ` (${code})` : '')));
+    }
+  } finally {
+    clearTimeout(guard);
+    if (attempt === _googleAttempt) { window._googleBusy = false; setGoogleBusy(false); }
+  }
+}
+async function loginWithGoogleRedirect() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  showAuthLoading('جاري تحويلك لجوجل...');
+  try { await auth.signInWithRedirect(provider); }
+  catch (e) { hideAuthLoading(); showLoginWall(); showLoginError(_loginErrorText(e && e.code) || 'تعذر بدء تسجيل الدخول'); }
+}

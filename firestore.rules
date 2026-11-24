@@ -61,9 +61,10 @@ service cloud.firestore {
     function memberCanWriteUserDoc(ownerId) {
       return isTeamMember(ownerId)
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['updatedAt', 'txCount', 'appVersion', 'chargeMachines', 'inventory'])
+             .hasOnly(['updatedAt', 'txCount', 'appVersion', 'chargeMachines', 'inventory', 'clientPhones'])
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['chargeMachines']) || mperm(ownerId, 'machines'))
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['inventory']) || mperm(ownerId, 'inventory'));
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['inventory']) || mperm(ownerId, 'inventory'))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['clientPhones']) || mperm(ownerId, 'clients') || mperm(ownerId, 'debts'));
     }
     function isStr(v, maxLen) {
       return v is string && v.size() <= maxLen;

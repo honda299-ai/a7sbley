@@ -36,7 +36,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20.9">
+  <link rel="stylesheet" href="styles.css?v=20.10">
 
   <!-- Driver.js for Elegant Tutorial -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
@@ -943,6 +943,7 @@
         </button>
 
         <p id="loginError" class="lg-err" role="alert" hidden></p>
+        <button id="loginAltBtn" type="button" class="lg-alt" hidden onclick="loginWithGoogleRedirect()"><i class="fa-solid fa-arrows-rotate"></i> النافذة مش بتفتح أو بترجع؟ جرّب طريقة بديلة</button>
 
         <div class="lg-trust">
           <span><i class="fa-solid fa-shield-halved"></i> مؤمّن</span>
@@ -1020,6 +1021,7 @@
             <label for="formClient" class="tx-lbl">اسم العميل <em>اختياري</em></label>
             <div class="tx-icon-in"><i class="fa-solid fa-user"></i><input type="text" id="formClient" list="clientsDatalist" maxlength="60" placeholder="مثال: أحمد" class="tx-in" autocomplete="off"></div>
             <datalist id="clientsDatalist"></datalist>
+            <div class="tx-icon-in tx-phone"><i class="fa-brands fa-whatsapp"></i><input type="tel" id="formClientPhone" inputmode="tel" dir="ltr" maxlength="20" placeholder="رقم واتساب العميل (اختياري)" class="tx-in" autocomplete="off"></div>
           </div>
 
           <div id="debtDueDateWrapper" class="hidden tx-field tx-due">
@@ -1127,6 +1129,7 @@
         </div>
       </div>
 
+      <div id="clientPhoneBar" class="cl-phonebar"></div>
       <div id="clientMetaStrip" class="cl-meta"></div>
 
       <div class="p-3 flex-1 overflow-y-auto">
@@ -1450,49 +1453,24 @@
   </div>
 
   <!-- DEBT REMINDER CARD MODAL -->
-  <div id="debtCardModal" class="fixed inset-0 z-[120] hidden items-center justify-center p-3 bg-black/85 backdrop-blur-sm" onclick="closeDebtCardModal()">
-    <div class="relative max-w-lg w-full bg-slate-900 border border-orange-500/40 rounded-3xl p-4 sm:p-5 shadow-2xl modal-enter overflow-hidden flex flex-col items-center" onclick="event.stopPropagation()">
-      <div class="w-full flex items-center justify-between pb-3 border-b border-white/10 mb-3">
-        <div class="flex items-center gap-2 text-white font-black text-sm">
-          <i class="fa-solid fa-receipt text-orange-500"></i>
-          <span>بطاقة المطالبة المالية</span>
-        </div>
-        <button onclick="closeDebtCardModal()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">
-          <i class="fa-solid fa-xmark"></i>
+  <div id="debtCardModal" class="pf-root hidden" onclick="closeDebtCardModal()" role="dialog" aria-modal="true" aria-labelledby="dcTitle" style="z-index:120">
+    <div class="pf-card dc-card" onclick="event.stopPropagation()">
+      <header class="mc-head">
+        <span class="mc-ib tm-ico" aria-hidden="true" style="color:#f97316;background:rgba(249,115,22,.14);border-color:rgba(249,115,22,.3)"><i class="fa-solid fa-receipt"></i></span>
+        <div class="mc-title"><span id="dcTitle">بطاقة المطالبة</span></div>
+        <button type="button" class="mc-ib" onclick="closeDebtCardModal()" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button>
+      </header>
+      <div class="mc-body dc-body">
+        <div class="dc-preview"><img id="debtCardImg" alt="بطاقة المطالبة"></div>
+        <canvas id="debtCardCanvas" style="display:none;"></canvas>
+        <button id="shareDebtCardWhatsAppBtn" type="button" class="dc-wa" onclick="sendDebtReminder(currentCardDebt && currentCardDebt.id)">
+          <i class="fa-brands fa-whatsapp"></i><span>إرسال تذكير على واتساب العميل</span>
         </button>
-      </div>
-
-      <!-- Preview Image of the Card -->
-      <div id="debtCardPreviewContainer" class="w-full max-h-[60vh] overflow-y-auto rounded-2xl border border-white/10 bg-black/50 p-1 flex justify-center">
-        <img id="debtCardImg" class="max-w-full rounded-xl shadow-lg object-contain" alt="بطاقة المطالبة">
-      </div>
-
-      <!-- Hidden canvas for rendering -->
-      <canvas id="debtCardCanvas" style="display:none;"></canvas>
-
-      <!-- Actions -->
-      <div class="w-full space-y-2 mt-4">
-        <button id="shareDebtCardWhatsAppBtn" onclick="shareDebtCardWhatsApp()"
-           class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 active:scale-[0.98] transition text-center">
-          <i class="fa-brands fa-whatsapp text-base"></i>
-          <span>إرسال للواتساب (نسخ الصورة وتجهيز الكلام)</span>
-        </button>
-        <div class="grid grid-cols-2 gap-2">
-          <a id="downloadDebtCardBtn" href="" download="debt-notice.png"
-             class="py-2.5 px-3 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-orange-400 font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition text-center">
-            <i class="fa-solid fa-download"></i>
-            <span>حفظ بالمعرض</span>
-          </a>
-          <button onclick="shareViaSystemSheet()"
-             class="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition text-center">
-            <i class="fa-solid fa-share-nodes"></i>
-            <span>مشاركة كاملة</span>
-          </button>
+        <div class="dc-row">
+          <button type="button" class="dc-sec" onclick="shareDebtCardImage()"><i class="fa-solid fa-share-nodes"></i> مشاركة الصورة</button>
+          <a id="downloadDebtCardBtn" class="dc-sec" href="" download="debt-notice.png"><i class="fa-solid fa-download"></i> حفظ بالمعرض</a>
         </div>
       </div>
-      <p class="text-[10px] text-slate-400 mt-2 text-center">
-        💡 عند فتح الواتساب، اضغط <strong class="text-emerald-400">"لصق / Paste"</strong> في صندوق الكتابة لإرسال الصورة مباشرة.
-      </p>
     </div>
   </div>
 
@@ -2023,6 +2001,21 @@
     </div>
   </div>
 
+  <!-- رقم واتساب العميل -->
+  <div id="clientPhoneModal" class="pf-root hidden" onclick="closeClientPhoneModal()" role="dialog" aria-modal="true" aria-labelledby="cpTitle" style="z-index:138">
+    <div class="pf-card pf-dialog" onclick="event.stopPropagation()">
+      <div class="pf-grab" aria-hidden="true"></div>
+      <div class="gim-ic" style="color:#10b981;background:rgba(16,185,129,.15)"><i class="fa-brands fa-whatsapp"></i></div>
+      <h3 id="cpTitle" class="gim-t">رقم واتساب العميل</h3>
+      <p id="cpSub" class="gim-p" style="margin-bottom:10px"></p>
+      <input id="cpInput" type="tel" inputmode="tel" dir="ltr" class="form-input cp-input" placeholder="01012345678" autocomplete="off" maxlength="20">
+      <p id="cpError" class="lk-err" role="alert" hidden></p>
+      <button id="cpSend" type="button" class="gim-btn cp-send" onclick="saveClientPhoneFromModal(true)"><i class="fa-brands fa-whatsapp"></i> حفظ وإرسال على واتساب</button>
+      <button id="cpSave" type="button" class="gim-btn gim-btn-p" onclick="saveClientPhoneFromModal(false)">حفظ الرقم</button>
+      <button type="button" class="gim-btn" onclick="closeClientPhoneModal()">إلغاء</button>
+    </div>
+  </div>
+
 <!-- MODE ONBOARDING MODAL -->
   <div id="modeOnboardingModal" class="fixed inset-0 z-[450] hidden items-center justify-center p-4 bg-black/90 backdrop-blur-md">
     <div class="adaptive-modal-card relative w-full max-w-md rounded-3xl bg-[#11131a] border border-orange-500/40 p-6 text-center text-white shadow-2xl modal-enter">
@@ -2058,6 +2051,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20.9"></script>
+  <script src="app.js?v=20.10"></script>
 </body>
 </html>
