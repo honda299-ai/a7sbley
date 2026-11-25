@@ -65,3 +65,12 @@ git push -u origin main
 - The mobile language switch is now part of the sticky header, so it never covers the settings/control-center button or dialogs.
 - The "working within a team" banner now requires a verified, active membership; stale workspace preferences can no longer show it to a user who has no team.
 - Mobile transaction cards now show three clear actions — WhatsApp, Edit and Delete — with larger touch targets and a tidy separated row instead of a lone delete icon.
+
+
+## v20.10.6 — open any account exactly as its owner sees it
+
+- Super admins can now open any registered user from Admin → Users → the user row → **Open account as its owner (super admin)**.
+- The whole app switches to that user's real workspace: home, transactions, debts, clients, inventory, machines, reports, budgets, team view, portal index and permissions — exactly the same screens and data the owner sees.
+- A prominent amber bar shows which account is being viewed and provides a one-tap **Back to my account** control. A real sign-out/token change always leaves view mode first.
+- Firebase Auth remains the super admin's account. All writes go to the viewed user's Firestore paths under super-admin rules and are attributed to the real admin in `admin_audit`, including open/exit and any edit made while viewing.
+- The account owner's PIN is never applied to the super-admin preview, so a protected account can still be inspected professionally.

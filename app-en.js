@@ -1523,6 +1523,7 @@ function _tourFirstVisible(selectors) {
   return null;
 }
 function _tourBlocked() {
+  if (typeof admViewActive === 'function' && admViewActive()) return true;
   const b = document.body.classList;
   if (b.contains('not-authed') || b.contains('auth-pending')) return true;
   return ['authLoading', 'loginWall', 'lockScreen', 'modeOnboardingModal', 'userProfileModal', 'guestImportModal', 'mobileInstallModal', 'pinModal', 'teamInviteModal', 'clientPhoneModal'].some(id => {
@@ -1780,6 +1781,7 @@ function _runAppTour(driverFactory) {
 }
 
 auth.onAuthStateChanged(async user => {
+  if (typeof admViewActive === 'function' && admViewActive()) admExitViewAs({ silent: true });
   // Old code forauth
   if (window.isPortalModeActive || new URLSearchParams(window.location.search).has('client')) return;
   if (isPortalModeActive) return;
@@ -1833,7 +1835,7 @@ auth.onAuthStateChanged(async user => {
     checkPendingShare();
 
     loadCloudData(wsUid()).finally(() => {
-      if (getPin() && !pinStillUnlocked()) showPinLock();
+      if (getPin() && !pinStillUnlocked() && !(typeof admViewActive === 'function' && admViewActive())) showPinLock();
       else { hidePinLock(); if (getPin()) markPinActive(); }
       
       // Run the Tutorial after everything you need to download
@@ -1851,6 +1853,10 @@ auth.onAuthStateChanged(async user => {
 
 
 function logout() {
+  if (typeof admViewActive === 'function' && admViewActive()) {
+    openConfirm(VIEWX.exitTitle, VIEWX.exitBody, () => admExitViewAs());
+    return;
+  }
   if (!currentUser) return;
   if (isRealCloudUser()) {
     openConfirm('Sign out?', 'The session will be terminated. Your data is securely stored in the cloud.', () => auth.signOut());
@@ -2241,6 +2247,7 @@ function loadLocalData() {
 function saveLocalData() { lsSet(STORAGE_KEY, JSON.stringify(transactions)); }
 function saveData(options = {}) {
   if (!requireAuth()) return;
+  if (typeof admAuditViewAction === 'function') admAuditViewAction('edit_as_owner');
   saveLocalData();
   if (options.force) forceSyncToCloud(); else syncToCloud();
 }
@@ -6383,14 +6390,7 @@ function admExportUsersCSV() {
 }
 
 /* ---------- User details ---------- */
-async function admLog(action, uid, details) {
-  try {
-    await db.collection('admin_audit').add({
-      action, uid, by: currentUser.uid, byEmail: currentUser.email || '', details: details || {},
-      ts: firebase.firestore.FieldValue.serverTimestamp()
-    });
-  } catch (e) { console.warn('admin audit not saved (update firestore.rules):', e.code || e.message); }
-}
+async function admLog(action, uid, details) { return admWriteAudit(action, uid, details); }
 function _admErrText(e, base) {
   const c = e && e.code;
   if (c === 'permission-denied') return base + ': New rules (admin_audit / admin_notes) You haven’t posted yetFirebase';
@@ -6470,6 +6470,8 @@ function admRenderDrawer(u) {
   document.getElementById('admEmailCopy').onclick = () => admCopy(u.email || u.phone || u.id);
   const fullBtn = document.getElementById('admFullAccessBtn');
   if (fullBtn) fullBtn.hidden = !isSuperAdmin;
+  const viewBtn = document.getElementById('admViewAsBtn');
+  if (viewBtn) viewBtn.hidden = !isSuperAdmin || (!!currentUser && u.id === currentUser.uid);
 }
 function admCopy(text) {
   const done = () => showToast('Copied✓', 'success');
@@ -6529,7 +6531,7 @@ async function admSaveNote() {
     admLog('note', uid, {});
   } catch (e) { st.textContent = _admErrText(e, 'Unable toSave'); console.warn('admin_notes write failed:', e.code, e.message); }
 }
-const ADM_ACTION_LABELS = { role_change: 'Role changed', suspend: 'Account suspended', unsuspend: 'Account reactivated', permissions: 'Permissions updated', note: 'Note updated', open_full_access: 'Opened full access', view_full_access: 'Viewed document', save_full_access: 'Updated document', delete_full_access: 'Deleted document', create_full_access: 'Created document', export_full_access: 'Exported documents' };
+const ADM_ACTION_LABELS = { role_change: 'Role changed', suspend: 'Account suspended', unsuspend: 'Account reactivated', permissions: 'Permissions updated', note: 'Note updated', open_full_access: 'Opened full access', view_full_access: 'Viewed document', save_full_access: 'Updated document', delete_full_access: 'Deleted document', create_full_access: 'Created document', export_full_access: 'Exported documents', open_view_as: 'Opened account as owner', close_view_as: 'Returned from account view', edit_as_owner: 'Edit during account view' };
 async function admLoadActivity(uid) {
   const host = document.getElementById('admActivity');
   host.replaceChildren(_admEl('div', 'adm-loading', 'Loading...'));
@@ -6552,7 +6554,7 @@ async function admLoadActivity(uid) {
 }
 
 
-/* ---------- v20.10.5 — Super admin full data access ---------- */
+/* ---------- v20.10.5/v20.10.6 — Super admin data access + account view ---------- */
 const ADMX = {
   noAccess: "Super admins only 🛡️",
   title: "Full data access",
@@ -6777,6 +6779,238 @@ function admExplorerExport() {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   admLog(ADMX.exportLog, admExploreUid, { collection: admExploreCol, count: out.length });
   showToast(ADMX.exported, 'success');
+}
+
+
+/* =========================================================
+   v20.10.6 — Super admin: open any registered account exactly
+   as its owner sees it. Firebase Auth stays the admin account;
+   only the in-app view context switches to the target uid.
+   ========================================================= */
+const VIEWX = {
+  noAccess: "Super admins only 🛡️",
+  self: "This is already your account — use the view bar to go back.",
+  notFound: "User not found",
+  confirmTitle: "Open this account as its owner?",
+  confirmBody: "You will see everything in <b>{name}</b> exactly as the owner does. Any change is written to that account and logged under your super-admin identity. Use “Back to my account” in the top bar to return.",
+  bannerTitle: "Viewing a user account — super admin mode",
+  bannerSub: "You are seeing the account exactly as its owner does. Every change is logged under your name.",
+  back: "Back to my account",
+  exitTitle: "Back to your account?",
+  exitBody: "You will return to your super-admin account. The user data you were viewing stays exactly as it is.",
+  openLog: "Opened account as owner",
+  closeLog: "Returned from account view",
+  editLog: "Edit during account view",
+  loaded: "Account opened exactly as its owner sees it ✓",
+  backToast: "Back to your account ✓",
+  btn: "Open account as its owner (super admin)",
+  bannerWho: "Loading account..."
+};
+let _admRealUser = null;
+let _admViewUid = null;
+let _admViewName = '';
+
+function admViewActive() { return !!(_admViewUid && _admRealUser); }
+function admActor() { return admViewActive() ? (_admRealUser || currentUser) : currentUser; }
+
+async function admWriteAudit(action, uid, details) {
+  const actor = admActor();
+  try {
+    await db.collection('admin_audit').add({
+      action, uid,
+      by: actor && actor.uid ? actor.uid : '',
+      byEmail: (actor && actor.email) || '',
+      details: details || {},
+      ts: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (e) { console.warn('admin audit not saved:', e.code || e.message); }
+}
+function admAuditViewAction(action, details) {
+  if (!admViewActive()) return;
+  const payload = Object.assign({ viewAs: true }, details || {});
+  try {
+    const actor = admActor();
+    db.collection('admin_audit').add({
+      action, uid: _admViewUid,
+      by: actor && actor.uid ? actor.uid : '',
+      byEmail: (actor && actor.email) || '',
+      details: payload,
+      ts: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+function admEnsureViewBanner() {
+  let b = document.getElementById('admViewBanner');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'admViewBanner';
+    b.className = 'adm-view-banner';
+    b.innerHTML = '<div class="adm-view-b-in"><span class="adm-view-ic"><i class="fa-solid fa-user-eye"></i></span>' +
+      '<div class="adm-view-tx"><b></b><small></small></div>' +
+      '<button type="button" id="admViewExitBtn" class="adm-view-exit"><i class="fa-solid fa-arrow-turn-up"></i><span></span></button></div>';
+    document.body.appendChild(b);
+  }
+  b.querySelector('b').textContent = VIEWX.bannerTitle;
+  const small = b.querySelector('small');
+  if (small && !small.textContent.trim()) small.textContent = VIEWX.bannerWho;
+  const btn = document.getElementById('admViewExitBtn');
+  if (btn) {
+    btn.querySelector('span').textContent = VIEWX.back;
+    btn.onclick = () => admExitViewAs();
+  }
+  return b;
+}
+
+function admPaintViewHeader(u) {
+  const avatar = document.getElementById('userAvatar');
+  if (avatar) {
+    if (u.photoURL) avatar.src = u.photoURL;
+    else {
+      const initial = String(u.name || u.email || u.id || 'U').charAt(0).toUpperCase();
+      avatar.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%23f59e0b'/><text x='50%' y='55%' text-anchor='middle' dominant-baseline='middle' font-size='20' font-family='Cairo' fill='white' font-weight='bold'>${escapeHTML(initial)}</text></svg>`;
+    }
+  }
+  const profile = document.getElementById('userProfile');
+  if (profile) { profile.classList.remove('hidden'); profile.classList.add('flex'); }
+  const footer = document.getElementById('footerSyncStatus');
+  if (footer) footer.innerHTML = `<i class="fa-solid fa-user-eye text-amber-400"></i> ${escapeHTML(u.name || u.email || u.id)}`;
+}
+
+function admOpenViewAs() {
+  if (!isSuperAdmin) { showToast(VIEWX.noAccess, 'error'); return; }
+  if (admViewActive()) { showToast(VIEWX.self, 'error'); return; }
+  const u = admUsers.find(x => x.id === admCurrentUid);
+  if (!u) { showToast(VIEWX.notFound, 'error'); return; }
+  const actor = admActor();
+  if (actor && actor.uid && u.id === actor.uid) { showToast(VIEWX.self, 'error'); return; }
+  openConfirm(
+    VIEWX.confirmTitle,
+    VIEWX.confirmBody.replace('{name}', escapeHTML(u.name || u.email || u.id)),
+    () => admStartViewAs(u)
+  );
+}
+
+async function admStartViewAs(u) {
+  if (admViewActive() || !u || !u.id) return;
+  const real = (auth.currentUser && auth.currentUser.uid) ? auth.currentUser : currentUser;
+  if (!real || !isSuperAdmin) { showToast(VIEWX.noAccess, 'error'); return; }
+  if (u.id === real.uid) { showToast(VIEWX.self, 'error'); return; }
+
+  _admRealUser = real;
+  _admViewUid = u.id;
+  _admViewName = u.name || u.email || u.id;
+
+  try { admCloseFullAccess(); } catch (e) {}
+  admCloseUser();
+  try { closeAdminPanel(); } catch (e) {}
+  closeAllOverlays();
+
+  [() => userDocUnsubscribe, () => transactionsUnsubscribe, () => requestsUnsubscribe, () => cloudUserMetaUnsubscribe]
+    .forEach(get => { try { const fn = get(); if (typeof fn === 'function') fn(); } catch (e) {} });
+  userDocUnsubscribe = null; transactionsUnsubscribe = null; requestsUnsubscribe = null; cloudUserMetaUnsubscribe = null;
+  cloudSnapshot.clear(); portalIndex.clear(); portalPayloadCache.clear();
+
+  const fake = {
+    uid: u.id,
+    email: u.email || null,
+    displayName: u.name || '',
+    photoURL: u.photoURL || null,
+    phoneNumber: u.phone || null,
+    emailVerified: true,
+    providerData: (real.providerData || []).slice(),
+    isAnonymous: false,
+    __admViewAs: true
+  };
+  currentUser = fake;
+  workspaceUid = null; teamPerms = null; teamOwnerName = '';
+  userRole = 'free'; currentUserPermissionsOverride = null; isSuperAdmin = false;
+
+  hideSuspendedScreen();
+  hidePinLock();
+  hideLoginWall();
+  handleUserSwitch(u.id);
+  document.body.classList.add('adm-view-mode');
+  const banner = admEnsureViewBanner();
+  banner.hidden = false;
+  const who = banner.querySelector('small');
+  if (who) who.textContent = `${_admViewName} · ${u.email || u.phone || u.id}`;
+  admPaintViewHeader(u);
+
+  try {
+    const snap = await db.collection('users').doc(u.id).get();
+    const d = snap.data() || {};
+    if (ROLES_META[d.role]) userRole = d.role;
+    currentUserPermissionsOverride = d.permissionsOverride || null;
+  } catch (e) { userRole = 'free'; currentUserPermissionsOverride = null; }
+
+  applyRoleUI();
+  loadAllLocal();
+  refreshAll();
+
+  try { await resolveWorkspace(fake); } catch (e) {}
+  applyTeamUI();
+  subscribeToUserDoc(u.id);
+  setSyncStatusUI('syncing');
+  try { await loadCloudData(u.id); } catch (e) {}
+  hidePinLock();
+
+  navigateSegmented('home');
+  window.scrollTo(0, 0);
+  admAuditViewAction('open_view_as', { name: _admViewName });
+  showToast(VIEWX.loaded, 'success');
+}
+
+function admExitViewAs(opts) {
+  if (!admViewActive()) return;
+  const targetUid = _admViewUid;
+  const targetName = _admViewName;
+  const real = _admRealUser;
+
+  admAuditViewAction('close_view_as', { name: targetName });
+
+  [() => userDocUnsubscribe, () => transactionsUnsubscribe, () => requestsUnsubscribe, () => cloudUserMetaUnsubscribe]
+    .forEach(get => { try { const fn = get(); if (typeof fn === 'function') fn(); } catch (e) {} });
+  userDocUnsubscribe = null; transactionsUnsubscribe = null; requestsUnsubscribe = null; cloudUserMetaUnsubscribe = null;
+  cloudSnapshot.clear(); portalIndex.clear(); portalPayloadCache.clear();
+
+  _admViewUid = null;
+  _admRealUser = null;
+  _admViewName = '';
+  document.body.classList.remove('adm-view-mode');
+  const banner = document.getElementById('admViewBanner');
+  if (banner) banner.hidden = true;
+
+  currentUser = real;
+  if (opts && opts.silent) {
+    isSuperAdmin = !!real && isSuperAdminEmail(String(real.email || '').toLowerCase().trim());
+    userRole = isSuperAdmin ? 'admin' : 'free';
+    currentUserPermissionsOverride = null;
+    return;
+  }
+
+  isSuperAdmin = !!real && isSuperAdminEmail(String(real.email || '').toLowerCase().trim());
+  userRole = isSuperAdmin ? 'admin' : 'free';
+  currentUserPermissionsOverride = null;
+  hideSuspendedScreen(); hidePinLock(); hideLoginWall();
+  handleUserSwitch(real.uid);
+  localStorage.setItem(LAST_UID_KEY, real.uid);
+
+  const avatar = document.getElementById('userAvatar');
+  if (avatar && real.photoURL) avatar.src = real.photoURL;
+  const footer = document.getElementById('footerSyncStatus');
+  if (footer) footer.innerHTML = `<i class="fa-solid fa-cloud text-emerald-500"></i> ${escapeHTML(real.email || real.phoneNumber || 'متصل بالسحاب')}`;
+
+  loadAllLocal();
+  refreshAll();
+  applyRoleUI();
+  try { resolveWorkspace(real).then(() => { applyTeamUI(); }); } catch (e) {}
+  subscribeToUserDoc(real.uid);
+  setSyncStatusUI('syncing');
+  loadCloudData(wsUid()).catch(() => {});
+  navigateSegmented('home');
+  window.scrollTo(0, 0);
+  showToast(VIEWX.backToast, 'success');
 }
 
 (function hookAdminActions() {

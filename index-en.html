@@ -33,7 +33,7 @@ function a7SwitchLang(){
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="tailwind-en.css?v=20.10.5">
+  <link rel="stylesheet" href="tailwind-en.css?v=20.10.6">
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha384-t1nt8BQoYMLFN5p42tRAtuAAFQaCQODekUVeKKZrEnEyp4H2R0RHFz0KWpmj7i8g" crossorigin="anonymous">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js" integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG" crossorigin="anonymous"></script>
@@ -44,11 +44,11 @@ function a7SwitchLang(){
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js" integrity="sha384-V+JDBdDUVJZg+P+FfMHPBpwRwZ/naAJin/v9bip69lHtHGBcZWXLCLA7SyOBX3QF" crossorigin="anonymous"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js" integrity="sha384-nTT69180wF6j2ZwBDbXzByFz0TFsSjMChXkzK9o1gUzu9o6WopS8RN0utzpRIcj9" crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="styles-en.css?v=20.10.5">
+  <link rel="stylesheet" href="styles-en.css?v=20.10.6">
 
   <!-- Driver.js for Elegant Tutorial -->
-  <link rel="stylesheet" href="driver.css?v=20.10.5">
-  <script src="driver.js?v=20.10.5"></script>
+  <link rel="stylesheet" href="driver.css?v=20.10.6">
+  <script src="driver.js?v=20.10.6"></script>
 
 
   <style>
@@ -179,7 +179,7 @@ function a7SwitchLang(){
     .driver-popover.a7-tour *, .driver-popover.a7-tour, .driver-active-element { transition: none !important; animation: none !important; }
   }
 
-  /* v20.10.5 — language button stays in the header flow, never covers settings */
+  /* v20.10.6 — language button stays in the header flow, never covers settings */
   .lang-toggle-btn {
     display: inline-flex; align-items: center; justify-content: center;
     min-width: 40px; height: 40px; padding: 0 10px; border-radius: 999px;
@@ -192,10 +192,10 @@ function a7SwitchLang(){
   @media (max-width: 480px) {
     .lang-toggle-btn { min-width: 36px; height: 36px; padding: 0 8px; font-size: 11px; }
   }
-  /* v20.10.5 — stronger than the mobile view class that forces display:block */
+  /* v20.10.6 — stronger than the mobile view class that forces display:block */
   body.mob-js-ready [data-mob-view].team-home[hidden], body .team-home[hidden] { display: none !important; }
-  /* v20.10.5 — super admin full data explorer */
-  .adm-drawer.full-access .adm-d-scroll > :not(#admFullAccess) { display: none !important; }
+  /* v20.10.6 — super admin full data explorer */
+  .adm-drawer.full-access .adm-d-scroll > :not(#admFullAccess):not(#admViewAsBtn) { display: none !important; }
   .adm-explorer[hidden], .adm-exp-editor[hidden], #admFullAccessBtn[hidden] { display: none !important; }
   .adm-explorer { display: flex; flex-direction: column; gap: 10px; }
   .adm-exp-head { display: flex; align-items: center; gap: 10px; }
@@ -224,7 +224,7 @@ function a7SwitchLang(){
   }
   html:not(.dark) .adm-exp-json { background: #f8fafc; color: #0f172a; }
   .exp-btn { border-color: rgba(249,115,22,.45) !important; color: #fb923c !important; }
-  /* v20.10.5 — mobile transaction actions: WhatsApp, Edit, Delete */
+  /* v20.10.6 — mobile transaction actions: WhatsApp, Edit, Delete */
   .tx-card { flex-direction: column; align-items: stretch; gap: 0; }
   .tx-m-row { display: flex; align-items: center; gap: 10px; min-width: 0; width: 100%; }
   .tx-m-acts { display: flex; align-items: stretch; gap: 7px; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--u-line); }
@@ -249,12 +249,44 @@ function a7SwitchLang(){
     .adm-exp-json { min-height: 180px; }
     .tx-ab { flex: 1 1 33%; }
   }
+
+  /* v20.10.6 — professional super-admin account-view bar */
+  .adm-view-banner { display: block; position: fixed; inset: 0 0 auto 0; height: 46px; z-index: 10000; background: linear-gradient(90deg,#7c2d12,#b45309 55%,#f59e0b); color:#fff; box-shadow:0 8px 24px rgba(2,6,23,.34); }
+  .adm-view-banner[hidden] { display: none !important; }
+  .adm-view-b-in { height:100%; max-width:1400px; margin:auto; padding:0 16px; display:flex; align-items:center; gap:10px; }
+  .adm-view-ic { width:30px; height:30px; flex:0 0 30px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,.16); }
+  .adm-view-tx { display:flex; flex-direction:column; min-width:0; line-height:1.2; }
+  .adm-view-tx b { font-size:12px; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .adm-view-tx small { font-size:10px; opacity:.86; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .adm-view-exit { margin-inline-start:auto; flex:0 0 auto; height:32px; padding:0 12px; display:inline-flex; align-items:center; gap:7px; border:0; border-radius:999px; background:#fff; color:#9a3412; font:900 11px/1 'Cairo',system-ui,sans-serif; cursor:pointer; }
+  .adm-view-exit:hover { filter:brightness(.96); }
+  body.adm-view-mode { padding-top:46px; }
+  body.adm-view-mode #appHeader { top:46px; }
+  .viewas-btn { border-color:rgba(245,158,11,.5) !important; color:#fbbf24 !important; }
+  #admViewAsBtn[hidden] { display:none !important; }
+  @media (max-width:767px) {
+    .adm-view-banner { height:52px; }
+    .adm-view-b-in { padding:0 10px; gap:8px; }
+    .adm-view-ic { width:28px; height:28px; flex-basis:28px; }
+    .adm-view-tx b { font-size:11px; }
+    .adm-view-tx small { font-size:9px; }
+    .adm-view-exit { padding:0 10px; font-size:10px; }
+    body.adm-view-mode { padding-top:52px; }
+    body.adm-view-mode #appHeader { top:52px; }
+  }
 </style>
 
 <noscript><style>[data-mob-view]{display:block!important}</style></noscript>
 </head>
 
 <body class="bg-slate-100 dark:bg-dark-950 text-slate-900 dark:text-slate-100 antialiased font-sans auth-pending">
+<div id="admViewBanner" class="adm-view-banner" hidden>
+  <div class="adm-view-b-in">
+    <span class="adm-view-ic"><i class="fa-solid fa-user-eye"></i></span>
+    <div class="adm-view-tx"><b>Viewing a user account — super admin mode</b><small id="admViewWho">Loading account...</small></div>
+    <button type="button" id="admViewExitBtn" class="adm-view-exit" onclick="admExitViewAs()"><i class="fa-solid fa-arrow-turn-up"></i><span>Back to my account</span></button>
+  </div>
+</div>
 
   <!-- HEADER -->
   <header id="appHeader" class="sticky top-0 z-40 border-b border-slate-200 dark:border-dark-800 bg-white dark:bg-dark-900 shadow-sm no-print">
@@ -1514,6 +1546,8 @@ function a7SwitchLang(){
             <button id="admEmailCopy" type="button" class="adm-btn wide"><i class="fa-solid fa-copy"></i> Copy email/phone</button>
             <button id="admFullAccessBtn" type="button" class="adm-btn wide exp-btn" onclick="admOpenFullAccess()" hidden><i class="fa-solid fa-user-shield"></i> Open full data (super admin)</button>
           </div>
+          <button id="admViewAsBtn" type="button" class="adm-btn wide viewas-btn" onclick="admOpenViewAs()" hidden><i class="fa-solid fa-user-eye"></i> Open account as its owner (super admin)</button>
+
 
           <h5 class="adm-d-h">Special notes <small>(User does not see it)</small></h5>
           <textarea id="admNote" class="form-input adm-note" rows="3" maxlength="1000" placeholder="Write any note about this account..." disabled></textarea>
@@ -2243,6 +2277,6 @@ function a7SwitchLang(){
     </div>
   </div>
 
-  <script src="app-en.js?v=20.10.5"></script>
+  <script src="app-en.js?v=20.10.6"></script>
 </body>
 </html>
