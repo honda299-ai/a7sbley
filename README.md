@@ -74,3 +74,17 @@ git push -u origin main
 - A prominent amber bar shows which account is being viewed and provides a one-tap **Back to my account** control. A real sign-out/token change always leaves view mode first.
 - Firebase Auth remains the super admin's account. All writes go to the viewed user's Firestore paths under super-admin rules and are attributed to the real admin in `admin_audit`, including open/exit and any edit made while viewing.
 - The account owner's PIN is never applied to the super-admin preview, so a protected account can still be inspected professionally.
+
+
+## v20.10.7 — debt reminder image restored and guaranteed
+
+- The debt reminder / claim card now always produces a real PNG image.
+- If the rich design cannot be exported (cross-origin receipt, missing logo, slow font load, or any canvas taint), the app automatically redraws a clean untainted card and uses it for both the preview and WhatsApp sharing.
+- The preview image is forced visible with high-priority CSS on phone and desktop.
+
+
+## v20.10.8 — Google login fixed inside the app
+
+- Trusted Web Activity (Android APK) and the Windows desktop app now sign in with Firebase's redirect flow instead of a pop-up window.
+- If a browser blocks the Google pop-up, the app automatically retries in the same window instead of showing an error.
+- The "alternative method" button still works as a manual fallback.

@@ -8201,6 +8201,16 @@ function isAppStandalone() {
          window.navigator.standalone === true ||
          document.referrer.includes('android-app://');
 }
+/* v20.10.8 — pop-ups do not return a result inside a TWA, Electron, or an
+   in-app browser. Those environments must use Firebase redirect sign-in. */
+function _needsAuthRedirect() {
+  try {
+    if (typeof isAppStandalone === 'function' && isAppStandalone()) return true;
+    if (/Electron/i.test(navigator.userAgent || '')) return true;
+    if (_plat().inApp) return true;
+  } catch (e) {}
+  return false;
+}
 
 /* =========================================================
    1) تسجيل الدخول
@@ -8230,7 +8240,7 @@ function _loginErrorText(code) {
 async function handleRedirectResult() {
   try {
     const result = await auth.getRedirectResult();
-    if (result && result.user) { localStorage.removeItem(GUEST_SESSION_KEY); showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success'); }
+    if (result && result.user) { _afterGoogleSuccess(); showToast(`أهلاً بك يا ${result.user.displayName || 'صديقنا'} 👋`, 'success'); }
   } catch (error) {
     const t = _loginErrorText(error && error.code);
     if (t) { showLoginError(t); }
@@ -8763,13 +8773,89 @@ function remindClient(name) {
 }
 
 /* ---------- بطاقة المطالبة (صورة احترافية جديدة) ---------- */
+/* =========================================================
+   v20.10.7 — guaranteed debt-reminder card image.
+   If the rich canvas cannot be exported (tainted receipt, missing
+   logo, slow font load), redraw a clean untainted card so the
+   preview and WhatsApp share always contain a real image.
+   ========================================================= */
+function _drawFallbackDebtCard(d, canvas) {
+  const total = Number((d && d.amount) || 0);
+  const paid = Number((d && d.paidAmount) || 0);
+  const rem = Math.max(0, total - paid);
+  canvas.width = 900; canvas.height = 620;
+  const c = canvas.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, 900, 620);
+  c.direction = 'rtl'; c.textBaseline = 'alphabetic';
+  const g = c.createLinearGradient(0, 0, 900, 250);
+  g.addColorStop(0, '#ea580c'); g.addColorStop(.55, '#f97316'); g.addColorStop(1, '#fbbf24');
+  c.fillStyle = g; c.fillRect(0, 0, 900, 250);
+  c.fillStyle = 'rgba(255,255,255,.13)';
+  c.beginPath(); c.arc(130, 45, 155, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.arc(860, 235, 115, 0, Math.PI * 2); c.fill();
+  c.textAlign = 'right'; c.fillStyle = '#fff';
+  c.font = '900 46px Cairo, "Segoe UI", sans-serif'; c.fillText('تذكير بالسداد', 820, 108);
+  c.font = '700 22px Cairo, "Segoe UI", sans-serif'; c.fillText((typeof _shopSignature === 'function' ? _shopSignature() : 'احسبلي | a7sbly'), 820, 148);
+  c.save(); c.shadowColor = 'rgba(15,23,42,.18)'; c.shadowBlur = 35; c.shadowOffsetY = 12;
+  c.fillStyle = '#fff'; _rr(c, 40, 210, 820, 340, 38); c.fill(); c.restore();
+  c.textAlign = 'right'; c.fillStyle = '#0f172a';
+  c.font = '900 36px Cairo, "Segoe UI", sans-serif'; c.fillText(_fit(c, 'العميل: ' + ((d && d.client) || 'عميل'), 620), 810, 300);
+  c.fillStyle = '#64748b'; c.font = '700 22px Cairo, "Segoe UI", sans-serif';
+  c.fillText(_fit(c, (d && (d.notes || d.category)) || 'مستحقات', 620), 810, 342);
+  c.fillStyle = i_color(total, paid);
+  c.font = '900 64px Cairo, "Segoe UI", sans-serif'; c.fillText(money(rem) + ' EGP', 810, 425);
+  c.textAlign = 'center'; c.fillStyle = '#475569'; c.font = '700 20px Cairo, "Segoe UI", sans-serif';
+  c.fillText('يرجى التكرم بالسداد في أقرب وقت ممكن', 450, 510);
+  c.fillStyle = '#ea580c'; c.font = '800 20px Cairo, "Segoe UI", sans-serif';
+  c.fillText('شكراً لحسن تعاملكم 🤍  |  احسبلي | a7sbly', 450, 548);
+  return canvas;
+}
+function i_color(total, paid) {
+  if (paid > 0 && paid >= total) return '#059669';
+  return '#ea580c';
+}
+function _canvasExportable(canvas) {
+  try { const u = canvas && canvas.toDataURL('image/png'); return !!(u && u.length > 60); }
+  catch (e) { return false; }
+}
+
 function safeCanvasToBlob(canvas, cb, type, quality) {
-  try { canvas.toBlob(cb, type, quality); }
-  catch (e) { console.warn('Canvas export blocked (cross-origin image):', e); cb(null); }
+  let retried = false;
+  const done = blob => {
+    if (!blob && !retried && currentCardDebt && canvas) {
+      retried = true;
+      try { _drawFallbackDebtCard(currentCardDebt, canvas); canvas.toBlob(done, type, quality); return; }
+      catch (e) {}
+    }
+    cb(blob);
+  };
+  try { canvas.toBlob(done, type, quality); }
+  catch (e) {
+    console.warn('Canvas export blocked (cross-origin image):', e);
+    if (!retried && currentCardDebt && canvas) {
+      retried = true;
+      try { _drawFallbackDebtCard(currentCardDebt, canvas); canvas.toBlob(done, type, quality); return; }
+      catch (e2) {}
+    }
+    cb(null);
+  }
 }
 function safeCanvasToDataURL(canvas, type, quality) {
-  try { return canvas.toDataURL(type, quality); }
-  catch (e) { console.warn('Canvas export blocked (cross-origin image):', e); return ''; }
+  let retried = false;
+  const attempt = () => {
+    try {
+      const url = canvas.toDataURL(type, quality);
+      if (url && url.length > 60) return url;
+    } catch (e) { console.warn('Canvas export blocked (cross-origin image):', e); }
+    if (!retried && currentCardDebt && canvas) {
+      retried = true;
+      try { _drawFallbackDebtCard(currentCardDebt, canvas); return attempt(); }
+      catch (e2) {}
+    }
+    return '';
+  };
+  return attempt();
 }
 function _loadImg(src) {
   return new Promise(res => {
@@ -8881,8 +8967,10 @@ async function openDebtCardModal(debtId) {
   currentCardDebt = debt;
   showToast('جاري تصميم بطاقة المطالبة...', 'info');
   const canvas = document.getElementById('debtCardCanvas');
-  try { await drawDebtCardCanvas(debt, canvas); } catch (e) { console.warn(e); showToast('تعذر تصميم البطاقة', 'error'); return; }
-  const dataUrl = safeCanvasToDataURL(canvas, 'image/png');
+  try { await drawDebtCardCanvas(debt, canvas); }
+  catch (e) { console.warn(e); _drawFallbackDebtCard(debt, canvas); showToast('تم عرض البطاقة بصورة بسيطة', 'info'); }
+  let dataUrl = safeCanvasToDataURL(canvas, 'image/png');
+  if (!dataUrl) { _drawFallbackDebtCard(debt, canvas); dataUrl = safeCanvasToDataURL(canvas, 'image/png'); }
   const img = document.getElementById('debtCardImg'); if (img) img.src = dataUrl;
   const dl = document.getElementById('downloadDebtCardBtn');
   if (dl) { dl.href = dataUrl; dl.download = `مطالبة_${debt.client || 'عميل'}_${debt.date}.png`; }
@@ -8895,6 +8983,7 @@ function closeDebtCardModal() {
 }
 async function shareDebtCardImage() {
   const d = currentCardDebt, canvas = document.getElementById('debtCardCanvas'); if (!d || !canvas) return;
+  if (!_canvasExportable(canvas)) _drawFallbackDebtCard(d, canvas);
   const blob = await new Promise(r => safeCanvasToBlob(canvas, r, 'image/png'));
   if (!blob) return;
   const file = new File([blob], `مطالبة_${d.client || 'عميل'}.png`, { type: 'image/png' });
@@ -8978,7 +9067,11 @@ async function loginWithGoogle() {
   const now = Date.now();
   if (window._googleBusy && now - (window._googleStartedAt || 0) < 1500) return;   // منع الضغط المزدوج السريع
   const p = _plat();
-  if (p.inApp) { showLoginError('جوجل بتمنع تسجيل الدخول من داخل تطبيقات زي فيسبوك وإنستجرام. افتح الرابط في Chrome أو Safari.'); return; }
+  if (_needsAuthRedirect()) {
+    clearLoginError();
+    showToast('جاري فتح جوجل داخل نفس النافذة...', 'info');
+    return loginWithGoogleRedirect();
+  }
   const attempt = ++_googleAttempt;
   window._googleBusy = true; window._googleStartedAt = now; setGoogleBusy(true); clearLoginError();
   const guard = setTimeout(() => {
@@ -8999,8 +9092,10 @@ async function loginWithGoogle() {
       await new Promise(r => setTimeout(r, 1600));
       if (auth.currentUser) { _afterGoogleSuccess(); }
       else { _googleFails++; if (_googleFails >= 2) showAltLogin(true); }
-    } else if (code === 'auth/popup-blocked') {
-      showAltLogin(true); showLoginError('المتصفح منع نافذة جوجل. اسمح بالنوافذ المنبثقة أو استخدم الطريقة البديلة.');
+    } else if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+      // v20.10.8 — do not leave the user stuck: retry automatically in the same window.
+      showToast('النافذة المنبثقة مش متاحة — جاري الدخول داخل نفس النافذة...', 'info');
+      return loginWithGoogleRedirect();
     } else {
       showAltLogin(true);
       showLoginError(_loginErrorText(code) || ('تعذر تسجيل الدخول' + (code ? ` (${code})` : '')));
@@ -9011,11 +9106,18 @@ async function loginWithGoogle() {
   }
 }
 async function loginWithGoogleRedirect() {
+  const now = Date.now();
+  if (window._googleBusy && now - (window._googleStartedAt || 0) < 1500) return;
+  window._googleBusy = true; window._googleStartedAt = now; setGoogleBusy(true); clearLoginError();
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   showAuthLoading('جاري تحويلك لجوجل...');
   try { await auth.signInWithRedirect(provider); }
-  catch (e) { hideAuthLoading(); showLoginWall(); showLoginError(_loginErrorText(e && e.code) || 'تعذر بدء تسجيل الدخول'); }
+  catch (e) {
+    window._googleBusy = false; setGoogleBusy(false);
+    hideAuthLoading(); showLoginWall(); showAltLogin(true);
+    showLoginError(_loginErrorText(e && e.code) || 'تعذر بدء تسجيل الدخول');
+  }
 }
 
 

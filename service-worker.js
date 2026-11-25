@@ -3,7 +3,7 @@
    PWA Engine + Offline Precache + Push Notifications
    ========================================================= */
 
-const VERSION = '20.10.6-viewas';
+const VERSION = '20.10.8-login';
 const CACHE_VERSION = `a7sbly-bilingual-v${VERSION}`;
 const RUNTIME_CACHE = `a7sbly-bilingual-runtime-v${VERSION}`;
 
