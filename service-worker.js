@@ -3,7 +3,7 @@
    PWA Engine + Offline Precache + Push Notifications
    ========================================================= */
 
-const VERSION = '20.10.3-bilingual';
+const VERSION = '20.10.5-admin';
 const CACHE_VERSION = `a7sbly-bilingual-v${VERSION}`;
 const RUNTIME_CACHE = `a7sbly-bilingual-runtime-v${VERSION}`;
 
@@ -19,6 +19,8 @@ const CORE_ASSETS = [
   './tailwind-en.css',
   './app-ar.js',
   './app-en.js',
+  './driver.js',
+  './driver.css',
   './manifest-ar.json',
   './manifest-en.json',
   './logo.png',

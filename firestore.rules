@@ -185,18 +185,20 @@ service cloud.firestore {
       // Private subcollections (explicit on purpose: a recursive wildcard here would
       // also match the user document itself and bypass the protected-keys rule above)
       match /transactions/{txId} {
-        allow read: if (isOwner(userId) && !isDisabled(userId)) || isTeamMember(userId);
-        allow create: if ((isOwner(userId) && !isDisabled(userId)) || memberCanCreateTx(userId, request.resource.data))
-                      && validTransaction(userId, txId, request.resource.data);
-        allow update: if ((isOwner(userId) && !isDisabled(userId)) || memberCanUpdateTx(userId, request.resource.data))
-                      && validTransaction(userId, txId, request.resource.data);
-        allow delete: if (isOwner(userId) && !isDisabled(userId)) || mperm(userId, 'deleteTx');
+        allow read: if isSuperAdmin() || (isOwner(userId) && !isDisabled(userId)) || isTeamMember(userId);
+        allow create: if isSuperAdmin()
+                      || (((isOwner(userId) && !isDisabled(userId)) || memberCanCreateTx(userId, request.resource.data))
+                      && validTransaction(userId, txId, request.resource.data));
+        allow update: if isSuperAdmin()
+                      || (((isOwner(userId) && !isDisabled(userId)) || memberCanUpdateTx(userId, request.resource.data))
+                      && validTransaction(userId, txId, request.resource.data));
+        allow delete: if isSuperAdmin() || (isOwner(userId) && !isDisabled(userId)) || mperm(userId, 'deleteTx');
       }
 
       // أعضاء الفريق (يديرها صاحب الحساب؛ العضو بينشئ مستنده بس من خلال دعوة صحيحة)
       match /members/{memberId} {
         allow read: if isOwner(userId) || request.auth.uid == memberId || isAdmin();
-        allow create: if signedIn()
+        allow create: if isSuperAdmin() || (signedIn()
           && request.auth.uid == memberId
           && request.auth.token.email_verified == true
           && ownerIsPro(userId)
@@ -205,22 +207,22 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/team_invites/$(userId + '_' + request.auth.token.email)).data.ownerUid == userId
           && request.resource.data.perms == get(/databases/$(database)/documents/team_invites/$(userId + '_' + request.auth.token.email)).data.perms
           && request.resource.data.uid == request.auth.uid
-          && request.resource.data.active == true;
-        allow update: if isOwner(userId);
-        allow delete: if isOwner(userId) || request.auth.uid == memberId;
+          && request.resource.data.active == true);
+        allow update: if isOwner(userId) || isSuperAdmin();
+        allow delete: if isOwner(userId) || request.auth.uid == memberId || isSuperAdmin();
       }
       // مؤشرات عضويتي في فرق تانية (الحقيقة دايماً من مستند members عند صاحب الفريق)
       match /memberships/{ownerId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isSuperAdmin();
       }
       match /portal_index/{hashId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isSuperAdmin();
       }
 
       // قفل التطبيق (PIN) المتزامن بين الأجهزة: يخزّن hash مملّح فقط (PBKDF2) وليس الرمز نفسه
       match /security/lock {
-        allow read, delete: if isOwner(userId);
-        allow create, update: if isOwner(userId)
+        allow read, delete: if isOwner(userId) || isSuperAdmin();
+        allow create, update: if isSuperAdmin() || (isOwner(userId)
           && request.resource.data.keys().hasOnly(['v','salt','hash','iter','updatedAt'])
           && request.resource.data.keys().hasAll(['v','salt','hash','iter'])
           && request.resource.data.v == 3
@@ -229,15 +231,15 @@ service cloud.firestore {
           && request.resource.data.iter is int
           && request.resource.data.iter >= 100000
           && request.resource.data.iter <= 2000000
-          && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is number);
+          && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is number));
       }
 
       // Client requests submitted from a public portal link.
       // The portalId acts as an unguessable capability and must belong to this user.
       match /requests/{reqId} {
-        allow create: if isOwner(userId)
+        allow create: if isSuperAdmin() || isOwner(userId)
                       || validClientRequest(userId, reqId, request.resource.data);
-        allow read, update, delete: if isOwner(userId);
+        allow read, update, delete: if isOwner(userId) || isSuperAdmin();
       }
     }
 
@@ -245,15 +247,15 @@ service cloud.firestore {
     match /client_portals/{portalId} {
       // 'get' needs the unguessable id; 'list' is blocked so portals can't be enumerated
       allow get: if true;
-      allow list: if false;
+      allow list: if isSuperAdmin();
 
-      allow create: if signedIn()
+      allow create: if isSuperAdmin() || (signedIn()
         && request.resource.data.ownerUid == request.auth.uid
-        && isStr(request.resource.data.clientName, 100);
-      allow update: if signedIn()
+        && isStr(request.resource.data.clientName, 100));
+      allow update: if isSuperAdmin() || (signedIn()
         && resource.data.ownerUid == request.auth.uid
-        && request.resource.data.ownerUid == request.auth.uid;
-      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+        && request.resource.data.ownerUid == request.auth.uid);
+      allow delete: if isSuperAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
     }
   }
 }

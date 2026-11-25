@@ -1504,7 +1504,7 @@ function applySignedOutState() {
    - It skips any item that does not appear on the current device (mobileOr computer)
    - It appears once on the device, and can be retrieved from the filePersonal
    ========================================================= */
-const TOUR_DONE_KEY = 'a7sbly_tour_done_v5';
+const TOUR_DONE_KEY = 'a7sbly_tour_done_v6';
 let _tourDriver = null;
 let _tourTimer = null;
 let _tourKeyHandler = null;
@@ -1537,6 +1537,8 @@ function scheduleAppTour(delay = 800, force = false) {
   const deadline = Date.now() + 90000;
   const tick = () => {
     if (!currentUser || _tourDriver) return;
+    const im = document.getElementById('mobileInstallModal');
+    if (im && !im.classList.contains('hidden') && typeof dismissMobileInstall === 'function') dismissMobileInstall();
     if (_tourBlocked()) {
       if (Date.now() < deadline) _tourTimer = setTimeout(tick, 700);
       return;
@@ -1564,6 +1566,8 @@ function startAppTour(opts) {
   const driverFactory = window.driver && window.driver.js && window.driver.js.driver;
   if (!driverFactory) { console.warn('Driver.js not loaded'); return; }
 
+  const installModal = document.getElementById('mobileInstallModal');
+  if (installModal && !installModal.classList.contains('hidden') && typeof dismissMobileInstall === 'function') dismissMobileInstall();
   navigateSegmented('home');
   window.scrollTo(0, 0);
   setTimeout(() => _runAppTour(driverFactory), 400);
@@ -1574,84 +1578,183 @@ function _runAppTour(driverFactory) {
 
   const isMobile = window.matchMedia('(max-width: 767px)').matches;
   const isBusiness = (document.body.getAttribute('data-mode') || 'business') === 'business';
+  const canMode = !!_tourFirstVisible(['#modeSwitcherBtn']);
+  const T = {
+  welcomeTitle: "a7sbly complete tour 👋",
+  welcomeDesc: "Short steps that explain every real control:<br>language, account, balances, quick add, transactions, debts, clients, inventory, reports and security.<br>Use Next/Back or Esc, and skip any time.",
+  langTitle: "Arabic / English any time 🌐",
+  langDesc: "The <b>EN / AR</b> button switches language and layout instantly. Your choice is remembered and your data stays exactly the same.",
+  profileTitle: "Your profile 👤",
+  profileDesc: "Avatar and name, sync status, theme, account type, workspace, replay this tour, and sign out.",
+  alertTitle: "Money alerts 🔔",
+  alertDesc: "When requests or due debts exist, this counter takes you straight to the details.",
+  modeTitle: "Shop or personal? 🏪 / 👤",
+  modeDesc: "One tap separates shop data (debts, clients, inventory) from your personal data. Each account stays independent.",
+  ccTitle: "Control center: all tools 🎛️",
+  ccDesc: "Shift closing, wallet transfers, charge machines, repairs, PDF/Excel reports, backup, PIN, team, and admin panel — all in one place.",
+  ccSearchTitle: "Find any tool 🔎",
+  ccSearchDesc: "Type the tool name in search — e.g. “PDF”, “backup” or “PIN” — and it appears instantly. The tabs above group the tools.",
+  balanceTitle: "Your balance in one card 💳",
+  balanceDesc: "Net balance, income, expenses, charity and wallets. Numbers refresh immediately after every entry.",
+  privacyTitle: "Hide the numbers 👁️",
+  privacyDesc: "Tap the eye to hide or reveal balances at any time, without adding any transaction.",
+  qaTitle: "The + button ⚡",
+  qaDesc: "Available on every screen: bottom bar on mobile, floating button on desktop. Everything new starts here.",
+  qaSheetTitle: "Quick add menu 📋",
+  qaSheetDesc: "Income, expense, charity, budget — plus for shops: receivable, payable, shift closing and charge machines. Pick a type and fill the form.",
+  txTitle: "Transactions 🧾",
+  txDesc: "Search, review the summary, open any entry to edit or delete it, and view its receipt. Date, time, category, client and payment method are all here.",
+  debtTitle: "Debts 🤝",
+  debtDesc: "Filter “receivable / payable / overdue”. Open a debt to record full or partial payment, or send a WhatsApp reminder to the client.",
+  clientTitle: "Clients 👥",
+  clientDesc: "A full ledger per client: income, receivable, payable, WhatsApp number and all transactions. Search and sorting are right on top.",
+  invTitle: "Spare-parts inventory 📦",
+  invDesc: "Items, price, quantity and low-stock alert. Add or edit an item without leaving the page.",
+  auditTitle: "Activity log 🕘",
+  auditDesc: "Every add, edit or delete is recorded here with date and user. If something changed, you can trace it.",
+  budgetTitle: "Monthly budget 💰",
+  budgetDesc: "Set a monthly cap and per-category budgets. The bar compares spending with the limit and changes color near the danger zone.",
+  profitTitle: "Profit curve 📈",
+  profitDesc: "Choose day / week / month / year and open the follow-up table. It shows period start, end and net profit.",
+  footerTitle: "Save & sync ☁️",
+  footerDesc: "Here you see your data state: synced to cloud, guest on this device, or syncing. The app also works offline.",
+  doneTitle: "Ready to start 🚀",
+  doneDesc: "Record your first entry with the + button. To see this tour again: Profile → Guided tour.<br>Good luck!",
+  progress: "{{current}} of {{total}}",
+  next: "Next",
+  prev: "Back",
+  done: "Let’s start 🚀",
+  skip: "Skip tour"
+};
 
-  const defs = [
-    { title: 'Welcome to Hesabli 👋',
-      desc: 'A quick tour (less than a minute) that introduces you to the most important places in the app. You can skip it at any time and return it from your profile.' },
-    { el: ['#modeSwitcherBtn'], side: 'bottom',
-      title: 'Personal or work? 🏪 / 👤',
-      desc: 'With one click, you separate the store’s accounts (debts, customers, and store) from your personal accounts.' }
-  ];
+  const wait = ms => new Promise(res => setTimeout(res, ms));
+  const tourNext = (fn, delay) => (el, step, ctx) => {
+    try { if (fn) fn(); } catch (e) { console.warn('a7sbly tour action failed', e); }
+    setTimeout(() => { if (_tourDriver) _tourDriver.moveNext(); }, delay || 240);
+  };
+  const tourPrev = (fn, delay) => (el, step, ctx) => {
+    try { if (fn) fn(); } catch (e) { console.warn('a7sbly tour action failed', e); }
+    setTimeout(() => { if (_tourDriver) _tourDriver.movePrevious(); }, delay || 200);
+  };
 
-  if (isMobile) {
-    defs.push(
-      { el: ['.fintech-bank-card'], side: 'bottom', title: 'Your balance is on one card 💳',
-        desc: 'Your net balance after income and expenses appears directly here, and you can hide it with a click if you want privacy.' },
-      { el: ['.ft-action-grid'], side: 'top', title: 'Quick add ⚡',
-        desc: 'Record income or expenses in seconds from these buttons.' },
-      { el: ['.mob-nav-fab'], side: 'top', title: 'Add button (+)',
-        desc: 'Available on any page. Click on it and record any operation without leaving your place.' },
-      { el: ['#mobileBottomNav'], side: 'top', title: 'Move between sections 🔄',
-        desc: 'From this bar, you move between Home, Transactions, Debts, and Store.' }
-    );
-  } else {
-    defs.push(
-      { el: ['#statNet'], side: 'bottom', align: 'start', pick: el => el.closest('div[class*="rounded"]') || el,
-        title: 'Available balance 💰', desc: 'Your net balance is real-time from income and expenses.' },
-      { el: ['section button[onclick="openModal(\'income\')"]'], side: 'bottom', pick: el => el.parentElement,
-        title: 'Add operations ⚡', desc: 'Record income, expenses or charity from these buttons at any time.' },
-      { el: ['#segmentedQuickNav'], side: 'bottom', title: 'Move between sections 🔄',
-        desc: 'Switch between Master, Transactions, Debts, and Clients with one click.' }
-    );
-  }
+  const navHome = () => {
+    try {
+      navigateSegmented('home');
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    } catch (e) {}
+  };
+  const goTab = tab => () => {
+    try {
+      if (typeof switchTab === 'function') switchTab(tab, false);
+      else navigateSegmented(tab);
+    } catch (e) {}
+  };
+  const openCC = () => { try { openControlCenter(); } catch (e) {} };
+  const closeCC = () => { try { closeControlCenter(); } catch (e) {} };
+  const openQA = () => { try { openQuickAdd(); } catch (e) {} };
+  const closeQA = () => { try { closeQuickAdd(false); } catch (e) {} };
+  const restoreQA = () => {
+    const sheet = document.getElementById('quickAddSheet');
+    if (sheet && sheet.classList.contains('hidden')) openQA();
+  };
 
-  defs.push(
-    { el: ['#userProfile'], side: 'bottom', title: 'Your account and data 🔐',
-      desc: 'From here, you can view your account, exit, and repeat this tour. Each account’s data is completely separate from the visitor’s status data.' },
-    { title: 'Ready to start! 🚀',
-      desc: isBusiness
-        ? 'Start by recording the first operation, and if you want to experiment before entering your real data, use the experimental data.'
-        : 'Start by recording your first expense or income, and set a monthly budget to easily track your spending.' }
-  );
+  const mk = (selector, title, description, opts) => {
+    const o = opts || {};
+    const popover = {
+      title: title,
+      description: description,
+      side: o.side || 'bottom',
+      align: o.align || 'center'
+    };
+    if (o.next) popover.onNextClick = tourNext(o.next, o.wait);
+    if (o.prev) popover.onPrevClick = tourPrev(o.prev, o.wait);
+    const out = { popover: popover };
+    if (selector) out.element = selector;
+    return out;
+  };
 
   const steps = [];
-  defs.forEach(d => {
-    const popover = { title: d.title, description: d.desc };
-    if (d.side) popover.side = d.side;
-    popover.align = d.align || 'center';
-    if (d.el) {
-      let el = _tourFirstVisible(d.el);
-      if (!el) return;
-      if (d.pick) { try { el = d.pick(el) || el; } catch (e) {} }
-      steps.push({ element: el, popover });
-    } else {
-      steps.push({ popover });
-    }
-  });
-  if (steps.length < 2) return;
+  steps.push(mk(null, T.welcomeTitle, T.welcomeDesc, { side: 'over' }));
+  steps.push(mk('#a7LangToggle', T.langTitle, T.langDesc, { side: isMobile ? 'bottom' : 'right' }));
+  steps.push(mk('#userProfile', T.profileTitle, T.profileDesc, { side: isMobile ? 'bottom' : 'right' }));
+  if (_tourFirstVisible(['#globalPendingAlert'])) {
+    steps.push(mk('#globalPendingAlert', T.alertTitle, T.alertDesc, { side: isMobile ? 'bottom' : 'right' }));
+  }
+  if (canMode) {
+    steps.push(mk('#modeSwitcherBtn', T.modeTitle, T.modeDesc, { side: isMobile ? 'bottom' : 'right' }));
+  }
 
+  steps.push(mk('#controlCenterBtn', T.ccTitle, T.ccDesc, { side: isMobile ? 'bottom' : 'right' }));
+  steps.push(mk('#controlCenterModal .cc-head', T.ccSearchTitle, T.ccSearchDesc, {
+    side: 'right', next: openCC, prev: closeCC
+  }));
+  steps.push(mk('#ccSearch', T.ccTitle, T.ccDesc, {
+    side: 'bottom', next: () => { closeCC(); navHome(); }, prev: openCC
+  }));
+
+  const balanceSel = isMobile ? '#mobileHero' : '#desktopHero';
+  steps.push(mk(balanceSel, T.balanceTitle, T.balanceDesc, { side: 'bottom' }));
+  const privacySel = isMobile ? '#privacyIcon' : '#privacyIconDk';
+  if (_tourFirstVisible([privacySel])) {
+    steps.push(mk(privacySel, T.privacyTitle, T.privacyDesc, { side: isMobile ? 'bottom' : 'right' }));
+  }
+
+  const qaSel = isMobile ? '.mob-nav-fab' : '#desktopFab';
+  steps.push(mk(qaSel, T.qaTitle, T.qaDesc, { side: 'top', next: openQA }));
+  steps.push(mk('#quickAddSheet .qa-panel', T.qaSheetTitle, T.qaSheetDesc, {
+    side: 'top', next: () => { closeQA(); goTab('transactions')(); }, prev: closeQA
+  }));
+
+  steps.push(mk('#panelTransactions', T.txTitle, T.txDesc, {
+    side: 'top', next: goTab('debts'), prev: restoreQA
+  }));
+  if (isBusiness) {
+    steps.push(mk('#panelDebts', T.debtTitle, T.debtDesc, {
+      side: 'top', next: goTab('clients'), prev: goTab('transactions')
+    }));
+    steps.push(mk('#panelClients', T.clientTitle, T.clientDesc, {
+      side: 'top', next: goTab('inventory'), prev: goTab('debts')
+    }));
+    steps.push(mk('#panelInventory', T.invTitle, T.invDesc, {
+      side: 'top', next: goTab('audit'), prev: goTab('clients')
+    }));
+  }
+  steps.push(mk('#panelAudit', T.auditTitle, T.auditDesc, {
+    side: 'top', next: navHome, prev: goTab('inventory')
+  }));
+  steps.push(mk('#budgetUsed', T.budgetTitle, T.budgetDesc, {
+    side: 'bottom', prev: () => { navHome(); goTab('audit')(); }
+  }));
+  steps.push(mk('#profitCurveCard', T.profitTitle, T.profitDesc, {
+    side: 'bottom', prev: navHome
+  }));
+  steps.push(mk('#footerSyncStatus', T.footerTitle, T.footerDesc, {
+    side: 'top', prev: navHome
+  }));
+  steps.push(mk(null, T.doneTitle, T.doneDesc, { side: 'over' }));
+
+  if (steps.length < 3) return;
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const lastIndex = steps.length - 1;
 
   _tourDriver = driverFactory({
-    steps,
+    steps: steps,
     popoverClass: 'a7-tour',
     showProgress: true,
-    progressText: '{{current}} from {{total}}',
-    nextBtnText: 'Next',
-    prevBtnText: 'Previous',
-    doneBtnText: 'Let’s get started 🚀',
+    progressText: T.progress,
+    nextBtnText: T.next,
+    prevBtnText: T.prev,
+    doneBtnText: T.done,
     showButtons: ['next', 'previous'],
     allowClose: false,
     allowKeyboardControl: true,
-    disableActiveInteraction: true,
+    overlayColor: '#05060a',
+    overlayOpacity: 0.82,
+    stagePadding: isMobile ? 7 : 11,
+    stageRadius: 18,
+    popoverOffset: isMobile ? 12 : 16,
     smoothScroll: !reduceMotion,
     animate: !reduceMotion,
-    overlayColor: '#05060a',
-    overlayOpacity: 0.78,
-    stagePadding: isMobile ? 6 : 10,
-    stageRadius: 16,
-    popoverOffset: 14,
     onPopoverRender: (popover, { state }) => {
       try {
         const old = popover.footer.querySelector('.a7-tour-skip');
@@ -1660,11 +1763,11 @@ function _runAppTour(driverFactory) {
           const skip = document.createElement('button');
           skip.type = 'button';
           skip.className = 'a7-tour-skip';
-          skip.textContent = 'Skip the tour';
+          skip.textContent = T.skip;
           skip.addEventListener('click', () => _finishTour(false));
           popover.footer.appendChild(skip);
         }
-      } catch (e) { /* The tour continues even without the skip button*/ }
+      } catch (e) {}
     },
     onDestroyStarted: (element, step, { state }) => {
       _finishTour(!!state && state.activeIndex === lastIndex);
@@ -5117,6 +5220,7 @@ function selectInitialMode(mode) {
   const modal = document.getElementById('modeOnboardingModal');
   if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
   showToast(mode === 'business' ? 'Shop and trade mode has been activated 🏪' : 'Personal mode has been activated 👤', 'success');
+  scheduleAppTour(350);
 }
 
 function applyAppMode(mode, persist = true) {
@@ -6295,6 +6399,7 @@ function _admErrText(e, base) {
   return base + (c ? ` (${c})` : '');
 }
 function admCloseUser() {
+  if (typeof admCloseFullAccess === 'function') admCloseFullAccess();
   admCurrentUid = null;
   const d = document.getElementById('admUserDrawer');
   if (d) d.classList.remove('open');
@@ -6363,6 +6468,8 @@ function admRenderDrawer(u) {
     warn.hidden = false; warn.textContent = 'Reason for suspension:' + dd.disabledReason;
   }
   document.getElementById('admEmailCopy').onclick = () => admCopy(u.email || u.phone || u.id);
+  const fullBtn = document.getElementById('admFullAccessBtn');
+  if (fullBtn) fullBtn.hidden = !isSuperAdmin;
 }
 function admCopy(text) {
   const done = () => showToast('Copied✓', 'success');
@@ -6422,7 +6529,7 @@ async function admSaveNote() {
     admLog('note', uid, {});
   } catch (e) { st.textContent = _admErrText(e, 'Unable toSave'); console.warn('admin_notes write failed:', e.code, e.message); }
 }
-const ADM_ACTION_LABELS = { role_change: 'changingThe role', suspend: 'Account suspension', unsuspend: 'Reactivate', permissions: 'amendmentPermissions', note: 'Update Observation' };
+const ADM_ACTION_LABELS = { role_change: 'Role changed', suspend: 'Account suspended', unsuspend: 'Account reactivated', permissions: 'Permissions updated', note: 'Note updated', open_full_access: 'Opened full access', view_full_access: 'Viewed document', save_full_access: 'Updated document', delete_full_access: 'Deleted document', create_full_access: 'Created document', export_full_access: 'Exported documents' };
 async function admLoadActivity(uid) {
   const host = document.getElementById('admActivity');
   host.replaceChildren(_admEl('div', 'adm-loading', 'Loading...'));
@@ -6442,6 +6549,234 @@ async function admLoadActivity(uid) {
       host.appendChild(row);
     });
   } catch (e) { host.replaceChildren(_admEl('div', 'adm-empty', _admErrText(e, 'Unable todownload Record theActions'))); console.warn('admin_audit read failed:', e.code, e.message); }
+}
+
+
+/* ---------- v20.10.5 — Super admin full data access ---------- */
+const ADMX = {
+  noAccess: "Super admins only 🛡️",
+  title: "Full data access",
+  warning: "Super admin mode: you can view, edit and delete any document. Every action is written to the audit log.",
+  userLabel: "User",
+  collection: "Collection",
+  newId: "New document ID (blank = auto)",
+  add: "Add document",
+  export: "Export JSON",
+  refresh: "Refresh",
+  docs: "Documents",
+  noDocs: "No documents in this collection",
+  editor: "Document content (JSON)",
+  status: "Status",
+  save: "Save document",
+  delete: "Delete document",
+  saved: "Document saved ✓",
+  deleted: "Document deleted ✓",
+  created: "Document created ✓",
+  exported: "JSON exported ✓",
+  invalidJson: "Invalid JSON",
+  invalidData: "Content must be a JSON object",
+  profileCreate: "The user profile already exists — open it and edit it here.",
+  deleteAsk: "Delete this document permanently?",
+  deleteBody: "<b>{id}</b> will be deleted from <b>{col}</b>. This action will be logged.",
+  openLog: "Opened full access",
+  viewLog: "Viewed document",
+  saveLog: "Updated document",
+  deleteLog: "Deleted document",
+  createLog: "Created document",
+  exportLog: "Exported documents",
+  fullBtn: "Open full data (super admin)",
+  cols: {"profile": "User profile", "transactions": "Transactions", "members": "Team members", "memberships": "Memberships", "portal_index": "Portal index", "security": "PIN lock", "requests": "Client requests", "client_portals": "Client portals", "admin_notes": "Admin notes"}
+};
+const ADM_EXPLORE_COLS = ['profile','transactions','members','memberships','portal_index','security','requests','client_portals','admin_notes'];
+let admExploreUid = null;
+let admExploreCol = 'profile';
+let admExploreDocs = [];
+let admExploreCurrent = null;
+
+function _admJson(v) {
+  if (v && typeof v.toDate === 'function') { try { return v.toDate().toISOString(); } catch (e) {} }
+  if (v instanceof Date) return v.toISOString();
+  if (Array.isArray(v)) return v.map(_admJson);
+  if (v && typeof v === 'object') {
+    const out = {};
+    Object.keys(v).forEach(k => { out[k] = _admJson(v[k]); });
+    return out;
+  }
+  return v;
+}
+function _admExploreRef(uid, col) {
+  if (col === 'profile') return db.collection('users').doc(uid);
+  if (col === 'admin_notes') return db.collection('admin_notes').doc(uid);
+  if (col === 'client_portals') return db.collection('client_portals');
+  return db.collection('users').doc(uid).collection(col);
+}
+function admCloseFullAccess() {
+  const wrap = document.getElementById('admFullAccess');
+  if (wrap) wrap.hidden = true;
+  const drawer = document.getElementById('admUserDrawer');
+  if (drawer) drawer.classList.remove('full-access');
+  admExploreUid = null;
+  admExploreCurrent = null;
+  admExploreDocs = [];
+}
+function admOpenFullAccess() {
+  if (!isSuperAdmin) { admCloseFullAccess(); showToast(ADMX.noAccess, 'error'); return; }
+  if (!admCurrentUid) return;
+  admExploreUid = admCurrentUid;
+  admExploreCol = 'profile';
+  admExploreCurrent = null;
+  const wrap = document.getElementById('admFullAccess');
+  const drawer = document.getElementById('admUserDrawer');
+  if (!wrap || !drawer) return;
+  wrap.hidden = false;
+  drawer.classList.add('full-access');
+  const u = admUsers.find(x => x.id === admExploreUid);
+  const label = document.getElementById('admExpUser');
+  if (label) label.textContent = ADMX.userLabel + ': ' + ((u && (u.name || u.email)) || admExploreUid);
+  const sel = document.getElementById('admExpCol');
+  if (sel) {
+    sel.replaceChildren();
+    ADM_EXPLORE_COLS.forEach(col => {
+      const o = document.createElement('option');
+      o.value = col;
+      o.textContent = (ADMX.cols[col] || col) + '  ·  ' + col;
+      sel.appendChild(o);
+    });
+    sel.value = admExploreCol;
+  }
+  const status = document.getElementById('admExpStatus');
+  if (status) status.textContent = '';
+  const editorWrap = document.getElementById('admExpEditorWrap');
+  if (editorWrap) editorWrap.hidden = true;
+  admLog(ADMX.openLog, admExploreUid, {});
+  admLoadExplorerDocs();
+}
+function admExplorerChangeCol(col) {
+  if (!ADM_EXPLORE_COLS.includes(col)) return;
+  admExploreCol = col;
+  admExploreCurrent = null;
+  const editorWrap = document.getElementById('admExpEditorWrap');
+  if (editorWrap) editorWrap.hidden = true;
+  admLoadExplorerDocs();
+}
+async function admLoadExplorerDocs() {
+  if (!admExploreUid || !isSuperAdmin) return;
+  const host = document.getElementById('admExpDocs');
+  if (!host) return;
+  host.replaceChildren(_admEl('div', 'adm-loading', '...'));
+  try {
+    let docs = [];
+    if (admExploreCol === 'profile' || admExploreCol === 'admin_notes') {
+      const d = await _admExploreRef(admExploreUid, admExploreCol).get();
+      if (d.exists) docs = [d];
+    } else if (admExploreCol === 'client_portals') {
+      const snap = await db.collection('client_portals').where('ownerUid', '==', admExploreUid).get();
+      docs = snap.docs.slice();
+    } else {
+      const snap = await db.collection('users').doc(admExploreUid).collection(admExploreCol).get();
+      docs = snap.docs.slice();
+    }
+    admExploreDocs = docs;
+    host.replaceChildren();
+    if (!docs.length) { host.appendChild(_admEl('div', 'adm-empty', ADMX.noDocs)); return; }
+    docs.forEach(d => {
+      const row = _admEl('button', 'adm-exp-doc' + (admExploreCurrent && admExploreCurrent.id === d.id ? ' on' : ''));
+      row.type = 'button';
+      const data = d.data() || {};
+      let preview = '';
+      try { preview = JSON.stringify(_admJson(data)).slice(0, 90); } catch (e) { preview = ''; }
+      row.append(_admEl('b', '', d.id), _admEl('small', '', preview));
+      row.addEventListener('click', () => {
+        admSelectExplorerDoc(d);
+        admLog(ADMX.viewLog, admExploreUid, { collection: admExploreCol, docId: d.id });
+      });
+      host.appendChild(row);
+    });
+  } catch (e) {
+    host.replaceChildren(_admEl('div', 'adm-empty err', _admErrText(e, 'Load failed')));
+  }
+}
+function admSelectExplorerDoc(doc) {
+  admExploreCurrent = doc;
+  const wrap = document.getElementById('admExpEditorWrap');
+  const ta = document.getElementById('admExpEditor');
+  const id = document.getElementById('admExpDocId');
+  const status = document.getElementById('admExpStatus');
+  if (!wrap || !ta) return;
+  wrap.hidden = false;
+  ta.value = JSON.stringify(_admJson(doc.data() || {}), null, 2);
+  if (id) id.textContent = doc.id;
+  if (status) status.textContent = '';
+  document.querySelectorAll('.adm-exp-doc').forEach(b => {
+    b.classList.toggle('on', !!b.querySelector('b') && b.querySelector('b').textContent === doc.id);
+  });
+}
+async function admExplorerSave() {
+  if (!isSuperAdmin || !admExploreCurrent) return;
+  const ta = document.getElementById('admExpEditor');
+  const status = document.getElementById('admExpStatus');
+  let data;
+  try { data = JSON.parse(ta.value); }
+  catch (e) { if (status) status.textContent = ADMX.invalidJson; showToast(ADMX.invalidJson, 'error'); return; }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    if (status) status.textContent = ADMX.invalidData;
+    showToast(ADMX.invalidData, 'error');
+    return;
+  }
+  try {
+    await admExploreCurrent.ref.set(data);
+    admLog(ADMX.saveLog, admExploreUid, { collection: admExploreCol, docId: admExploreCurrent.id });
+    showToast(ADMX.saved, 'success');
+    await admLoadExplorerDocs();
+  } catch (e) {
+    if (status) status.textContent = _admErrText(e, 'Save failed');
+    showToast(_admErrText(e, 'Save failed'), 'error');
+  }
+}
+async function admExplorerCreate() {
+  if (!isSuperAdmin || !admExploreUid) return;
+  try {
+    const input = document.getElementById('admExpNewId');
+    let id = (input && input.value || '').trim();
+    if (admExploreCol === 'profile') { showToast(ADMX.profileCreate, 'info'); return; }
+    if (admExploreCol === 'admin_notes') { id = admExploreUid; }
+    if (!id) id = db.collection('_').doc().id;
+    const payload = { createdByAdmin: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+    if (admExploreCol === 'client_portals') payload.ownerUid = admExploreUid;
+    await _admExploreRef(admExploreUid, admExploreCol).doc(id).set(payload);
+    admLog(ADMX.createLog, admExploreUid, { collection: admExploreCol, docId: id });
+    if (input) input.value = '';
+    showToast(ADMX.created, 'success');
+    await admLoadExplorerDocs();
+  } catch (e) { showToast(_admErrText(e, 'Create failed'), 'error'); }
+}
+function admExplorerDelete() {
+  if (!isSuperAdmin || !admExploreCurrent) return;
+  const doc = admExploreCurrent;
+  const colLabel = (ADMX.cols[admExploreCol] || admExploreCol);
+  openConfirm(ADMX.deleteAsk, ADMX.deleteBody.replace('{id}', doc.id).replace('{col}', colLabel), async () => {
+    try {
+      await doc.ref.delete();
+      admLog(ADMX.deleteLog, admExploreUid, { collection: admExploreCol, docId: doc.id });
+      admExploreCurrent = null;
+      const wrap = document.getElementById('admExpEditorWrap');
+      if (wrap) wrap.hidden = true;
+      showToast(ADMX.deleted, 'success');
+      await admLoadExplorerDocs();
+    } catch (e) { showToast(_admErrText(e, 'Delete failed'), 'error'); }
+  });
+}
+function admExplorerExport() {
+  if (!isSuperAdmin || !admExploreUid) return;
+  const out = admExploreDocs.map(d => ({ id: d.id, data: _admJson(d.data() || {}) }));
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `a7sbly_${admExploreUid}_${admExploreCol}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  admLog(ADMX.exportLog, admExploreUid, { collection: admExploreCol, count: out.length });
+  showToast(ADMX.exported, 'success');
 }
 
 (function hookAdminActions() {
@@ -6684,8 +7019,12 @@ renderTransactions = function () {
     if (feed) {
       const card = document.createElement('div');
       card.className = 'ft-tx-feed-item tx-card';
-      card.innerHTML = buildFeedCardHTML(item) +
-        `<button type="button" onclick="requestDelete('${jsAttr(item.id)}')" class="tx-del" aria-label="delete"><i class="fa-solid fa-trash-can"></i></button>`;
+      card.innerHTML = `<div class="tx-m-row">${buildFeedCardHTML(item)}</div>
+        <div class="tx-m-acts">
+          <button type="button" onclick="shareViaWhatsApp('${jsAttr(item.id)}')" class="tx-ab wa" title="WhatsApp" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span></button>
+          <button type="button" onclick="editTransaction('${jsAttr(item.id)}')" class="tx-ab" title="Edit" aria-label="Edit"><i class="fa-solid fa-pen"></i><span>Edit</span></button>
+          <button type="button" onclick="requestDelete('${jsAttr(item.id)}')" class="tx-ab del" title="Delete" aria-label="Delete"><i class="fa-solid fa-trash-can"></i><span>Delete</span></button>
+        </div>`;
       feed.appendChild(card);
     }
     if (tbody) {
@@ -7219,7 +7558,10 @@ let teamMemberships = [];     // The teams I am a member of
 let teamPendingInvites = [];  // InvitationsPendingWhy, why?
 let teamOwnerName = '';
 
-function isTeamMode() { return !!(workspaceUid && currentUser && workspaceUid !== currentUser.uid); }
+function isTeamMode() {
+  return !!(workspaceUid && currentUser && workspaceUid !== currentUser.uid
+    && Array.isArray(teamMemberships) && teamMemberships.some(x => x.ownerUid === workspaceUid));
+}
 function wsUid() { return isTeamMode() ? workspaceUid : (currentUser && currentUser.uid); }
 function teamHas(f) {
   if (!teamPerms) return false;
@@ -7238,6 +7580,9 @@ const _origGetMax = getMaxTransactions;
 getMaxTransactions = function () { return isTeamMode() ? -1 : _origGetMax(); };
 
 function applyTeamUI() {
+  if (workspaceUid && Array.isArray(teamMemberships) && !teamMemberships.some(x => x.ownerUid === workspaceUid)) {
+    workspaceUid = null; teamPerms = null; teamOwnerName = '';
+  }
   const b = document.body, team = isTeamMode();
   b.classList.toggle('team-member', team);
   TEAM_PERM_KEYS.forEach(k => b.classList.toggle('team-no-' + k, team && !(teamPerms && teamPerms[k] === true)));
@@ -7248,6 +7593,14 @@ function applyTeamUI() {
   if (team) {
     const badge = document.getElementById('roleBadge');
     if (badge) { badge.className = 'hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-violet-500/40 text-violet-400'; badge.innerHTML = '<i class="fa-solid fa-people-group"></i> team member'; }
+  }
+  else {
+    const badge = document.getElementById('roleBadge');
+    if (badge) {
+      badge.className = 'hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400';
+      const roleName = (typeof ROLES_META !== 'undefined' && ROLES_META[userRole]) ? ROLES_META[userRole].name : '';
+      badge.innerHTML = roleName ? '<i class="fa-solid fa-user"></i> ' + escapeHTML(roleName) : '';
+    }
   }
   const homeCard = document.getElementById('teamHomeCard');
   if (homeCard) {
@@ -7907,7 +8260,7 @@ function _installBlocked() {
   if (document.body.classList.contains('auth-pending')) return true;
   const vis = id => { const e = document.getElementById(id); return !!e && !e.classList.contains('hidden') && getComputedStyle(e).display !== 'none'; };
   const sus = document.getElementById('suspendedScreen');
-  return vis('lockScreen') || vis('modeOnboardingModal') || vis('teamInviteModal') || vis('guestImportModal') || (sus && !sus.hidden) || !!(typeof _tourDriver !== 'undefined' && _tourDriver);
+  return vis('lockScreen') || vis('modeOnboardingModal') || vis('teamInviteModal') || vis('guestImportModal') || (sus && !sus.hidden) || !!(typeof _tourDriver !== 'undefined' && _tourDriver) || (!!currentUser && typeof TOUR_DONE_KEY !== 'undefined' && localStorage.getItem(TOUR_DONE_KEY) !== 'true');
 }
 function scheduleInstallPrompt(delay = 1200) {
   clearTimeout(_installTimer);

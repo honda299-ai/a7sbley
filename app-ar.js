@@ -1504,7 +1504,7 @@ function applySignedOutState() {
    - بتتخطى أي عنصر مش ظاهر على الجهاز الحالي (موبايل أو كمبيوتر)
    - بتظهر مرة واحدة على الجهاز، وممكن تتعاد من الملف الشخصي
    ========================================================= */
-const TOUR_DONE_KEY = 'a7sbly_tour_done_v5';
+const TOUR_DONE_KEY = 'a7sbly_tour_done_v6';
 let _tourDriver = null;
 let _tourTimer = null;
 let _tourKeyHandler = null;
@@ -1537,6 +1537,8 @@ function scheduleAppTour(delay = 800, force = false) {
   const deadline = Date.now() + 90000;
   const tick = () => {
     if (!currentUser || _tourDriver) return;
+    const im = document.getElementById('mobileInstallModal');
+    if (im && !im.classList.contains('hidden') && typeof dismissMobileInstall === 'function') dismissMobileInstall();
     if (_tourBlocked()) {
       if (Date.now() < deadline) _tourTimer = setTimeout(tick, 700);
       return;
@@ -1564,6 +1566,8 @@ function startAppTour(opts) {
   const driverFactory = window.driver && window.driver.js && window.driver.js.driver;
   if (!driverFactory) { console.warn('Driver.js not loaded'); return; }
 
+  const installModal = document.getElementById('mobileInstallModal');
+  if (installModal && !installModal.classList.contains('hidden') && typeof dismissMobileInstall === 'function') dismissMobileInstall();
   navigateSegmented('home');
   window.scrollTo(0, 0);
   setTimeout(() => _runAppTour(driverFactory), 400);
@@ -1574,84 +1578,183 @@ function _runAppTour(driverFactory) {
 
   const isMobile = window.matchMedia('(max-width: 767px)').matches;
   const isBusiness = (document.body.getAttribute('data-mode') || 'business') === 'business';
+  const canMode = !!_tourFirstVisible(['#modeSwitcherBtn']);
+  const T = {
+  welcomeTitle: "جولة احسبلي الشاملة 👋",
+  welcomeDesc: "خطوات قصيرة تشرح كل زرار فعلي:<br>اللغة، الحساب، الأرصدة، الإضافة، المعاملات، الديون، العملاء، المخزن، التقارير، والأمان.<br>استخدم التالي/السابق أو Esc، وتقدر تتخطى في أي وقت.",
+  langTitle: "عربي / إنجليزي في أي وقت 🌐",
+  langDesc: "زرار <b>EN / ع</b> بيبدّل اللغة والاتجاه فوراً. اختيارك محفوظ، وبياناتك بالظبط ما بتتغيرش.",
+  profileTitle: "ملفك الشخصي 👤",
+  profileDesc: "الصورة والاسم، حالة المزامنة، المظهر، نوع الحساب، مساحة العمل، إعادة الجولة، وتسجيل الخروج.",
+  alertTitle: "تنبيهات الفلوس 🔔",
+  alertDesc: "لما فيه طلبات أو ديون مستحقة، العدّاد هنا بيوصلك لتفاصيلها مباشرة.",
+  modeTitle: "محل ولا شخصي؟ 🏪 / 👤",
+  modeDesc: "بضغطة واحدة تفصل بين بيانات المحل (ديون، عملاء، مخزن) وبياناتك الشخصية. كل حساب بياناته مستقلة.",
+  ccTitle: "مركز التحكم: كل الأدوات 🎛️",
+  ccDesc: "تقفيل اليومية، تحويل الخزائن، مكن الشحن، الصيانة، تقارير PDF/Excel، نسخ احتياطي، PIN، الفريق، ولوحة المدير — كله في مكان واحد.",
+  ccSearchTitle: "دور على أي أداة 🔎",
+  ccSearchDesc: "اكتب اسم الأداة في البحث — مثلاً «PDF» أو «نسخ» أو «قفل» — وهتلاقيها فوراً. والتصنيفات فوق بتقسّم الأدوات.",
+  balanceTitle: "رصيدك في كارت واحد 💳",
+  balanceDesc: "صافي الرصيد، الدخل، المصروف، الخير، والمحافظ. الأرقام بتتحدث لحظياً بعد كل عملية.",
+  privacyTitle: "خصوصية الأرقام 👁️",
+  privacyDesc: "اضغط عين الرصيد عشان تخفي أو تظهر الأرقام في أي وقت — من غير ما تضيف أي عملية.",
+  qaTitle: "زر الإضافة (+) ⚡",
+  qaDesc: "موجود في أي صفحة: في الشريط السفلي على الموبايل، وزر عائم على الكمبيوتر. كل جديد يبدأ من هنا.",
+  qaSheetTitle: "قائمة الإضافة السريعة 📋",
+  qaSheetDesc: "دخل، مصروف، صدقة، ميزانية — وللمحل: دين ليّ، دين عليّ، تقفيل اليوم، مكن الشحن. اختر النوع واكمل البيانات.",
+  txTitle: "المعاملات 🧾",
+  txDesc: "ابحث، شوف الملخص، افتح أي عملية للتعديل أو الحذف، واعرض الإيصال المرفق. التاريخ، الوقت، الفئة، العميل، وطريقة الدفع كلها هنا.",
+  debtTitle: "الديون 🤝",
+  debtDesc: "فلتر «ليّ / عليّ / متأخرة». اضغط أي دين لتسجيل سداد كامل أو جزئي، أو إرسال تذكير واتساب للعميل برقمه.",
+  clientTitle: "العملاء 👥",
+  clientDesc: "كشف حساب لكل عميل: دخل، مستحق، واجب، رقم واتساب، وكل عملياته. البحث والترتيب فوق مباشرة.",
+  invTitle: "مخزن قطع الغيار 📦",
+  invDesc: "الأصناف، السعر، الكمية، وحد التنبيه. تقدر تضيف صنف وتعدّله من غير ما تخرج من الصفحة.",
+  auditTitle: "سجل النشاطات 🕘",
+  auditDesc: "كل إضافة أو تعديل أو حذف متسجّل هنا بالتاريخ والمستخدم. لو حصل تغيير، هتلاقي أثره.",
+  budgetTitle: "الميزانية 💰",
+  budgetDesc: "حدد سقف الشهر وميزانية كل فئة. الشريط بيقارن اللي اتصرف بالحد المحدد، واللون بيتغير قرب الخطر.",
+  profitTitle: "منحنى الأرباح 📈",
+  profitDesc: "اختار يوم / أسبوع / شهر / سنة، وافتح جدول المتابعة. بيوضّح بداية ونهاية الفترة وصافي الربح.",
+  footerTitle: "الحفظ والمزامنة ☁️",
+  footerDesc: "هنا تعرف حالة بياناتك: متصل بالسحاب، زائر على الجهاز، أو مزامنة جارية. والتطبيق شغال أوفلاين كمان.",
+  doneTitle: "جاهز تبدأ 🚀",
+  doneDesc: "جرّب تسجيل أول عملية من زرار +. لو احتجت الجولة تاني: الملف الشخصي ← الجولة التعريفية.<br>بالتوفيق!",
+  progress: "{{current}} من {{total}}",
+  next: "التالي",
+  prev: "السابق",
+  done: "يلا نبدأ 🚀",
+  skip: "تخطي الجولة"
+};
 
-  const defs = [
-    { title: 'أهلاً بيك في احسبلي 👋',
-      desc: 'جولة سريعة (أقل من دقيقة) تعرّفك على أهم الأماكن في التطبيق. تقدر تتخطاها في أي وقت وتعيدها من ملفك الشخصي.' },
-    { el: ['#modeSwitcherBtn'], side: 'bottom',
-      title: 'شخصي ولا شغل؟ 🏪 / 👤',
-      desc: 'بضغطة واحدة تفصل بين حسابات المحل (ديون وعملاء ومخزن) وحساباتك الشخصية.' }
-  ];
+  const wait = ms => new Promise(res => setTimeout(res, ms));
+  const tourNext = (fn, delay) => (el, step, ctx) => {
+    try { if (fn) fn(); } catch (e) { console.warn('a7sbly tour action failed', e); }
+    setTimeout(() => { if (_tourDriver) _tourDriver.moveNext(); }, delay || 240);
+  };
+  const tourPrev = (fn, delay) => (el, step, ctx) => {
+    try { if (fn) fn(); } catch (e) { console.warn('a7sbly tour action failed', e); }
+    setTimeout(() => { if (_tourDriver) _tourDriver.movePrevious(); }, delay || 200);
+  };
 
-  if (isMobile) {
-    defs.push(
-      { el: ['.fintech-bank-card'], side: 'bottom', title: 'رصيدك في كارت واحد 💳',
-        desc: 'صافي رصيدك بعد الدخل والمصروفات بيظهر هنا مباشرة، وتقدر تخفيه بضغطة لو حابب خصوصية.' },
-      { el: ['.ft-action-grid'], side: 'top', title: 'إضافة سريعة ⚡',
-        desc: 'سجّل دخل أو مصروف في ثواني من الأزرار دي.' },
-      { el: ['.mob-nav-fab'], side: 'top', title: 'زر الإضافة (+)',
-        desc: 'متاح في أي صفحة. اضغط عليه وسجّل أي عملية من غير ما تخرج من مكانك.' },
-      { el: ['#mobileBottomNav'], side: 'top', title: 'التنقل بين الأقسام 🔄',
-        desc: 'من الشريط ده تنتقل بين الرئيسية والمعاملات والديون والمخزن.' }
-    );
-  } else {
-    defs.push(
-      { el: ['#statNet'], side: 'bottom', align: 'start', pick: el => el.closest('div[class*="rounded"]') || el,
-        title: 'الرصيد المتاح 💰', desc: 'صافي رصيدك بيتحدث لحظياً من الإيرادات والمصروفات.' },
-      { el: ['section button[onclick="openModal(\'income\')"]'], side: 'bottom', pick: el => el.parentElement,
-        title: 'إضافة العمليات ⚡', desc: 'سجّل دخل أو مصروف أو صدقة من الأزرار دي في أي وقت.' },
-      { el: ['#segmentedQuickNav'], side: 'bottom', title: 'التنقل بين الأقسام 🔄',
-        desc: 'بدّل بين الرئيسية والمعاملات والديون والعملاء بضغطة واحدة.' }
-    );
-  }
+  const navHome = () => {
+    try {
+      navigateSegmented('home');
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    } catch (e) {}
+  };
+  const goTab = tab => () => {
+    try {
+      if (typeof switchTab === 'function') switchTab(tab, false);
+      else navigateSegmented(tab);
+    } catch (e) {}
+  };
+  const openCC = () => { try { openControlCenter(); } catch (e) {} };
+  const closeCC = () => { try { closeControlCenter(); } catch (e) {} };
+  const openQA = () => { try { openQuickAdd(); } catch (e) {} };
+  const closeQA = () => { try { closeQuickAdd(false); } catch (e) {} };
+  const restoreQA = () => {
+    const sheet = document.getElementById('quickAddSheet');
+    if (sheet && sheet.classList.contains('hidden')) openQA();
+  };
 
-  defs.push(
-    { el: ['#userProfile'], side: 'bottom', title: 'حسابك وبياناتك 🔐',
-      desc: 'من هنا تشوف حسابك، وتخرج، وتعيد الجولة دي. بيانات كل حساب منفصلة تماماً عن بيانات وضع الزائر.' },
-    { title: 'جاهز تبدأ! 🚀',
-      desc: isBusiness
-        ? 'ابدأ بتسجيل أول عملية، ولو حابب تجرب قبل ما تدخل بياناتك الحقيقية استخدم البيانات التجريبية.'
-        : 'ابدأ بتسجيل أول مصروف أو دخل، وحدد ميزانية شهرية عشان تتابع صرفك بسهولة.' }
-  );
+  const mk = (selector, title, description, opts) => {
+    const o = opts || {};
+    const popover = {
+      title: title,
+      description: description,
+      side: o.side || 'bottom',
+      align: o.align || 'center'
+    };
+    if (o.next) popover.onNextClick = tourNext(o.next, o.wait);
+    if (o.prev) popover.onPrevClick = tourPrev(o.prev, o.wait);
+    const out = { popover: popover };
+    if (selector) out.element = selector;
+    return out;
+  };
 
   const steps = [];
-  defs.forEach(d => {
-    const popover = { title: d.title, description: d.desc };
-    if (d.side) popover.side = d.side;
-    popover.align = d.align || 'center';
-    if (d.el) {
-      let el = _tourFirstVisible(d.el);
-      if (!el) return;
-      if (d.pick) { try { el = d.pick(el) || el; } catch (e) {} }
-      steps.push({ element: el, popover });
-    } else {
-      steps.push({ popover });
-    }
-  });
-  if (steps.length < 2) return;
+  steps.push(mk(null, T.welcomeTitle, T.welcomeDesc, { side: 'over' }));
+  steps.push(mk('#a7LangToggle', T.langTitle, T.langDesc, { side: isMobile ? 'bottom' : 'right' }));
+  steps.push(mk('#userProfile', T.profileTitle, T.profileDesc, { side: isMobile ? 'bottom' : 'right' }));
+  if (_tourFirstVisible(['#globalPendingAlert'])) {
+    steps.push(mk('#globalPendingAlert', T.alertTitle, T.alertDesc, { side: isMobile ? 'bottom' : 'right' }));
+  }
+  if (canMode) {
+    steps.push(mk('#modeSwitcherBtn', T.modeTitle, T.modeDesc, { side: isMobile ? 'bottom' : 'right' }));
+  }
 
+  steps.push(mk('#controlCenterBtn', T.ccTitle, T.ccDesc, { side: isMobile ? 'bottom' : 'right' }));
+  steps.push(mk('#controlCenterModal .cc-head', T.ccSearchTitle, T.ccSearchDesc, {
+    side: 'right', next: openCC, prev: closeCC
+  }));
+  steps.push(mk('#ccSearch', T.ccTitle, T.ccDesc, {
+    side: 'bottom', next: () => { closeCC(); navHome(); }, prev: openCC
+  }));
+
+  const balanceSel = isMobile ? '#mobileHero' : '#desktopHero';
+  steps.push(mk(balanceSel, T.balanceTitle, T.balanceDesc, { side: 'bottom' }));
+  const privacySel = isMobile ? '#privacyIcon' : '#privacyIconDk';
+  if (_tourFirstVisible([privacySel])) {
+    steps.push(mk(privacySel, T.privacyTitle, T.privacyDesc, { side: isMobile ? 'bottom' : 'right' }));
+  }
+
+  const qaSel = isMobile ? '.mob-nav-fab' : '#desktopFab';
+  steps.push(mk(qaSel, T.qaTitle, T.qaDesc, { side: 'top', next: openQA }));
+  steps.push(mk('#quickAddSheet .qa-panel', T.qaSheetTitle, T.qaSheetDesc, {
+    side: 'top', next: () => { closeQA(); goTab('transactions')(); }, prev: closeQA
+  }));
+
+  steps.push(mk('#panelTransactions', T.txTitle, T.txDesc, {
+    side: 'top', next: goTab('debts'), prev: restoreQA
+  }));
+  if (isBusiness) {
+    steps.push(mk('#panelDebts', T.debtTitle, T.debtDesc, {
+      side: 'top', next: goTab('clients'), prev: goTab('transactions')
+    }));
+    steps.push(mk('#panelClients', T.clientTitle, T.clientDesc, {
+      side: 'top', next: goTab('inventory'), prev: goTab('debts')
+    }));
+    steps.push(mk('#panelInventory', T.invTitle, T.invDesc, {
+      side: 'top', next: goTab('audit'), prev: goTab('clients')
+    }));
+  }
+  steps.push(mk('#panelAudit', T.auditTitle, T.auditDesc, {
+    side: 'top', next: navHome, prev: goTab('inventory')
+  }));
+  steps.push(mk('#budgetUsed', T.budgetTitle, T.budgetDesc, {
+    side: 'bottom', prev: () => { navHome(); goTab('audit')(); }
+  }));
+  steps.push(mk('#profitCurveCard', T.profitTitle, T.profitDesc, {
+    side: 'bottom', prev: navHome
+  }));
+  steps.push(mk('#footerSyncStatus', T.footerTitle, T.footerDesc, {
+    side: 'top', prev: navHome
+  }));
+  steps.push(mk(null, T.doneTitle, T.doneDesc, { side: 'over' }));
+
+  if (steps.length < 3) return;
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const lastIndex = steps.length - 1;
 
   _tourDriver = driverFactory({
-    steps,
+    steps: steps,
     popoverClass: 'a7-tour',
     showProgress: true,
-    progressText: '{{current}} من {{total}}',
-    nextBtnText: 'التالي',
-    prevBtnText: 'السابق',
-    doneBtnText: 'يلا نبدأ 🚀',
+    progressText: T.progress,
+    nextBtnText: T.next,
+    prevBtnText: T.prev,
+    doneBtnText: T.done,
     showButtons: ['next', 'previous'],
     allowClose: false,
     allowKeyboardControl: true,
-    disableActiveInteraction: true,
+    overlayColor: '#05060a',
+    overlayOpacity: 0.82,
+    stagePadding: isMobile ? 7 : 11,
+    stageRadius: 18,
+    popoverOffset: isMobile ? 12 : 16,
     smoothScroll: !reduceMotion,
     animate: !reduceMotion,
-    overlayColor: '#05060a',
-    overlayOpacity: 0.78,
-    stagePadding: isMobile ? 6 : 10,
-    stageRadius: 16,
-    popoverOffset: 14,
     onPopoverRender: (popover, { state }) => {
       try {
         const old = popover.footer.querySelector('.a7-tour-skip');
@@ -1660,11 +1763,11 @@ function _runAppTour(driverFactory) {
           const skip = document.createElement('button');
           skip.type = 'button';
           skip.className = 'a7-tour-skip';
-          skip.textContent = 'تخطي الجولة';
+          skip.textContent = T.skip;
           skip.addEventListener('click', () => _finishTour(false));
           popover.footer.appendChild(skip);
         }
-      } catch (e) { /* الجولة تشتغل حتى من غير زر التخطي */ }
+      } catch (e) {}
     },
     onDestroyStarted: (element, step, { state }) => {
       _finishTour(!!state && state.activeIndex === lastIndex);
@@ -5117,6 +5220,7 @@ function selectInitialMode(mode) {
   const modal = document.getElementById('modeOnboardingModal');
   if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
   showToast(mode === 'business' ? 'تم تفعيل وضع المحل والتجارة 🏪' : 'تم تفعيل الوضع الشخصي 👤', 'success');
+  scheduleAppTour(350);
 }
 
 function applyAppMode(mode, persist = true) {
@@ -6295,6 +6399,7 @@ function _admErrText(e, base) {
   return base + (c ? ` (${c})` : '');
 }
 function admCloseUser() {
+  if (typeof admCloseFullAccess === 'function') admCloseFullAccess();
   admCurrentUid = null;
   const d = document.getElementById('admUserDrawer');
   if (d) d.classList.remove('open');
@@ -6363,6 +6468,8 @@ function admRenderDrawer(u) {
     warn.hidden = false; warn.textContent = 'سبب الإيقاف: ' + dd.disabledReason;
   }
   document.getElementById('admEmailCopy').onclick = () => admCopy(u.email || u.phone || u.id);
+  const fullBtn = document.getElementById('admFullAccessBtn');
+  if (fullBtn) fullBtn.hidden = !isSuperAdmin;
 }
 function admCopy(text) {
   const done = () => showToast('تم النسخ ✓', 'success');
@@ -6422,7 +6529,7 @@ async function admSaveNote() {
     admLog('note', uid, {});
   } catch (e) { st.textContent = _admErrText(e, 'تعذر الحفظ'); console.warn('admin_notes write failed:', e.code, e.message); }
 }
-const ADM_ACTION_LABELS = { role_change: 'تغيير الدور', suspend: 'إيقاف الحساب', unsuspend: 'إعادة تفعيل', permissions: 'تعديل الصلاحيات', note: 'تحديث الملاحظة' };
+const ADM_ACTION_LABELS = { role_change: 'تغيير الدور', suspend: 'إيقاف الحساب', unsuspend: 'إعادة تفعيل', permissions: 'تعديل الصلاحيات', note: 'تحديث الملاحظة', open_full_access: 'فتح الوصول الكامل', view_full_access: 'عرض مستند', save_full_access: 'تعديل مستند', delete_full_access: 'حذف مستند', create_full_access: 'إنشاء مستند', export_full_access: 'تصدير مستندات' };
 async function admLoadActivity(uid) {
   const host = document.getElementById('admActivity');
   host.replaceChildren(_admEl('div', 'adm-loading', 'جاري التحميل...'));
@@ -6442,6 +6549,234 @@ async function admLoadActivity(uid) {
       host.appendChild(row);
     });
   } catch (e) { host.replaceChildren(_admEl('div', 'adm-empty', _admErrText(e, 'تعذر تحميل سجل الإجراءات'))); console.warn('admin_audit read failed:', e.code, e.message); }
+}
+
+
+/* ---------- v20.10.5 — Super admin full data access ---------- */
+const ADMX = {
+  noAccess: "ده متاح لسوبر أدمن بس 🛡️",
+  title: "الوصول الكامل للبيانات",
+  warning: "وضع السوبر أدمن: تقدر تشوف وتعدّل وتحذف أي مستند. كل عملية بتتسجّل في سجل الإجراءات.",
+  userLabel: "المستخدم",
+  collection: "المجموعة",
+  newId: "معرّف المستند الجديد (فاضي = تلقائي)",
+  add: "إضافة مستند",
+  export: "تصدير JSON",
+  refresh: "تحديث",
+  docs: "المستندات",
+  noDocs: "لا توجد مستندات في هذه المجموعة",
+  editor: "محتوى المستند (JSON)",
+  status: "الحالة",
+  save: "حفظ المستند",
+  delete: "حذف المستند",
+  saved: "تم حفظ المستند ✓",
+  deleted: "تم حذف المستند ✓",
+  created: "تم إنشاء المستند ✓",
+  exported: "تم تصدير JSON ✓",
+  invalidJson: "JSON غير صحيح",
+  invalidData: "المحتوى لازم يكون كائن JSON",
+  profileCreate: "ملف المستخدم موجود بالفعل — افتحه وعدّله من هنا.",
+  deleteAsk: "حذف المستند نهائياً؟",
+  deleteBody: "هيتحذف <b>{id}</b> من <b>{col}</b>. العملية هتتسجّل في سجل الإجراءات.",
+  openLog: "فتح الوصول الكامل",
+  viewLog: "عرض مستند",
+  saveLog: "تعديل مستند",
+  deleteLog: "حذف مستند",
+  createLog: "إنشاء مستند",
+  exportLog: "تصدير مستندات",
+  fullBtn: "فتح البيانات الكاملة (سوبر أدمن)",
+  cols: {"profile": "ملف المستخدم", "transactions": "المعاملات", "members": "أعضاء الفريق", "memberships": "العضويات", "portal_index": "فهرس البوابات", "security": "قفل PIN", "requests": "طلبات العملاء", "client_portals": "بوابات العملاء", "admin_notes": "ملاحظات المدير"}
+};
+const ADM_EXPLORE_COLS = ['profile','transactions','members','memberships','portal_index','security','requests','client_portals','admin_notes'];
+let admExploreUid = null;
+let admExploreCol = 'profile';
+let admExploreDocs = [];
+let admExploreCurrent = null;
+
+function _admJson(v) {
+  if (v && typeof v.toDate === 'function') { try { return v.toDate().toISOString(); } catch (e) {} }
+  if (v instanceof Date) return v.toISOString();
+  if (Array.isArray(v)) return v.map(_admJson);
+  if (v && typeof v === 'object') {
+    const out = {};
+    Object.keys(v).forEach(k => { out[k] = _admJson(v[k]); });
+    return out;
+  }
+  return v;
+}
+function _admExploreRef(uid, col) {
+  if (col === 'profile') return db.collection('users').doc(uid);
+  if (col === 'admin_notes') return db.collection('admin_notes').doc(uid);
+  if (col === 'client_portals') return db.collection('client_portals');
+  return db.collection('users').doc(uid).collection(col);
+}
+function admCloseFullAccess() {
+  const wrap = document.getElementById('admFullAccess');
+  if (wrap) wrap.hidden = true;
+  const drawer = document.getElementById('admUserDrawer');
+  if (drawer) drawer.classList.remove('full-access');
+  admExploreUid = null;
+  admExploreCurrent = null;
+  admExploreDocs = [];
+}
+function admOpenFullAccess() {
+  if (!isSuperAdmin) { admCloseFullAccess(); showToast(ADMX.noAccess, 'error'); return; }
+  if (!admCurrentUid) return;
+  admExploreUid = admCurrentUid;
+  admExploreCol = 'profile';
+  admExploreCurrent = null;
+  const wrap = document.getElementById('admFullAccess');
+  const drawer = document.getElementById('admUserDrawer');
+  if (!wrap || !drawer) return;
+  wrap.hidden = false;
+  drawer.classList.add('full-access');
+  const u = admUsers.find(x => x.id === admExploreUid);
+  const label = document.getElementById('admExpUser');
+  if (label) label.textContent = ADMX.userLabel + ': ' + ((u && (u.name || u.email)) || admExploreUid);
+  const sel = document.getElementById('admExpCol');
+  if (sel) {
+    sel.replaceChildren();
+    ADM_EXPLORE_COLS.forEach(col => {
+      const o = document.createElement('option');
+      o.value = col;
+      o.textContent = (ADMX.cols[col] || col) + '  ·  ' + col;
+      sel.appendChild(o);
+    });
+    sel.value = admExploreCol;
+  }
+  const status = document.getElementById('admExpStatus');
+  if (status) status.textContent = '';
+  const editorWrap = document.getElementById('admExpEditorWrap');
+  if (editorWrap) editorWrap.hidden = true;
+  admLog(ADMX.openLog, admExploreUid, {});
+  admLoadExplorerDocs();
+}
+function admExplorerChangeCol(col) {
+  if (!ADM_EXPLORE_COLS.includes(col)) return;
+  admExploreCol = col;
+  admExploreCurrent = null;
+  const editorWrap = document.getElementById('admExpEditorWrap');
+  if (editorWrap) editorWrap.hidden = true;
+  admLoadExplorerDocs();
+}
+async function admLoadExplorerDocs() {
+  if (!admExploreUid || !isSuperAdmin) return;
+  const host = document.getElementById('admExpDocs');
+  if (!host) return;
+  host.replaceChildren(_admEl('div', 'adm-loading', '...'));
+  try {
+    let docs = [];
+    if (admExploreCol === 'profile' || admExploreCol === 'admin_notes') {
+      const d = await _admExploreRef(admExploreUid, admExploreCol).get();
+      if (d.exists) docs = [d];
+    } else if (admExploreCol === 'client_portals') {
+      const snap = await db.collection('client_portals').where('ownerUid', '==', admExploreUid).get();
+      docs = snap.docs.slice();
+    } else {
+      const snap = await db.collection('users').doc(admExploreUid).collection(admExploreCol).get();
+      docs = snap.docs.slice();
+    }
+    admExploreDocs = docs;
+    host.replaceChildren();
+    if (!docs.length) { host.appendChild(_admEl('div', 'adm-empty', ADMX.noDocs)); return; }
+    docs.forEach(d => {
+      const row = _admEl('button', 'adm-exp-doc' + (admExploreCurrent && admExploreCurrent.id === d.id ? ' on' : ''));
+      row.type = 'button';
+      const data = d.data() || {};
+      let preview = '';
+      try { preview = JSON.stringify(_admJson(data)).slice(0, 90); } catch (e) { preview = ''; }
+      row.append(_admEl('b', '', d.id), _admEl('small', '', preview));
+      row.addEventListener('click', () => {
+        admSelectExplorerDoc(d);
+        admLog(ADMX.viewLog, admExploreUid, { collection: admExploreCol, docId: d.id });
+      });
+      host.appendChild(row);
+    });
+  } catch (e) {
+    host.replaceChildren(_admEl('div', 'adm-empty err', _admErrText(e, 'Load failed')));
+  }
+}
+function admSelectExplorerDoc(doc) {
+  admExploreCurrent = doc;
+  const wrap = document.getElementById('admExpEditorWrap');
+  const ta = document.getElementById('admExpEditor');
+  const id = document.getElementById('admExpDocId');
+  const status = document.getElementById('admExpStatus');
+  if (!wrap || !ta) return;
+  wrap.hidden = false;
+  ta.value = JSON.stringify(_admJson(doc.data() || {}), null, 2);
+  if (id) id.textContent = doc.id;
+  if (status) status.textContent = '';
+  document.querySelectorAll('.adm-exp-doc').forEach(b => {
+    b.classList.toggle('on', !!b.querySelector('b') && b.querySelector('b').textContent === doc.id);
+  });
+}
+async function admExplorerSave() {
+  if (!isSuperAdmin || !admExploreCurrent) return;
+  const ta = document.getElementById('admExpEditor');
+  const status = document.getElementById('admExpStatus');
+  let data;
+  try { data = JSON.parse(ta.value); }
+  catch (e) { if (status) status.textContent = ADMX.invalidJson; showToast(ADMX.invalidJson, 'error'); return; }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    if (status) status.textContent = ADMX.invalidData;
+    showToast(ADMX.invalidData, 'error');
+    return;
+  }
+  try {
+    await admExploreCurrent.ref.set(data);
+    admLog(ADMX.saveLog, admExploreUid, { collection: admExploreCol, docId: admExploreCurrent.id });
+    showToast(ADMX.saved, 'success');
+    await admLoadExplorerDocs();
+  } catch (e) {
+    if (status) status.textContent = _admErrText(e, 'Save failed');
+    showToast(_admErrText(e, 'Save failed'), 'error');
+  }
+}
+async function admExplorerCreate() {
+  if (!isSuperAdmin || !admExploreUid) return;
+  try {
+    const input = document.getElementById('admExpNewId');
+    let id = (input && input.value || '').trim();
+    if (admExploreCol === 'profile') { showToast(ADMX.profileCreate, 'info'); return; }
+    if (admExploreCol === 'admin_notes') { id = admExploreUid; }
+    if (!id) id = db.collection('_').doc().id;
+    const payload = { createdByAdmin: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+    if (admExploreCol === 'client_portals') payload.ownerUid = admExploreUid;
+    await _admExploreRef(admExploreUid, admExploreCol).doc(id).set(payload);
+    admLog(ADMX.createLog, admExploreUid, { collection: admExploreCol, docId: id });
+    if (input) input.value = '';
+    showToast(ADMX.created, 'success');
+    await admLoadExplorerDocs();
+  } catch (e) { showToast(_admErrText(e, 'Create failed'), 'error'); }
+}
+function admExplorerDelete() {
+  if (!isSuperAdmin || !admExploreCurrent) return;
+  const doc = admExploreCurrent;
+  const colLabel = (ADMX.cols[admExploreCol] || admExploreCol);
+  openConfirm(ADMX.deleteAsk, ADMX.deleteBody.replace('{id}', doc.id).replace('{col}', colLabel), async () => {
+    try {
+      await doc.ref.delete();
+      admLog(ADMX.deleteLog, admExploreUid, { collection: admExploreCol, docId: doc.id });
+      admExploreCurrent = null;
+      const wrap = document.getElementById('admExpEditorWrap');
+      if (wrap) wrap.hidden = true;
+      showToast(ADMX.deleted, 'success');
+      await admLoadExplorerDocs();
+    } catch (e) { showToast(_admErrText(e, 'Delete failed'), 'error'); }
+  });
+}
+function admExplorerExport() {
+  if (!isSuperAdmin || !admExploreUid) return;
+  const out = admExploreDocs.map(d => ({ id: d.id, data: _admJson(d.data() || {}) }));
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `a7sbly_${admExploreUid}_${admExploreCol}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  admLog(ADMX.exportLog, admExploreUid, { collection: admExploreCol, count: out.length });
+  showToast(ADMX.exported, 'success');
 }
 
 (function hookAdminActions() {
@@ -6684,8 +7019,12 @@ renderTransactions = function () {
     if (feed) {
       const card = document.createElement('div');
       card.className = 'ft-tx-feed-item tx-card';
-      card.innerHTML = buildFeedCardHTML(item) +
-        `<button type="button" onclick="requestDelete('${jsAttr(item.id)}')" class="tx-del" aria-label="حذف"><i class="fa-solid fa-trash-can"></i></button>`;
+      card.innerHTML = `<div class="tx-m-row">${buildFeedCardHTML(item)}</div>
+        <div class="tx-m-acts">
+          <button type="button" onclick="shareViaWhatsApp('${jsAttr(item.id)}')" class="tx-ab wa" title="واتساب" aria-label="واتساب"><i class="fa-brands fa-whatsapp"></i><span>واتساب</span></button>
+          <button type="button" onclick="editTransaction('${jsAttr(item.id)}')" class="tx-ab" title="تعديل" aria-label="تعديل"><i class="fa-solid fa-pen"></i><span>تعديل</span></button>
+          <button type="button" onclick="requestDelete('${jsAttr(item.id)}')" class="tx-ab del" title="حذف" aria-label="حذف"><i class="fa-solid fa-trash-can"></i><span>حذف</span></button>
+        </div>`;
       feed.appendChild(card);
     }
     if (tbody) {
@@ -7219,7 +7558,10 @@ let teamMemberships = [];     // الفرق اللي أنا عضو فيها
 let teamPendingInvites = [];  // دعوات معلقة ليّ
 let teamOwnerName = '';
 
-function isTeamMode() { return !!(workspaceUid && currentUser && workspaceUid !== currentUser.uid); }
+function isTeamMode() {
+  return !!(workspaceUid && currentUser && workspaceUid !== currentUser.uid
+    && Array.isArray(teamMemberships) && teamMemberships.some(x => x.ownerUid === workspaceUid));
+}
 function wsUid() { return isTeamMode() ? workspaceUid : (currentUser && currentUser.uid); }
 function teamHas(f) {
   if (!teamPerms) return false;
@@ -7238,6 +7580,9 @@ const _origGetMax = getMaxTransactions;
 getMaxTransactions = function () { return isTeamMode() ? -1 : _origGetMax(); };
 
 function applyTeamUI() {
+  if (workspaceUid && Array.isArray(teamMemberships) && !teamMemberships.some(x => x.ownerUid === workspaceUid)) {
+    workspaceUid = null; teamPerms = null; teamOwnerName = '';
+  }
   const b = document.body, team = isTeamMode();
   b.classList.toggle('team-member', team);
   TEAM_PERM_KEYS.forEach(k => b.classList.toggle('team-no-' + k, team && !(teamPerms && teamPerms[k] === true)));
@@ -7248,6 +7593,14 @@ function applyTeamUI() {
   if (team) {
     const badge = document.getElementById('roleBadge');
     if (badge) { badge.className = 'hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-violet-500/40 text-violet-400'; badge.innerHTML = '<i class="fa-solid fa-people-group"></i> عضو فريق'; }
+  }
+  else {
+    const badge = document.getElementById('roleBadge');
+    if (badge) {
+      badge.className = 'hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-500/30 text-slate-400';
+      const roleName = (typeof ROLES_META !== 'undefined' && ROLES_META[userRole]) ? ROLES_META[userRole].name : '';
+      badge.innerHTML = roleName ? '<i class="fa-solid fa-user"></i> ' + escapeHTML(roleName) : '';
+    }
   }
   const homeCard = document.getElementById('teamHomeCard');
   if (homeCard) {
@@ -7907,7 +8260,7 @@ function _installBlocked() {
   if (document.body.classList.contains('auth-pending')) return true;
   const vis = id => { const e = document.getElementById(id); return !!e && !e.classList.contains('hidden') && getComputedStyle(e).display !== 'none'; };
   const sus = document.getElementById('suspendedScreen');
-  return vis('lockScreen') || vis('modeOnboardingModal') || vis('teamInviteModal') || vis('guestImportModal') || (sus && !sus.hidden) || !!(typeof _tourDriver !== 'undefined' && _tourDriver);
+  return vis('lockScreen') || vis('modeOnboardingModal') || vis('teamInviteModal') || vis('guestImportModal') || (sus && !sus.hidden) || !!(typeof _tourDriver !== 'undefined' && _tourDriver) || (!!currentUser && typeof TOUR_DONE_KEY !== 'undefined' && localStorage.getItem(TOUR_DONE_KEY) !== 'true');
 }
 function scheduleInstallPrompt(delay = 1200) {
   clearTimeout(_installTimer);
